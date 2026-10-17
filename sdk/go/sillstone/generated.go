@@ -106,3 +106,19 @@ func SillstoneMathDst3(data []float64) []float64 {
     return out
 }
 
+func SillstoneUnicodeGraphemeCount(data []byte) int {
+    var ptr *C.uint8_t
+    if len(data) > 0 {
+        ptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+    }
+    var count C.size_t
+    C.sillstone_unicode_grapheme_count(ptr, C.size_t(len(data)), &count)
+    return int(count)
+}
+
+func SillstoneUnicodeCharCategory(cp rune) uint8 {
+    var cat C.uint8_t
+    C.sillstone_unicode_char_category(C.uint32_t(cp), &cat)
+    return uint8(cat)
+}
+

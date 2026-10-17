@@ -49,6 +49,15 @@ class TestSillstonePython(unittest.TestCase):
         for a, b in zip(x, rec2):
             self.assertAlmostEqual(a, b, places=10)
 
+    def test_unicode(self):
+        # Family emoji (4 emoji chars + 3 ZWJ): 1 grapheme cluster
+        fam = "👨‍👩‍👧‍👦"
+        self.assertEqual(sillstone.grapheme_count(fam), 1)
+        self.assertEqual(sillstone.grapheme_count("Hello"), 5)
+        self.assertEqual(sillstone.grapheme_count(""), 0)
+        cat_a = sillstone.char_category("A")
+        self.assertGreaterEqual(cat_a, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

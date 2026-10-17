@@ -54,3 +54,12 @@ test("dst functions satisfy mathematical inversions", () => {
     assert.ok(Math.abs(x[i] - rec2[i]) < 1e-10);
   }
 });
+
+test("unicode grapheme clustering and character categories", () => {
+  const fam = "👨‍👩‍👧‍👦";
+  assert.strictEqual(sillstone.graphemeCount(fam), 1);
+  assert.strictEqual(sillstone.graphemeCount("Hello"), 5);
+  assert.strictEqual(sillstone.graphemeCount(""), 0);
+  const cat = sillstone.charCategory("A");
+  assert.ok(cat >= 0);
+});

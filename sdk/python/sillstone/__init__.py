@@ -14,6 +14,8 @@ from ._generated import (
     sillstone_math_dst1_raw,
     sillstone_math_dst2_raw,
     sillstone_math_dst3_raw,
+    sillstone_unicode_grapheme_count_raw,
+    sillstone_unicode_char_category_raw,
 )
 
 __version__ = "0.2.0b1"
@@ -110,3 +112,24 @@ def dst3(data: list[float]) -> list[float]:
     if rc != 0:
         raise ValueError(f"dst3 failed with status {rc}")
     return list(c_out)
+
+def grapheme_count(text: str) -> int:
+    """Counts UAX #29 grapheme clusters in a string."""
+    b = text.encode("utf-8")
+    count = ctypes.c_size_t(0)
+    rc = sillstone_unicode_grapheme_count_raw(b, len(b), ctypes.byref(count))
+    if rc != 0:
+        raise ValueError(f"grapheme_count failed with status {rc}")
+    return count.value
+
+
+def char_category(char: str) -> int:
+    """Returns general category tag for a single character."""
+    if len(char) != 1:
+        raise ValueError("char_category expects a 1-character string")
+    cp = ord(char)
+    cat = ctypes.c_char(b'\x00')
+    rc = sillstone_unicode_char_category_raw(cp, ctypes.byref(cat))
+    if rc != 0:
+        raise ValueError(f"char_category failed with status {rc}")
+    return ord(cat.value)

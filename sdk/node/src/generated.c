@@ -169,6 +169,37 @@ static napi_value n_sillstone_math_dst3(napi_env env, napi_callback_info info) {
     return result;
 }
 
+static napi_value n_sillstone_unicode_grapheme_count(napi_env env, napi_callback_info info) {
+    size_t argc = 1;
+    napi_value args[1];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    void* data = NULL;
+    size_t length = 0;
+    if (argc > 0) {
+        napi_get_buffer_info(env, args[0], &data, &length);
+    }
+    size_t count = 0;
+    sillstone_unicode_grapheme_count((const uint8_t*)data, length, &count);
+    napi_value result;
+    napi_create_int64(env, (int64_t)count, &result);
+    return result;
+}
+
+static napi_value n_sillstone_unicode_char_category(napi_env env, napi_callback_info info) {
+    size_t argc = 1;
+    napi_value args[1];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    uint32_t cp = 0;
+    if (argc > 0) {
+        napi_get_value_uint32(env, args[0], &cp);
+    }
+    uint8_t cat = 0;
+    sillstone_unicode_char_category(cp, &cat);
+    napi_value result;
+    napi_create_uint32(env, cat, &result);
+    return result;
+}
+
 NAPI_MODULE_INIT() {
     napi_value fn_sillstone_version_major;
     napi_create_function(env, NULL, 0, n_sillstone_version_major, NULL, &fn_sillstone_version_major);
@@ -206,5 +237,11 @@ NAPI_MODULE_INIT() {
     napi_value fn_sillstone_math_dst3;
     napi_create_function(env, NULL, 0, n_sillstone_math_dst3, NULL, &fn_sillstone_math_dst3);
     napi_set_named_property(env, exports, "sillstone_math_dst3", fn_sillstone_math_dst3);
+    napi_value fn_sillstone_unicode_grapheme_count;
+    napi_create_function(env, NULL, 0, n_sillstone_unicode_grapheme_count, NULL, &fn_sillstone_unicode_grapheme_count);
+    napi_set_named_property(env, exports, "sillstone_unicode_grapheme_count", fn_sillstone_unicode_grapheme_count);
+    napi_value fn_sillstone_unicode_char_category;
+    napi_create_function(env, NULL, 0, n_sillstone_unicode_char_category, NULL, &fn_sillstone_unicode_char_category);
+    napi_set_named_property(env, exports, "sillstone_unicode_char_category", fn_sillstone_unicode_char_category);
     return exports;
 }

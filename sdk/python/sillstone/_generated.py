@@ -116,3 +116,19 @@ def sillstone_math_dst3_raw(*args):
     fn.argtypes = [ctypes.POINTER(ctypes.c_double), ctypes.c_size_t, ctypes.POINTER(ctypes.c_double)]
     return fn(*args)
 
+def sillstone_unicode_grapheme_count_raw(*args):
+    if LIB is None:
+        raise RuntimeError('sillstone_ffi library not loaded')
+    fn = getattr(LIB, 'sillstone_unicode_grapheme_count')
+    fn.restype = ctypes.c_int32
+    fn.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t)]
+    return fn(*args)
+
+def sillstone_unicode_char_category_raw(*args):
+    if LIB is None:
+        raise RuntimeError('sillstone_ffi library not loaded')
+    fn = getattr(LIB, 'sillstone_unicode_char_category')
+    fn.restype = ctypes.c_int32
+    fn.argtypes = [ctypes.c_uint32, ctypes.c_char_p]
+    return fn(*args)
+

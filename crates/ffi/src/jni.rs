@@ -282,3 +282,30 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1math
     }
     unsafe { create_output_double_array(env, &out) }
 }
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1unicode_1grapheme_1count(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    data: JArray,
+) -> jlong {
+    let bytes = unsafe { get_input_bytes(env, data) };
+    let s = match core::str::from_utf8(&bytes) {
+        Ok(s) => s,
+        Err(_) => return -2,
+    };
+    sillstone_unicode::graphemes(s).count() as jlong
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1unicode_1char_1category(
+    _env: *mut JNIEnv,
+    _class: *mut c_void,
+    cp: jint,
+) -> jint {
+    let c = match char::from_u32(cp as u32) {
+        Some(c) => c,
+        None => return -1,
+    };
+    sillstone_unicode::char_category(c) as jint
+}

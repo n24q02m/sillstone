@@ -66,3 +66,19 @@ func TestDst(t *testing.T) {
 		}
 	}
 }
+
+func TestUnicode(t *testing.T) {
+	fam := "👨‍👩‍👧‍👦"
+	cnt := SillstoneUnicodeGraphemeCount([]byte(fam))
+	if cnt != 1 {
+		t.Fatalf("family emoji grapheme count = %d; want 1", cnt)
+	}
+	hello := SillstoneUnicodeGraphemeCount([]byte("Hello"))
+	if hello != 5 {
+		t.Fatalf("hello grapheme count = %d; want 5", hello)
+	}
+	cat := SillstoneUnicodeCharCategory('A')
+	if cat == 255 {
+		t.Fatalf("category of 'A' unexpected")
+	}
+}

@@ -30,4 +30,8 @@ public final class Generated {
 
     public static native double[] sillstone_math_dst3(double[] data);
 
+    public static native long sillstone_unicode_grapheme_count(byte[] data);
+
+    public static native int sillstone_unicode_char_category(int cp);
+
 }

@@ -268,6 +268,55 @@ unsafe fn normalize(
         Err(status) => status,
     }
 }
+/// Counts the number of UAX #29 grapheme clusters in UTF-8 text `data`.
+///
+/// # Safety
+///
+/// `data` must point to `len` readable bytes; `out_count` to one writable `usize`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_unicode_grapheme_count(
+    data: *const u8,
+    len: usize,
+    out_count: *mut usize,
+) -> i32 {
+    if (len > 0 && data.is_null()) || out_count.is_null() {
+        return PITH_E_INVALID;
+    }
+    let bytes = if len == 0 {
+        &[][..]
+    } else {
+        unsafe { core::slice::from_raw_parts(data, len) }
+    };
+    let s = match core::str::from_utf8(bytes) {
+        Ok(s) => s,
+        Err(_) => return PITH_E_REJECTED,
+    };
+    let count = crate::graphemes(s).count();
+    unsafe { *out_count = count };
+    PITH_OK
+}
+
+/// Returns the Unicode General Category of code point `cp` as a numeric enum tag.
+///
+/// # Safety
+///
+/// `out_cat` must point to one writable `u8`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_unicode_char_category(
+    cp: u32,
+    out_cat: *mut u8,
+) -> i32 {
+    if out_cat.is_null() {
+        return PITH_E_INVALID;
+    }
+    let c = match char::from_u32(cp) {
+        Some(c) => c,
+        None => return PITH_E_INVALID,
+    };
+    let cat = crate::char_category(c);
+    unsafe { *out_cat = cat as u8 };
+    PITH_OK
+}
 
 #[cfg(test)]
 mod tests {

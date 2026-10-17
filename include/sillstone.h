@@ -33,6 +33,10 @@ int32_t sillstone_math_dst2(const double *data, size_t len, double *out);
 
 int32_t sillstone_math_dst3(const double *data, size_t len, double *out);
 
+int32_t sillstone_unicode_grapheme_count(const uint8_t *data, size_t len, size_t *out);
+
+int32_t sillstone_unicode_char_category(uint32_t cp, uint8_t *out);
+
 #ifdef __cplusplus
 }
 #endif

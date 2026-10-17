@@ -120,4 +120,19 @@ module.exports = {
     }
     return Array.from(out);
   },
+  graphemeCount: function (str) {
+    const b = Buffer.from(str, "utf8");
+    if (native && native.sillstone_unicode_grapheme_count) {
+      return Number(native.sillstone_unicode_grapheme_count(b));
+    }
+    const segmenter = new Intl.Segmenter("und", { granularity: "grapheme" });
+    return Array.from(segmenter.segment(str)).length;
+  },
+  charCategory: function (ch) {
+    const cp = ch.codePointAt(0);
+    if (native && native.sillstone_unicode_char_category) {
+      return native.sillstone_unicode_char_category(cp);
+    }
+    return 0;
+  },
 };

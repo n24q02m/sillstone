@@ -59,4 +59,15 @@ public class ChecksumTest {
             assertEquals(x[i], rec2[i], 1e-10);
         }
     }
+
+    @Test
+    public void testUnicode() throws Exception {
+        String fam = "👨‍👩‍👧‍👦";
+        long cnt = Generated.sillstone_unicode_grapheme_count(fam.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        assertEquals(1, cnt);
+        long hello = Generated.sillstone_unicode_grapheme_count("Hello".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        assertEquals(5, hello);
+        int cat = Generated.sillstone_unicode_char_category((int)'A');
+        assertTrue(cat >= 0);
+    }
 }

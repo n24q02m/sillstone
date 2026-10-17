@@ -63,6 +63,12 @@ fn is_digest_fn(name: &str) -> bool {
 fn is_math_dst_fn(name: &str) -> bool {
     name.starts_with("sillstone_math_dst")
 }
+fn is_unicode_grapheme_fn(name: &str) -> bool {
+    name == "sillstone_unicode_grapheme_count"
+}
+fn is_unicode_category_fn(name: &str) -> bool {
+    name == "sillstone_unicode_char_category"
+}
 
 
 fn digest_len(name: &str) -> usize {
@@ -102,6 +108,7 @@ fn gen_c_header(fns: &[Function]) -> String {
                         "*mut u8" => "uint8_t *",
                         "*const f64" => "const double *",
                         "*mut f64" => "double *",
+                        "*mut usize" => "size_t *",
                         "f64" => "double",
                         "usize" => "size_t",
                         "u32" => "uint32_t",
@@ -167,6 +174,7 @@ fn gen_python(fns: &[Function]) -> String {
                 "u32" => "ctypes.c_uint32",
                 "u64" => "ctypes.c_uint64",
                 "i32" => "ctypes.c_int32",
+                "*mut usize" => "ctypes.POINTER(ctypes.c_size_t)",
                 _ => "ctypes.c_void_p",
             })
             .collect();
@@ -223,6 +231,18 @@ fn gen_go(fns: &[Function]) -> String {
                 f.name
             ));
             out.push_str("    return out\n}\n\n");
+        } else if is_unicode_grapheme_fn(&f.name) {
+            out.push_str("func SillstoneUnicodeGraphemeCount(data []byte) int {\n");
+            out.push_str("    var ptr *C.uint8_t\n");
+            out.push_str("    if len(data) > 0 {\n        ptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))\n    }\n");
+            out.push_str("    var count C.size_t\n");
+            out.push_str("    C.sillstone_unicode_grapheme_count(ptr, C.size_t(len(data)), &count)\n");
+            out.push_str("    return int(count)\n}\n\n");
+        } else if is_unicode_category_fn(&f.name) {
+            out.push_str("func SillstoneUnicodeCharCategory(cp rune) uint8 {\n");
+            out.push_str("    var cat C.uint8_t\n");
+            out.push_str("    C.sillstone_unicode_char_category(C.uint32_t(cp), &cat)\n");
+            out.push_str("    return uint8(cat)\n}\n\n");
         } else if f.args.is_empty() {
             let go_ret = match f.ret.as_str() {
                 "u32" => "uint32",
@@ -271,6 +291,16 @@ fn gen_node_napi(fns: &[Function]) -> String {
             out.push_str("    napi_create_buffer(env, length, &out_data, &result);\n");
             out.push_str(&format!("    {}((const double*)data, count, (double*)out_data);\n", f.name));
             out.push_str("    return result;\n");
+        } else if is_unicode_grapheme_fn(&f.name) {
+            out.push_str("    size_t argc = 1;\n    napi_value args[1];\n    napi_get_cb_info(env, info, &argc, args, NULL, NULL);\n");
+            out.push_str("    void* data = NULL;\n    size_t length = 0;\n    if (argc > 0) {\n        napi_get_buffer_info(env, args[0], &data, &length);\n    }\n");
+            out.push_str("    size_t count = 0;\n    sillstone_unicode_grapheme_count((const uint8_t*)data, length, &count);\n");
+            out.push_str("    napi_value result;\n    napi_create_int64(env, (int64_t)count, &result);\n    return result;\n");
+        } else if is_unicode_category_fn(&f.name) {
+            out.push_str("    size_t argc = 1;\n    napi_value args[1];\n    napi_get_cb_info(env, info, &argc, args, NULL, NULL);\n");
+            out.push_str("    uint32_t cp = 0;\n    if (argc > 0) {\n        napi_get_value_uint32(env, args[0], &cp);\n    }\n");
+            out.push_str("    uint8_t cat = 0;\n    sillstone_unicode_char_category(cp, &cat);\n");
+            out.push_str("    napi_value result;\n    napi_create_uint32(env, cat, &result);\n    return result;\n");
         } else {
             out.push_str(&format!("    uint32_t val = {}();\n", f.name));
             out.push_str("    napi_value result;\n    napi_create_uint32(env, val, &result);\n    return result;\n");
@@ -302,6 +332,10 @@ fn gen_java(fns: &[Function]) -> String {
             out.push_str(&format!("    public static native byte[] {}(byte[] data);\n\n", f.name));
         } else if is_math_dst_fn(&f.name) {
             out.push_str(&format!("    public static native double[] {}(double[] data);\n\n", f.name));
+        } else if is_unicode_grapheme_fn(&f.name) {
+            out.push_str("    public static native long sillstone_unicode_grapheme_count(byte[] data);\n\n");
+        } else if is_unicode_category_fn(&f.name) {
+            out.push_str("    public static native int sillstone_unicode_char_category(int cp);\n\n");
         } else {
             out.push_str(&format!("    public static native int {}();\n\n", f.name));
         }

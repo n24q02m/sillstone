@@ -51,6 +51,12 @@
 /// The C ABI surface the Python (ctypes), Node (koffi) and Go (cgo)
 /// SDKs bind through.
 pub mod ffi;
+/// UAX #29 Grapheme cluster segmentation, General Category, and Character Names.
+pub mod grapheme;
+#[allow(missing_docs)]
+pub mod tables;
+pub use grapheme::{char_category, char_name, graphemes, Graphemes};
+pub use tables::{GeneralCategory, Gbp, InCb};
 // The Java SDK's native-method surface: `Java_hash_sillstone_unicode_*`
 // exports that forward to the C ABI above. Compiled out of the unit
 // test build (the `#[no_mangle]` exports would collide with the test
