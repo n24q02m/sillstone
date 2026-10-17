@@ -20,4 +20,22 @@ public class ChecksumTest {
         long sum = Generated.sillstone_buffer_checksum(input, input.length);
         assertEquals(0xe6cb594c1a148ac5L, sum);
     }
+
+    @Test
+    public void testDigests() {
+        byte[] empty = new byte[0];
+        byte[] b3 = Generated.sillstone_digest_blake3(empty);
+        assertNotNull(b3);
+        assertEquals(32, b3.length);
+        // Check prefix 0xaf, 0x13
+        assertEquals((byte) 0xaf, b3[0]);
+        assertEquals((byte) 0x13, b3[1]);
+
+        byte[] abc = "abc".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] s256 = Generated.sillstone_digest_sha256(abc);
+        assertNotNull(s256);
+        assertEquals(32, s256.length);
+        assertEquals((byte) 0xba, s256[0]);
+        assertEquals((byte) 0x78, s256[1]);
+    }
 }

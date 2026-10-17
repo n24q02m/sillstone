@@ -20,6 +20,9 @@
 #![deny(unsafe_code)]
 #![deny(missing_docs)]
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
 mod bitreader;
 mod checksums;
 mod digest;
@@ -30,6 +33,9 @@ mod sha1;
 mod sha256;
 mod sha512;
 mod splitmix64;
+pub mod blake2b;
+pub mod blake3;
+pub mod sha3;
 
 pub mod base64;
 pub mod ffi;
@@ -64,6 +70,9 @@ pub use crate::names::{Algorithm, Format};
 pub use crate::sha1::sha1;
 pub use crate::sha256::sha256;
 pub use crate::sha512::sha512;
+pub use crate::blake2b::{blake2b, blake2b_512, blake2b_into};
+pub use crate::blake3::{blake3, blake3_keyed, blake3_xof, Hasher as Blake3Hasher};
+pub use crate::sha3::{sha3_256, sha3_512};
 pub use crate::splitmix64::SplitMix64;
 pub use crate::xoshiro::Xoshiro256StarStar;
 pub use crate::xxh64::xxh64;

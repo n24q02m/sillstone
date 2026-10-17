@@ -312,6 +312,9 @@ fn algorithm_wire_round_trip_and_output_len() {
         (Algorithm::Sha1, "sha1", Some(20usize)),
         (Algorithm::Sha256, "sha256", Some(32)),
         (Algorithm::Sha512, "sha512", Some(64)),
+        (Algorithm::Sha3_256, "sha3-256", Some(32)),
+        (Algorithm::Sha3_512, "sha3-512", Some(64)),
+        (Algorithm::Blake2b, "blake2b", Some(64)),
         (Algorithm::Blake3, "blake3", Some(32)),
         (Algorithm::Md5, "md5", Some(16)),
         (Algorithm::XxHash64, "xxhash64", Some(8)),
@@ -331,7 +334,7 @@ fn algorithm_wire_round_trip_and_output_len() {
 /// is lowercase and exact.
 #[test]
 fn algorithm_unknown_strings_yield_unknown() {
-    assert_eq!(Algorithm::from_str("sha3-256"), Algorithm::Unknown);
+    assert_eq!(Algorithm::from_str("sha3-384"), Algorithm::Unknown);
     assert_eq!(Algorithm::from_str(""), Algorithm::Unknown);
     assert_eq!(Algorithm::from_str("SHA256"), Algorithm::Unknown);
     assert_eq!(Algorithm::from_str("sha-256"), Algorithm::Unknown);

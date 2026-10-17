@@ -52,3 +52,43 @@ def sillstone_buffer_checksum_raw(*args):
     fn.argtypes = [ctypes.c_char_p, ctypes.c_size_t]
     return fn(*args)
 
+def sillstone_digest_sha256_raw(*args):
+    if LIB is None:
+        raise RuntimeError('sillstone_ffi library not loaded')
+    fn = getattr(LIB, 'sillstone_digest_sha256')
+    fn.restype = ctypes.c_int32
+    fn.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p]
+    return fn(*args)
+
+def sillstone_digest_sha3_256_raw(*args):
+    if LIB is None:
+        raise RuntimeError('sillstone_ffi library not loaded')
+    fn = getattr(LIB, 'sillstone_digest_sha3_256')
+    fn.restype = ctypes.c_int32
+    fn.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p]
+    return fn(*args)
+
+def sillstone_digest_sha3_512_raw(*args):
+    if LIB is None:
+        raise RuntimeError('sillstone_ffi library not loaded')
+    fn = getattr(LIB, 'sillstone_digest_sha3_512')
+    fn.restype = ctypes.c_int32
+    fn.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p]
+    return fn(*args)
+
+def sillstone_digest_blake2b_512_raw(*args):
+    if LIB is None:
+        raise RuntimeError('sillstone_ffi library not loaded')
+    fn = getattr(LIB, 'sillstone_digest_blake2b_512')
+    fn.restype = ctypes.c_int32
+    fn.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p]
+    return fn(*args)
+
+def sillstone_digest_blake3_raw(*args):
+    if LIB is None:
+        raise RuntimeError('sillstone_ffi library not loaded')
+    fn = getattr(LIB, 'sillstone_digest_blake3')
+    fn.restype = ctypes.c_int32
+    fn.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p]
+    return fn(*args)
+

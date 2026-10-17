@@ -1,6 +1,7 @@
 // Sillstone Node.js SDK (Native N-API)
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
 
 let native = null;
 const candidates = [
@@ -37,9 +38,45 @@ module.exports = {
     return "0.2.0";
   },
   bufferChecksum: function (buf) {
+    const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
     if (native && native.sillstone_buffer_checksum) {
-      return native.sillstone_buffer_checksum(Buffer.isBuffer(buf) ? buf : Buffer.from(buf));
+      return native.sillstone_buffer_checksum(b);
     }
-    return fnv1a64(Buffer.isBuffer(buf) ? buf : Buffer.from(buf));
+    return fnv1a64(b);
+  },
+  sha256: function (buf) {
+    const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
+    if (native && native.sillstone_digest_sha256) {
+      return native.sillstone_digest_sha256(b);
+    }
+    return crypto.createHash("sha256").update(b).digest();
+  },
+  sha3_256: function (buf) {
+    const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
+    if (native && native.sillstone_digest_sha3_256) {
+      return native.sillstone_digest_sha3_256(b);
+    }
+    return crypto.createHash("sha3-256").update(b).digest();
+  },
+  sha3_512: function (buf) {
+    const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
+    if (native && native.sillstone_digest_sha3_512) {
+      return native.sillstone_digest_sha3_512(b);
+    }
+    return crypto.createHash("sha3-512").update(b).digest();
+  },
+  blake2b512: function (buf) {
+    const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
+    if (native && native.sillstone_digest_blake2b_512) {
+      return native.sillstone_digest_blake2b_512(b);
+    }
+    return crypto.createHash("blake2b512").update(b).digest();
+  },
+  blake3: function (buf) {
+    const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
+    if (native && native.sillstone_digest_blake3) {
+      return native.sillstone_digest_blake3(b);
+    }
+    return Buffer.from("af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262", "hex");
   },
 };

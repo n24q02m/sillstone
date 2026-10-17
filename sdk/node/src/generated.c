@@ -38,6 +38,86 @@ static napi_value n_sillstone_buffer_checksum(napi_env env, napi_callback_info i
     return result;
 }
 
+static napi_value n_sillstone_digest_sha256(napi_env env, napi_callback_info info) {
+    size_t argc = 1;
+    napi_value args[1];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    void* data = NULL;
+    size_t length = 0;
+    if (argc > 0) {
+        napi_get_buffer_info(env, args[0], &data, &length);
+    }
+    uint8_t out[32];
+    sillstone_digest_sha256((const uint8_t*)data, length, out);
+    napi_value result;
+    napi_create_buffer_copy(env, 32, out, NULL, &result);
+    return result;
+}
+
+static napi_value n_sillstone_digest_sha3_256(napi_env env, napi_callback_info info) {
+    size_t argc = 1;
+    napi_value args[1];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    void* data = NULL;
+    size_t length = 0;
+    if (argc > 0) {
+        napi_get_buffer_info(env, args[0], &data, &length);
+    }
+    uint8_t out[32];
+    sillstone_digest_sha3_256((const uint8_t*)data, length, out);
+    napi_value result;
+    napi_create_buffer_copy(env, 32, out, NULL, &result);
+    return result;
+}
+
+static napi_value n_sillstone_digest_sha3_512(napi_env env, napi_callback_info info) {
+    size_t argc = 1;
+    napi_value args[1];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    void* data = NULL;
+    size_t length = 0;
+    if (argc > 0) {
+        napi_get_buffer_info(env, args[0], &data, &length);
+    }
+    uint8_t out[64];
+    sillstone_digest_sha3_512((const uint8_t*)data, length, out);
+    napi_value result;
+    napi_create_buffer_copy(env, 64, out, NULL, &result);
+    return result;
+}
+
+static napi_value n_sillstone_digest_blake2b_512(napi_env env, napi_callback_info info) {
+    size_t argc = 1;
+    napi_value args[1];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    void* data = NULL;
+    size_t length = 0;
+    if (argc > 0) {
+        napi_get_buffer_info(env, args[0], &data, &length);
+    }
+    uint8_t out[64];
+    sillstone_digest_blake2b_512((const uint8_t*)data, length, out);
+    napi_value result;
+    napi_create_buffer_copy(env, 64, out, NULL, &result);
+    return result;
+}
+
+static napi_value n_sillstone_digest_blake3(napi_env env, napi_callback_info info) {
+    size_t argc = 1;
+    napi_value args[1];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    void* data = NULL;
+    size_t length = 0;
+    if (argc > 0) {
+        napi_get_buffer_info(env, args[0], &data, &length);
+    }
+    uint8_t out[32];
+    sillstone_digest_blake3((const uint8_t*)data, length, out);
+    napi_value result;
+    napi_create_buffer_copy(env, 32, out, NULL, &result);
+    return result;
+}
+
 NAPI_MODULE_INIT() {
     napi_value fn_sillstone_version_major;
     napi_create_function(env, NULL, 0, n_sillstone_version_major, NULL, &fn_sillstone_version_major);
@@ -51,5 +131,20 @@ NAPI_MODULE_INIT() {
     napi_value fn_sillstone_buffer_checksum;
     napi_create_function(env, NULL, 0, n_sillstone_buffer_checksum, NULL, &fn_sillstone_buffer_checksum);
     napi_set_named_property(env, exports, "sillstone_buffer_checksum", fn_sillstone_buffer_checksum);
+    napi_value fn_sillstone_digest_sha256;
+    napi_create_function(env, NULL, 0, n_sillstone_digest_sha256, NULL, &fn_sillstone_digest_sha256);
+    napi_set_named_property(env, exports, "sillstone_digest_sha256", fn_sillstone_digest_sha256);
+    napi_value fn_sillstone_digest_sha3_256;
+    napi_create_function(env, NULL, 0, n_sillstone_digest_sha3_256, NULL, &fn_sillstone_digest_sha3_256);
+    napi_set_named_property(env, exports, "sillstone_digest_sha3_256", fn_sillstone_digest_sha3_256);
+    napi_value fn_sillstone_digest_sha3_512;
+    napi_create_function(env, NULL, 0, n_sillstone_digest_sha3_512, NULL, &fn_sillstone_digest_sha3_512);
+    napi_set_named_property(env, exports, "sillstone_digest_sha3_512", fn_sillstone_digest_sha3_512);
+    napi_value fn_sillstone_digest_blake2b_512;
+    napi_create_function(env, NULL, 0, n_sillstone_digest_blake2b_512, NULL, &fn_sillstone_digest_blake2b_512);
+    napi_set_named_property(env, exports, "sillstone_digest_blake2b_512", fn_sillstone_digest_blake2b_512);
+    napi_value fn_sillstone_digest_blake3;
+    napi_create_function(env, NULL, 0, n_sillstone_digest_blake3, NULL, &fn_sillstone_digest_blake3);
+    napi_set_named_property(env, exports, "sillstone_digest_blake3", fn_sillstone_digest_blake3);
     return exports;
 }

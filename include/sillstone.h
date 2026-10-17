@@ -17,6 +17,16 @@ uint32_t sillstone_version_patch(void);
 
 uint64_t sillstone_buffer_checksum(const uint8_t *ptr, size_t len);
 
+int32_t sillstone_digest_sha256(const uint8_t *data, size_t len, uint8_t *out);
+
+int32_t sillstone_digest_sha3_256(const uint8_t *data, size_t len, uint8_t *out);
+
+int32_t sillstone_digest_sha3_512(const uint8_t *data, size_t len, uint8_t *out);
+
+int32_t sillstone_digest_blake2b_512(const uint8_t *data, size_t len, uint8_t *out);
+
+int32_t sillstone_digest_blake3(const uint8_t *data, size_t len, uint8_t *out);
+
 #ifdef __cplusplus
 }
 #endif

@@ -213,6 +213,151 @@ pub unsafe extern "C" fn sillstone_digest_sha512(data: *const u8, len: usize, ou
     PITH_OK
 }
 
+/// The SHA-3-256 digest of `data`, written as 32 raw bytes through `out`.
+///
+/// # Safety
+///
+/// `data` must point to `len` readable bytes and `out` to 32 writable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_digest_sha3_256(data: *const u8, len: usize, out: *mut u8) -> i32 {
+    if out.is_null() || (data.is_null() && len > 0) {
+        return PITH_E_INVALID;
+    }
+    let bytes = borrow(data, len);
+    match crate::sha3_256(bytes) {
+        Ok(digest) => {
+            unsafe { core::ptr::copy_nonoverlapping(digest.as_bytes().as_ptr(), out, 32) };
+            PITH_OK
+        }
+        Err(_) => PITH_E_REJECTED,
+    }
+}
+
+/// The SHA-3-512 digest of `data`, written as 64 raw bytes through `out`.
+///
+/// # Safety
+///
+/// `data` must point to `len` readable bytes and `out` to 64 writable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_digest_sha3_512(data: *const u8, len: usize, out: *mut u8) -> i32 {
+    if out.is_null() || (data.is_null() && len > 0) {
+        return PITH_E_INVALID;
+    }
+    let bytes = borrow(data, len);
+    match crate::sha3_512(bytes) {
+        Ok(digest) => {
+            unsafe { core::ptr::copy_nonoverlapping(digest.as_bytes().as_ptr(), out, 64) };
+            PITH_OK
+        }
+        Err(_) => PITH_E_REJECTED,
+    }
+}
+
+/// The BLAKE2b hash or MAC of `data` under optional `key`, written through `out`.
+///
+/// # Safety
+///
+/// `data` points to `len` bytes, `key` to `key_len` bytes, and `out` to `out_len` bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_digest_blake2b(
+    data: *const u8,
+    len: usize,
+    key: *const u8,
+    key_len: usize,
+    out: *mut u8,
+    out_len: usize,
+) -> i32 {
+    if out.is_null() || (data.is_null() && len > 0) || (key.is_null() && key_len > 0) {
+        return PITH_E_INVALID;
+    }
+    let bytes = borrow(data, len);
+    let k = borrow(key, key_len);
+    let out_slice = unsafe { core::slice::from_raw_parts_mut(out, out_len) };
+    match crate::blake2b_into(bytes, k, out_slice) {
+        Ok(()) => PITH_OK,
+        Err(_) => PITH_E_REJECTED,
+    }
+}
+
+/// The unkeyed 512-bit BLAKE2b digest of `data`, written as 64 raw bytes through `out`.
+///
+/// # Safety
+///
+/// `data` points to `len` bytes and `out` to 64 writable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_digest_blake2b_512(data: *const u8, len: usize, out: *mut u8) -> i32 {
+    unsafe { sillstone_digest_blake2b(data, len, core::ptr::null(), 0, out, 64) }
+}
+
+/// The default 32-byte BLAKE3 digest of `data`, written through `out`.
+///
+/// # Safety
+///
+/// `data` points to `len` bytes and `out` to 32 writable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_digest_blake3(data: *const u8, len: usize, out: *mut u8) -> i32 {
+    if out.is_null() || (data.is_null() && len > 0) {
+        return PITH_E_INVALID;
+    }
+    let bytes = borrow(data, len);
+    match crate::blake3(bytes) {
+        Ok(digest) => {
+            unsafe { core::ptr::copy_nonoverlapping(digest.as_bytes().as_ptr(), out, 32) };
+            PITH_OK
+        }
+        Err(_) => PITH_E_REJECTED,
+    }
+}
+
+/// The 32-byte keyed BLAKE3 MAC of `data` under `key` (32 bytes), written through `out`.
+///
+/// # Safety
+///
+/// `key` points to 32 bytes, `data` points to `len` bytes, and `out` to 32 writable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_digest_blake3_keyed(
+    key: *const u8,
+    data: *const u8,
+    len: usize,
+    out: *mut u8,
+) -> i32 {
+    if key.is_null() || out.is_null() || (data.is_null() && len > 0) {
+        return PITH_E_INVALID;
+    }
+    let key_bytes = unsafe { &*(key as *const [u8; 32]) };
+    let bytes = borrow(data, len);
+    match crate::blake3_keyed(key_bytes, bytes) {
+        Ok(digest) => {
+            unsafe { core::ptr::copy_nonoverlapping(digest.as_bytes().as_ptr(), out, 32) };
+            PITH_OK
+        }
+        Err(_) => PITH_E_REJECTED,
+    }
+}
+
+/// Computes arbitrary length BLAKE3 XOF output for `data` into `out`.
+///
+/// # Safety
+///
+/// `data` points to `len` bytes and `out` to `out_len` writable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_digest_blake3_xof(
+    data: *const u8,
+    len: usize,
+    out: *mut u8,
+    out_len: usize,
+) -> i32 {
+    if (out.is_null() && out_len > 0) || (data.is_null() && len > 0) {
+        return PITH_E_INVALID;
+    }
+    let bytes = borrow(data, len);
+    let out_slice = unsafe { core::slice::from_raw_parts_mut(out, out_len) };
+    match crate::blake3_xof(bytes, out_slice) {
+        Ok(()) => PITH_OK,
+        Err(_) => PITH_E_REJECTED,
+    }
+}
+
 /// The HMAC-SHA-1 of `data` under `key`, written as 20 raw bytes
 /// through `out`.
 ///

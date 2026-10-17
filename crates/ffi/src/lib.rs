@@ -39,6 +39,7 @@ pub unsafe extern "C" fn sillstone_buffer_checksum(ptr: *const u8, len: usize) -
     sillstone_buffer::checksum_bytes(slice)
 }
 
+
 #[cfg(test)]
 mod tests {
     use super::*;

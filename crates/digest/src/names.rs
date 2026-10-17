@@ -16,6 +16,12 @@ pub enum Algorithm {
     Sha256,
     /// SHA-2 with a 512-bit state. 64-byte digests.
     Sha512,
+    /// FIPS 202 SHA-3 with a 256-bit output.
+    Sha3_256,
+    /// FIPS 202 SHA-3 with a 512-bit output.
+    Sha3_512,
+    /// RFC 7693 BLAKE2b with 64-byte output.
+    Blake2b,
     /// BLAKE3 with the default 32-byte output.
     Blake3,
     /// MD5. 16-byte digests.
@@ -42,6 +48,9 @@ impl Algorithm {
             Algorithm::Sha1 => "sha1",
             Algorithm::Sha256 => "sha256",
             Algorithm::Sha512 => "sha512",
+            Algorithm::Sha3_256 => "sha3-256",
+            Algorithm::Sha3_512 => "sha3-512",
+            Algorithm::Blake2b => "blake2b",
             Algorithm::Blake3 => "blake3",
             Algorithm::Md5 => "md5",
             Algorithm::XxHash64 => "xxhash64",
@@ -63,6 +72,9 @@ impl Algorithm {
             "sha1" => Algorithm::Sha1,
             "sha256" => Algorithm::Sha256,
             "sha512" => Algorithm::Sha512,
+            "sha3-256" => Algorithm::Sha3_256,
+            "sha3-512" => Algorithm::Sha3_512,
+            "blake2b" => Algorithm::Blake2b,
             "blake3" => Algorithm::Blake3,
             "md5" => Algorithm::Md5,
             "xxhash64" => Algorithm::XxHash64,
@@ -80,6 +92,9 @@ impl Algorithm {
             Algorithm::Sha1 => Some(20),
             Algorithm::Sha256 => Some(32),
             Algorithm::Sha512 => Some(64),
+            Algorithm::Sha3_256 => Some(32),
+            Algorithm::Sha3_512 => Some(64),
+            Algorithm::Blake2b => Some(64),
             Algorithm::Blake3 => Some(32),
             Algorithm::Md5 => Some(16),
             Algorithm::XxHash64 => Some(8),

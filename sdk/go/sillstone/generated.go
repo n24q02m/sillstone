@@ -29,3 +29,53 @@ func SillstoneBufferChecksum(data []byte) uint64 {
     return uint64(C.sillstone_buffer_checksum((*C.uint8_t)(unsafe.Pointer(&data[0])), C.size_t(len(data))))
 }
 
+func SillstoneDigestSha256(data []byte) []byte {
+    out := make([]byte, 32)
+    var ptr *C.uint8_t
+    if len(data) > 0 {
+        ptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+    }
+    C.sillstone_digest_sha256(ptr, C.size_t(len(data)), (*C.uint8_t)(unsafe.Pointer(&out[0])))
+    return out
+}
+
+func SillstoneDigestSha3256(data []byte) []byte {
+    out := make([]byte, 32)
+    var ptr *C.uint8_t
+    if len(data) > 0 {
+        ptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+    }
+    C.sillstone_digest_sha3_256(ptr, C.size_t(len(data)), (*C.uint8_t)(unsafe.Pointer(&out[0])))
+    return out
+}
+
+func SillstoneDigestSha3512(data []byte) []byte {
+    out := make([]byte, 64)
+    var ptr *C.uint8_t
+    if len(data) > 0 {
+        ptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+    }
+    C.sillstone_digest_sha3_512(ptr, C.size_t(len(data)), (*C.uint8_t)(unsafe.Pointer(&out[0])))
+    return out
+}
+
+func SillstoneDigestBlake2b512(data []byte) []byte {
+    out := make([]byte, 64)
+    var ptr *C.uint8_t
+    if len(data) > 0 {
+        ptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+    }
+    C.sillstone_digest_blake2b_512(ptr, C.size_t(len(data)), (*C.uint8_t)(unsafe.Pointer(&out[0])))
+    return out
+}
+
+func SillstoneDigestBlake3(data []byte) []byte {
+    out := make([]byte, 32)
+    var ptr *C.uint8_t
+    if len(data) > 0 {
+        ptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
+    }
+    C.sillstone_digest_blake3(ptr, C.size_t(len(data)), (*C.uint8_t)(unsafe.Pointer(&out[0])))
+    return out
+}
+

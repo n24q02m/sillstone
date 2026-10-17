@@ -14,4 +14,14 @@ public final class Generated {
 
     public static native long sillstone_buffer_checksum(byte[] data, long len);
 
+    public static native byte[] sillstone_digest_sha256(byte[] data);
+
+    public static native byte[] sillstone_digest_sha3_256(byte[] data);
+
+    public static native byte[] sillstone_digest_sha3_512(byte[] data);
+
+    public static native byte[] sillstone_digest_blake2b_512(byte[] data);
+
+    public static native byte[] sillstone_digest_blake3(byte[] data);
+
 }
