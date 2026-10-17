@@ -37,6 +37,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
+      - name: Generate Cargo Lockfile
+        run: cargo generate-lockfile
       - name: Zero Dependencies Gate
         run: python scripts/ci/check-zero-deps.py
       - name: Clean Identity Separation Gate
@@ -58,6 +60,9 @@ jobs:
         include:
           - platform: linux-x64
             os: ubuntu-latest
+            artifact: libsillstone_ffi.so
+          - platform: linux-arm64
+            os: ubuntu-24.04-arm
             artifact: libsillstone_ffi.so
           - platform: darwin-arm64
             os: macos-latest
