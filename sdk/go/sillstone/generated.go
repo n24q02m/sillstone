@@ -79,3 +79,30 @@ func SillstoneDigestBlake3(data []byte) []byte {
     return out
 }
 
+func SillstoneMathDst1(data []float64) []float64 {
+    out := make([]float64, len(data))
+    if len(data) == 0 {
+        return out
+    }
+    C.sillstone_math_dst1((*C.double)(unsafe.Pointer(&data[0])), C.size_t(len(data)), (*C.double)(unsafe.Pointer(&out[0])))
+    return out
+}
+
+func SillstoneMathDst2(data []float64) []float64 {
+    out := make([]float64, len(data))
+    if len(data) == 0 {
+        return out
+    }
+    C.sillstone_math_dst2((*C.double)(unsafe.Pointer(&data[0])), C.size_t(len(data)), (*C.double)(unsafe.Pointer(&out[0])))
+    return out
+}
+
+func SillstoneMathDst3(data []float64) []float64 {
+    out := make([]float64, len(data))
+    if len(data) == 0 {
+        return out
+    }
+    C.sillstone_math_dst3((*C.double)(unsafe.Pointer(&data[0])), C.size_t(len(data)), (*C.double)(unsafe.Pointer(&out[0])))
+    return out
+}
+

@@ -60,6 +60,10 @@ fn parse_idl(content: &str) -> Vec<Function> {
 fn is_digest_fn(name: &str) -> bool {
     name.starts_with("sillstone_digest_")
 }
+fn is_math_dst_fn(name: &str) -> bool {
+    name.starts_with("sillstone_math_dst")
+}
+
 
 fn digest_len(name: &str) -> usize {
     if name.ends_with("_512") {
@@ -96,6 +100,9 @@ fn gen_c_header(fns: &[Function]) -> String {
                     let c_ty = match a.ty.as_str() {
                         "*const u8" => "const uint8_t *",
                         "*mut u8" => "uint8_t *",
+                        "*const f64" => "const double *",
+                        "*mut f64" => "double *",
+                        "f64" => "double",
                         "usize" => "size_t",
                         "u32" => "uint32_t",
                         "u64" => "uint64_t",
@@ -153,6 +160,9 @@ fn gen_python(fns: &[Function]) -> String {
             .map(|a| match a.ty.as_str() {
                 "*const u8" => "ctypes.c_char_p",
                 "*mut u8" => "ctypes.c_char_p",
+                "*const f64" => "ctypes.POINTER(ctypes.c_double)",
+                "*mut f64" => "ctypes.POINTER(ctypes.c_double)",
+                "f64" => "ctypes.c_double",
                 "usize" => "ctypes.c_size_t",
                 "u32" => "ctypes.c_uint32",
                 "u64" => "ctypes.c_uint64",
@@ -204,6 +214,15 @@ fn gen_go(fns: &[Function]) -> String {
                 f.name
             ));
             out.push_str("    return out\n}\n\n");
+        } else if is_math_dst_fn(&f.name) {
+            out.push_str(&format!("func {go_name}(data []float64) []float64 {{\n"));
+            out.push_str("    out := make([]float64, len(data))\n");
+            out.push_str("    if len(data) == 0 {\n        return out\n    }\n");
+            out.push_str(&format!(
+                "    C.{}((*C.double)(unsafe.Pointer(&data[0])), C.size_t(len(data)), (*C.double)(unsafe.Pointer(&out[0])))\n",
+                f.name
+            ));
+            out.push_str("    return out\n}\n\n");
         } else if f.args.is_empty() {
             let go_ret = match f.ret.as_str() {
                 "u32" => "uint32",
@@ -241,6 +260,17 @@ fn gen_node_napi(fns: &[Function]) -> String {
             out.push_str(&format!("    uint8_t out[{out_len}];\n"));
             out.push_str(&format!("    {}((const uint8_t*)data, length, out);\n", f.name));
             out.push_str(&format!("    napi_value result;\n    napi_create_buffer_copy(env, {out_len}, out, NULL, &result);\n    return result;\n"));
+        } else if is_math_dst_fn(&f.name) {
+            out.push_str("    size_t argc = 1;\n    napi_value args[1];\n");
+            out.push_str("    napi_get_cb_info(env, info, &argc, args, NULL, NULL);\n");
+            out.push_str("    void* data = NULL;\n    size_t length = 0;\n");
+            out.push_str("    if (argc > 0) {\n        napi_get_buffer_info(env, args[0], &data, &length);\n    }\n");
+            out.push_str("    size_t count = length / sizeof(double);\n");
+            out.push_str("    napi_value result;\n");
+            out.push_str("    void* out_data = NULL;\n");
+            out.push_str("    napi_create_buffer(env, length, &out_data, &result);\n");
+            out.push_str(&format!("    {}((const double*)data, count, (double*)out_data);\n", f.name));
+            out.push_str("    return result;\n");
         } else {
             out.push_str(&format!("    uint32_t val = {}();\n", f.name));
             out.push_str("    napi_value result;\n    napi_create_uint32(env, val, &result);\n    return result;\n");
@@ -270,6 +300,8 @@ fn gen_java(fns: &[Function]) -> String {
             out.push_str("    public static native long sillstone_buffer_checksum(byte[] data, long len);\n\n");
         } else if is_digest_fn(&f.name) {
             out.push_str(&format!("    public static native byte[] {}(byte[] data);\n\n", f.name));
+        } else if is_math_dst_fn(&f.name) {
+            out.push_str(&format!("    public static native double[] {}(double[] data);\n\n", f.name));
         } else {
             out.push_str(&format!("    public static native int {}();\n\n", f.name));
         }

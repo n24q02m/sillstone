@@ -21,3 +21,4 @@ rust_2018_idioms = { level = "deny", priority = -1 }
 [dependencies]
 sillstone-buffer = { path = "../buffer" }
 sillstone-digest = { path = "../digest" }
+sillstone-math = { path = "../math" }

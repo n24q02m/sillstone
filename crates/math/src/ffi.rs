@@ -1128,6 +1128,94 @@ pub unsafe extern "C" fn sillstone_math_free(ptr: *mut f64, len: usize) {
     drop(unsafe { Box::from_raw(slice) });
 }
 
+/// Computes orthonormal DST-I into caller-provided out buffer of length `len` f64 elements.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_math_dst1(data: *const f64, len: usize, out: *mut f64) -> i32 {
+    if data.is_null() || out.is_null() || len == 0 {
+        return PITH_E_INVALID;
+    }
+    let in_slice = unsafe { core::slice::from_raw_parts(data, len) };
+    let res = crate::dst::dst1_orthonormal(in_slice);
+    unsafe {
+        core::ptr::copy_nonoverlapping(res.as_ptr(), out, len);
+    }
+    PITH_OK
+}
+
+/// Computes orthonormal DST-II into caller-provided out buffer of length `len` f64 elements.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_math_dst2(data: *const f64, len: usize, out: *mut f64) -> i32 {
+    if data.is_null() || out.is_null() || len == 0 {
+        return PITH_E_INVALID;
+    }
+    let in_slice = unsafe { core::slice::from_raw_parts(data, len) };
+    let res = crate::dst::dst2_orthonormal(in_slice);
+    unsafe {
+        core::ptr::copy_nonoverlapping(res.as_ptr(), out, len);
+    }
+    PITH_OK
+}
+
+/// Computes orthonormal DST-III into caller-provided out buffer of length `len` f64 elements.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_math_dst3(data: *const f64, len: usize, out: *mut f64) -> i32 {
+    if data.is_null() || out.is_null() || len == 0 {
+        return PITH_E_INVALID;
+    }
+    let in_slice = unsafe { core::slice::from_raw_parts(data, len) };
+    let res = crate::dst::dst3_orthonormal(in_slice);
+    unsafe {
+        core::ptr::copy_nonoverlapping(res.as_ptr(), out, len);
+    }
+    PITH_OK
+}
+
+/// Computes trapezoidal numerical integration over uniformly spaced samples `y` with spacing `dx`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_math_trapezoid_samples(y: *const f64, len: usize, dx: f64, out: *mut f64) -> i32 {
+    if y.is_null() || out.is_null() || len == 0 {
+        return PITH_E_INVALID;
+    }
+    let slice = unsafe { core::slice::from_raw_parts(y, len) };
+    if len == 1 {
+        unsafe { *out = 0.0; }
+        return PITH_OK;
+    }
+    let mut sum = 0.5 * (slice[0] + slice[len - 1]);
+    for &val in &slice[1..len - 1] {
+        sum += val;
+    }
+    unsafe {
+        *out = sum * dx;
+    }
+    PITH_OK
+}
+
+/// Computes Simpson's 1/3 numerical integration over uniformly spaced samples `y` with spacing `dx`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_math_simpson_samples(y: *const f64, len: usize, dx: f64, out: *mut f64) -> i32 {
+    if y.is_null() || out.is_null() || len < 3 {
+        return PITH_E_INVALID;
+    }
+    let slice = unsafe { core::slice::from_raw_parts(y, len) };
+    let n = len - 1;
+    if n % 2 != 0 {
+        return PITH_E_INVALID;
+    }
+    let mut sum = slice[0] + slice[n];
+    for i in 1..n {
+        if i % 2 == 0 {
+            sum += 2.0 * slice[i];
+        } else {
+            sum += 4.0 * slice[i];
+        }
+    }
+    unsafe {
+        *out = sum * (dx / 3.0);
+    }
+    PITH_OK
+}
+
 #[cfg(test)]
 mod tests {
     use super::{

@@ -79,4 +79,45 @@ module.exports = {
     }
     return Buffer.from("af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262", "hex");
   },
+  dst1: function (arr) {
+    const n = arr.length;
+    const out = new Float64Array(n);
+    const factor = Math.sqrt(2.0 / (n + 1));
+    for (let k = 0; k < n; k++) {
+      let sum = 0.0;
+      for (let i = 0; i < n; i++) {
+        sum += arr[i] * Math.sin((Math.PI * (k + 1) * (i + 1)) / (n + 1));
+      }
+      out[k] = factor * sum;
+    }
+    return Array.from(out);
+  },
+  dst2: function (arr) {
+    const n = arr.length;
+    const out = new Float64Array(n);
+    const base = Math.sqrt(2.0 / n);
+    for (let k = 0; k < n; k++) {
+      let sum = 0.0;
+      for (let i = 0; i < n; i++) {
+        sum += arr[i] * Math.sin((Math.PI * (k + 1) * (i + 0.5)) / n);
+      }
+      const ck = k === n - 1 ? 1.0 / Math.SQRT2 : 1.0;
+      out[k] = base * ck * sum;
+    }
+    return Array.from(out);
+  },
+  dst3: function (arr) {
+    const n = arr.length;
+    const out = new Float64Array(n);
+    const base = Math.sqrt(2.0 / n);
+    for (let k = 0; k < n; k++) {
+      let sum = 0.0;
+      for (let i = 0; i < n; i++) {
+        const ck = i === n - 1 ? 1.0 / Math.SQRT2 : 1.0;
+        sum += ck * arr[i] * Math.sin((Math.PI * (k + 0.5) * (i + 1)) / n);
+      }
+      out[k] = base * sum;
+    }
+    return Array.from(out);
+  },
 };

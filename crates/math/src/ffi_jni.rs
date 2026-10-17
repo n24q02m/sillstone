@@ -283,6 +283,36 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_dct3(
     unsafe { run_flat_alloc(env, x, core_dct3) }
 }
 
+/// Java: `PithMath.dst1(double[]) -> double[]` - orthonormal DST-I.
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_dst1(
+    env: RawEnv,
+    _class: JClass,
+    x: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { run_flat_alloc(env, x, crate::dst::dst1_orthonormal) }
+}
+
+/// Java: `PithMath.dst2(double[]) -> double[]` - orthonormal DST-II.
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_dst2(
+    env: RawEnv,
+    _class: JClass,
+    x: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { run_flat_alloc(env, x, crate::dst::dst2_orthonormal) }
+}
+
+/// Java: `PithMath.dst3(double[]) -> double[]` - orthonormal DST-III.
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_dst3(
+    env: RawEnv,
+    _class: JClass,
+    x: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { run_flat_alloc(env, x, crate::dst::dst3_orthonormal) }
+}
+
 /// Java: `PithMath.dct2_2d(double[], int w, int h) → double[]`.
 ///
 /// # Safety

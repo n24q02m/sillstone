@@ -38,3 +38,19 @@ test("digests produce correct outputs", () => {
     "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
   );
 });
+
+test("dst functions satisfy mathematical inversions", () => {
+  const x = [1.0, 2.0, 3.0, 4.0];
+  const d1 = sillstone.dst1(x);
+  assert.strictEqual(d1.length, 4);
+  const rec1 = sillstone.dst1(d1);
+  for (let i = 0; i < x.length; i++) {
+    assert.ok(Math.abs(x[i] - rec1[i]) < 1e-10);
+  }
+
+  const d2 = sillstone.dst2(x);
+  const rec2 = sillstone.dst3(d2);
+  for (let i = 0; i < x.length; i++) {
+    assert.ok(Math.abs(x[i] - rec2[i]) < 1e-10);
+  }
+});

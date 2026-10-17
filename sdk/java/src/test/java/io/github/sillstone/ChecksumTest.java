@@ -38,4 +38,25 @@ public class ChecksumTest {
         assertEquals((byte) 0xba, s256[0]);
         assertEquals((byte) 0x78, s256[1]);
     }
+
+    @Test
+    public void testDst() {
+        double[] x = new double[] { 1.0, 2.0, 3.0, 4.0 };
+        double[] d1 = Generated.sillstone_math_dst1(x);
+        assertNotNull(d1);
+        assertEquals(4, d1.length);
+        double[] rec1 = Generated.sillstone_math_dst1(d1);
+        assertNotNull(rec1);
+        for (int i = 0; i < x.length; i++) {
+            assertEquals(x[i], rec1[i], 1e-10);
+        }
+
+        double[] d2 = Generated.sillstone_math_dst2(x);
+        assertNotNull(d2);
+        double[] rec2 = Generated.sillstone_math_dst3(d2);
+        assertNotNull(rec2);
+        for (int i = 0; i < x.length; i++) {
+            assertEquals(x[i], rec2[i], 1e-10);
+        }
+    }
 }

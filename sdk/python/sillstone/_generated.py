@@ -92,3 +92,27 @@ def sillstone_digest_blake3_raw(*args):
     fn.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p]
     return fn(*args)
 
+def sillstone_math_dst1_raw(*args):
+    if LIB is None:
+        raise RuntimeError('sillstone_ffi library not loaded')
+    fn = getattr(LIB, 'sillstone_math_dst1')
+    fn.restype = ctypes.c_int32
+    fn.argtypes = [ctypes.POINTER(ctypes.c_double), ctypes.c_size_t, ctypes.POINTER(ctypes.c_double)]
+    return fn(*args)
+
+def sillstone_math_dst2_raw(*args):
+    if LIB is None:
+        raise RuntimeError('sillstone_ffi library not loaded')
+    fn = getattr(LIB, 'sillstone_math_dst2')
+    fn.restype = ctypes.c_int32
+    fn.argtypes = [ctypes.POINTER(ctypes.c_double), ctypes.c_size_t, ctypes.POINTER(ctypes.c_double)]
+    return fn(*args)
+
+def sillstone_math_dst3_raw(*args):
+    if LIB is None:
+        raise RuntimeError('sillstone_ffi library not loaded')
+    fn = getattr(LIB, 'sillstone_math_dst3')
+    fn.restype = ctypes.c_int32
+    fn.argtypes = [ctypes.POINTER(ctypes.c_double), ctypes.c_size_t, ctypes.POINTER(ctypes.c_double)]
+    return fn(*args)
+

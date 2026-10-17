@@ -24,4 +24,10 @@ public final class Generated {
 
     public static native byte[] sillstone_digest_blake3(byte[] data);
 
+    public static native double[] sillstone_math_dst1(double[] data);
+
+    public static native double[] sillstone_math_dst2(double[] data);
+
+    public static native double[] sillstone_math_dst3(double[] data);
+
 }

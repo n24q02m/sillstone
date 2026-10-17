@@ -11,6 +11,9 @@ from ._generated import (
     sillstone_digest_sha3_512_raw,
     sillstone_digest_blake2b_512_raw,
     sillstone_digest_blake3_raw,
+    sillstone_math_dst1_raw,
+    sillstone_math_dst2_raw,
+    sillstone_math_dst3_raw,
 )
 
 __version__ = "0.2.0b1"
@@ -69,3 +72,41 @@ def blake3(data: bytes) -> bytes:
     if rc != 0:
         raise ValueError(f"blake3 failed with status {rc}")
     return out.raw
+
+def dst1(data: list[float]) -> list[float]:
+    """Computes orthonormal DST-I over input float array."""
+    n = len(data)
+    if n == 0:
+        return []
+    c_in = (ctypes.c_double * n)(*data)
+    c_out = (ctypes.c_double * n)()
+    rc = sillstone_math_dst1_raw(c_in, n, c_out)
+    if rc != 0:
+        raise ValueError(f"dst1 failed with status {rc}")
+    return list(c_out)
+
+
+def dst2(data: list[float]) -> list[float]:
+    """Computes orthonormal DST-II over input float array."""
+    n = len(data)
+    if n == 0:
+        return []
+    c_in = (ctypes.c_double * n)(*data)
+    c_out = (ctypes.c_double * n)()
+    rc = sillstone_math_dst2_raw(c_in, n, c_out)
+    if rc != 0:
+        raise ValueError(f"dst2 failed with status {rc}")
+    return list(c_out)
+
+
+def dst3(data: list[float]) -> list[float]:
+    """Computes orthonormal DST-III over input float array."""
+    n = len(data)
+    if n == 0:
+        return []
+    c_in = (ctypes.c_double * n)(*data)
+    c_out = (ctypes.c_double * n)()
+    rc = sillstone_math_dst3_raw(c_in, n, c_out)
+    if rc != 0:
+        raise ValueError(f"dst3 failed with status {rc}")
+    return list(c_out)

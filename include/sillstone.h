@@ -27,6 +27,12 @@ int32_t sillstone_digest_blake2b_512(const uint8_t *data, size_t len, uint8_t *o
 
 int32_t sillstone_digest_blake3(const uint8_t *data, size_t len, uint8_t *out);
 
+int32_t sillstone_math_dst1(const double *data, size_t len, double *out);
+
+int32_t sillstone_math_dst2(const double *data, size_t len, double *out);
+
+int32_t sillstone_math_dst3(const double *data, size_t len, double *out);
+
 #ifdef __cplusplus
 }
 #endif

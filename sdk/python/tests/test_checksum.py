@@ -34,6 +34,21 @@ class TestSillstonePython(unittest.TestCase):
         # BLAKE3 "abc" reference
         self.assertEqual(sillstone.blake3(b"").hex(), "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262")
 
+    def test_dst(self):
+        x = [1.0, 2.0, 3.0, 4.0]
+        d1 = sillstone.dst1(x)
+        self.assertEqual(len(d1), 4)
+        # dst1 is self-inverse when orthonormal
+        rec1 = sillstone.dst1(d1)
+        for a, b in zip(x, rec1):
+            self.assertAlmostEqual(a, b, places=10)
+
+        # dst2 and dst3 are mutually inverse
+        d2 = sillstone.dst2(x)
+        rec2 = sillstone.dst3(d2)
+        for a, b in zip(x, rec2):
+            self.assertAlmostEqual(a, b, places=10)
+
 
 if __name__ == "__main__":
     unittest.main()

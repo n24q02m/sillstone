@@ -196,3 +196,89 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1dige
     }
     unsafe { create_output_byte_array(env, &out) }
 }
+
+unsafe fn get_input_doubles(env: *mut JNIEnv, array: JArray) -> Vec<f64> {
+    if array.is_null() {
+        return Vec::new();
+    }
+    let table: &[usize; 256] = unsafe { &*(*env as *const [usize; 256]) };
+    let len = unsafe {
+        let f: extern "system" fn(*mut JNIEnv, JArray) -> jint =
+            core::mem::transmute(table[171]);
+        f(env, array) as usize
+    };
+    let mut out = vec![0.0f64; len];
+    if len > 0 {
+        unsafe {
+            let f: extern "system" fn(*mut JNIEnv, JArray, *mut f64, *mut u8) -> *mut f64 =
+                core::mem::transmute(table[190]);
+            let data = f(env, array, core::ptr::null_mut(), core::ptr::null_mut());
+            out.copy_from_slice(core::slice::from_raw_parts(data, len));
+            let r: extern "system" fn(*mut JNIEnv, JArray, *mut f64, jint) =
+                core::mem::transmute(table[198]);
+            r(env, array, data, 0);
+        }
+    }
+    out
+}
+
+unsafe fn create_output_double_array(env: *mut JNIEnv, data: &[f64]) -> JArray {
+    let table: &[usize; 256] = unsafe { &*(*env as *const [usize; 256]) };
+    unsafe {
+        let new: extern "system" fn(*mut JNIEnv, jint) -> JArray =
+            core::mem::transmute(table[182]);
+        let arr = new(env, data.len() as jint);
+        if arr.is_null() {
+            return core::ptr::null_mut();
+        }
+        let set: extern "system" fn(*mut JNIEnv, JArray, jint, jint, *const f64) =
+            core::mem::transmute(table[214]);
+        set(env, arr, 0, data.len() as jint, data.as_ptr());
+        arr
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1math_1dst1(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    data: JArray,
+) -> JArray {
+    let doubles = unsafe { get_input_doubles(env, data) };
+    let mut out = vec![0.0f64; doubles.len()];
+    let status = unsafe { sillstone_math::ffi::sillstone_math_dst1(doubles.as_ptr(), doubles.len(), out.as_mut_ptr()) };
+    if status != 0 {
+        return core::ptr::null_mut();
+    }
+    unsafe { create_output_double_array(env, &out) }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1math_1dst2(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    data: JArray,
+) -> JArray {
+    let doubles = unsafe { get_input_doubles(env, data) };
+    let mut out = vec![0.0f64; doubles.len()];
+    let status = unsafe { sillstone_math::ffi::sillstone_math_dst2(doubles.as_ptr(), doubles.len(), out.as_mut_ptr()) };
+    if status != 0 {
+        return core::ptr::null_mut();
+    }
+    unsafe { create_output_double_array(env, &out) }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1math_1dst3(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    data: JArray,
+) -> JArray {
+    let doubles = unsafe { get_input_doubles(env, data) };
+    let mut out = vec![0.0f64; doubles.len()];
+    let status = unsafe { sillstone_math::ffi::sillstone_math_dst3(doubles.as_ptr(), doubles.len(), out.as_mut_ptr()) };
+    if status != 0 {
+        return core::ptr::null_mut();
+    }
+    unsafe { create_output_double_array(env, &out) }
+}

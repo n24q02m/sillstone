@@ -118,6 +118,57 @@ static napi_value n_sillstone_digest_blake3(napi_env env, napi_callback_info inf
     return result;
 }
 
+static napi_value n_sillstone_math_dst1(napi_env env, napi_callback_info info) {
+    size_t argc = 1;
+    napi_value args[1];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    void* data = NULL;
+    size_t length = 0;
+    if (argc > 0) {
+        napi_get_buffer_info(env, args[0], &data, &length);
+    }
+    size_t count = length / sizeof(double);
+    napi_value result;
+    void* out_data = NULL;
+    napi_create_buffer(env, length, &out_data, &result);
+    sillstone_math_dst1((const double*)data, count, (double*)out_data);
+    return result;
+}
+
+static napi_value n_sillstone_math_dst2(napi_env env, napi_callback_info info) {
+    size_t argc = 1;
+    napi_value args[1];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    void* data = NULL;
+    size_t length = 0;
+    if (argc > 0) {
+        napi_get_buffer_info(env, args[0], &data, &length);
+    }
+    size_t count = length / sizeof(double);
+    napi_value result;
+    void* out_data = NULL;
+    napi_create_buffer(env, length, &out_data, &result);
+    sillstone_math_dst2((const double*)data, count, (double*)out_data);
+    return result;
+}
+
+static napi_value n_sillstone_math_dst3(napi_env env, napi_callback_info info) {
+    size_t argc = 1;
+    napi_value args[1];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    void* data = NULL;
+    size_t length = 0;
+    if (argc > 0) {
+        napi_get_buffer_info(env, args[0], &data, &length);
+    }
+    size_t count = length / sizeof(double);
+    napi_value result;
+    void* out_data = NULL;
+    napi_create_buffer(env, length, &out_data, &result);
+    sillstone_math_dst3((const double*)data, count, (double*)out_data);
+    return result;
+}
+
 NAPI_MODULE_INIT() {
     napi_value fn_sillstone_version_major;
     napi_create_function(env, NULL, 0, n_sillstone_version_major, NULL, &fn_sillstone_version_major);
@@ -146,5 +197,14 @@ NAPI_MODULE_INIT() {
     napi_value fn_sillstone_digest_blake3;
     napi_create_function(env, NULL, 0, n_sillstone_digest_blake3, NULL, &fn_sillstone_digest_blake3);
     napi_set_named_property(env, exports, "sillstone_digest_blake3", fn_sillstone_digest_blake3);
+    napi_value fn_sillstone_math_dst1;
+    napi_create_function(env, NULL, 0, n_sillstone_math_dst1, NULL, &fn_sillstone_math_dst1);
+    napi_set_named_property(env, exports, "sillstone_math_dst1", fn_sillstone_math_dst1);
+    napi_value fn_sillstone_math_dst2;
+    napi_create_function(env, NULL, 0, n_sillstone_math_dst2, NULL, &fn_sillstone_math_dst2);
+    napi_set_named_property(env, exports, "sillstone_math_dst2", fn_sillstone_math_dst2);
+    napi_value fn_sillstone_math_dst3;
+    napi_create_function(env, NULL, 0, n_sillstone_math_dst3, NULL, &fn_sillstone_math_dst3);
+    napi_set_named_property(env, exports, "sillstone_math_dst3", fn_sillstone_math_dst3);
     return exports;
 }

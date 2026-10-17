@@ -10,3 +10,6 @@ fn sillstone_digest_sha3_256(data: *const u8, len: usize, out: *mut u8) -> i32
 fn sillstone_digest_sha3_512(data: *const u8, len: usize, out: *mut u8) -> i32
 fn sillstone_digest_blake2b_512(data: *const u8, len: usize, out: *mut u8) -> i32
 fn sillstone_digest_blake3(data: *const u8, len: usize, out: *mut u8) -> i32
+fn sillstone_math_dst1(data: *const f64, len: usize, out: *mut f64) -> i32
+fn sillstone_math_dst2(data: *const f64, len: usize, out: *mut f64) -> i32
+fn sillstone_math_dst3(data: *const f64, len: usize, out: *mut f64) -> i32

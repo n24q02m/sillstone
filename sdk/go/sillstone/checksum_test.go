@@ -1,6 +1,7 @@
 package sillstone
 
 import (
+	"math"
 	"testing"
 )
 
@@ -41,5 +42,27 @@ func TestDigests(t *testing.T) {
 	}
 	if s256[0] != 0xba || s256[1] != 0x78 {
 		t.Fatalf("sha256 mismatch prefix: %x", s256[:4])
+	}
+}
+
+func TestDst(t *testing.T) {
+	x := []float64{1.0, 2.0, 3.0, 4.0}
+	d1 := SillstoneMathDst1(x)
+	if len(d1) != 4 {
+		t.Fatalf("dst1 len %d != 4", len(d1))
+	}
+	rec1 := SillstoneMathDst1(d1)
+	for i := range x {
+		if math.Abs(x[i]-rec1[i]) > 1e-10 {
+			t.Fatalf("dst1 self-inversion mismatch at %d: %f != %f", i, x[i], rec1[i])
+		}
+	}
+
+	d2 := SillstoneMathDst2(x)
+	rec2 := SillstoneMathDst3(d2)
+	for i := range x {
+		if math.Abs(x[i]-rec2[i]) > 1e-10 {
+			t.Fatalf("dst2/dst3 inversion mismatch at %d: %f != %f", i, x[i], rec2[i])
+		}
 	}
 }
