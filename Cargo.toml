@@ -20,6 +20,8 @@ members = [
     "crates/cdc",
     "crates/file",
     "crates/video",
+    "crates/curator",
+    "crates/cli",
     "crates/ffi",
     "tools/idl-gen",
 ]

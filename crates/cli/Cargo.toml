@@ -1,0 +1,36 @@
+[[bin]]
+name = "pith"
+path = "src/main.rs"
+doc = false
+
+[package]
+name = "sillstone-cli"
+description = "The `pith` command line interface over the pith-hash suite facade."
+readme = "../README.md"
+license = "Apache-2.0"
+categories = [ "algorithms", "cryptography",]
+
+[package.version]
+workspace = true
+
+[package.edition]
+workspace = true
+
+[package.rust-version]
+workspace = true
+
+[package.repository]
+workspace = true
+
+[package.homepage]
+workspace = true
+
+[package.authors]
+workspace = true
+
+[dependencies.sillstone-curator]
+path = "../curator"
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "deny"
