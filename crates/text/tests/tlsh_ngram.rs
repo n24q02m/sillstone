@@ -38,9 +38,7 @@ fn test_tlsh_short_input_refusal() {
 
 #[test]
 fn test_tlsh_official_reference_vector() {
-    let txt = include_bytes!(
-        "../../../../pith-hash-audit-2026-10-12/wave2/vectors/tlsh/example_data/021106_yossivassa.txt"
-    );
+    let txt = include_bytes!("fixtures/021106_yossivassa.txt");
     let t = tlsh(txt).expect("tlsh calculation");
     let expected = "T11FA1B357F78913B236924271569EA6D1FB2C451C33668484552C812D33138B8C73FFCE";
     assert_eq!(t.as_str(), expected);
@@ -56,12 +54,8 @@ fn test_tlsh_official_reference_vector() {
 
 #[test]
 fn test_tlsh_distance_official_score() {
-    let txt_yossi = include_bytes!(
-        "../../../../pith-hash-audit-2026-10-12/wave2/vectors/tlsh/example_data/021106_yossivassa.txt"
-    );
-    let txt_web = include_bytes!(
-        "../../../../pith-hash-audit-2026-10-12/wave2/vectors/tlsh/example_data/website_course_descriptors06-07.txt"
-    );
+    let txt_yossi = include_bytes!("fixtures/021106_yossivassa.txt");
+    let txt_web = include_bytes!("fixtures/website_course_descriptors06-07.txt");
 
     let t_yossi = tlsh(txt_yossi).expect("yossi hash");
     let t_web = tlsh(txt_web).expect("web hash");
@@ -73,9 +67,7 @@ fn test_tlsh_distance_official_score() {
 
 #[test]
 fn test_tlsh_ffi() {
-    let txt = include_bytes!(
-        "../../../../pith-hash-audit-2026-10-12/wave2/vectors/tlsh/example_data/021106_yossivassa.txt"
-    );
+    let txt = include_bytes!("fixtures/021106_yossivassa.txt");
 
     let mut buf = [0u8; 72];
     let status = unsafe { sillstone_text_tlsh(txt.as_ptr(), txt.len(), buf.as_mut_ptr()) };
@@ -102,9 +94,7 @@ fn test_tlsh_ffi() {
     );
 
     // Test FFI distance
-    let txt_web = include_bytes!(
-        "../../../../pith-hash-audit-2026-10-12/wave2/vectors/tlsh/example_data/website_course_descriptors06-07.txt"
-    );
+    let txt_web = include_bytes!("fixtures/website_course_descriptors06-07.txt");
     let mut buf_web = [0u8; 72];
     assert_eq!(
         unsafe { sillstone_text_tlsh(txt_web.as_ptr(), txt_web.len(), buf_web.as_mut_ptr()) },
