@@ -60,7 +60,7 @@ jobs:
 
       - name: Java SDK Tests
         working-directory: sdk/java
-        run: mvn test
+        run: mvn test -DargLine="-Djava.library.path=../../target/debug"
       - name: Verify Zero Dependencies
         run: python scripts/ci/check-zero-deps.py
 

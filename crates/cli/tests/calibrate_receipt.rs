@@ -138,7 +138,8 @@ fn receipt_dataset_is_reproducible() {
         std::fs::write(root.join("pairs.csv"), &csv).expect("write committed csv");
     }
     assert_eq!(
-        csv, COMMITTED_CSV,
+        csv,
+        COMMITTED_CSV.replace("\r\n", "\n"),
         "dataset recipe drifted from the committed pairs.csv"
     );
 }
