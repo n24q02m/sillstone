@@ -54,6 +54,12 @@ pub mod ffi;
 #[cfg(not(test))]
 mod ffi_jni;
 pub mod stream;
+/// Pure Rust Brotli decompressor (RFC 7932).
+pub mod brotli;
+/// Pure Rust Zstandard decompressor (RFC 8878).
+pub mod zstd;
+pub use brotli::decompress as inflate_brotli;
+pub use zstd::decompress as inflate_zstd;
 
 pub use stream::{Framing, StreamingDecoder};
 

@@ -64,6 +64,10 @@ enum Op {
     Auto,
     /// RFC 1952 gzip framing (`inflate_gzip`, multi-member aware).
     Gzip,
+    /// RFC 7932 Brotli stream.
+    Brotli,
+    /// RFC 8878 Zstandard frame.
+    Zstd,
 }
 
 /// Decompresses a raw RFC 1951 DEFLATE stream.
@@ -129,6 +133,22 @@ enum Op {
 /// Same contract as [`sillstone_inflate_inflate_raw`].
 #[rustfmt::skip]
 #[unsafe(no_mangle)] pub unsafe extern "C" fn sillstone_inflate_inflate_gzip(data: *const u8, len: usize, out: *mut *mut u8, out_len: *mut usize) -> i32 { inflate_ffi(Op::Gzip, data, len, out, out_len) }
+
+/// Decompresses a Brotli (RFC 7932) stream.
+///
+/// # Safety
+///
+/// Same contract as [`sillstone_inflate_inflate_raw`].
+#[rustfmt::skip]
+#[unsafe(no_mangle)] pub unsafe extern "C" fn sillstone_inflate_inflate_brotli(data: *const u8, len: usize, out: *mut *mut u8, out_len: *mut usize) -> i32 { inflate_ffi(Op::Brotli, data, len, out, out_len) }
+
+/// Decompresses a Zstandard (RFC 8878) frame.
+///
+/// # Safety
+///
+/// Same contract as [`sillstone_inflate_inflate_raw`].
+#[rustfmt::skip]
+#[unsafe(no_mangle)] pub unsafe extern "C" fn sillstone_inflate_inflate_zstd(data: *const u8, len: usize, out: *mut *mut u8, out_len: *mut usize) -> i32 { inflate_ffi(Op::Zstd, data, len, out, out_len) }
 
 /// Computes the Adler-32 checksum (RFC 1950 section 9) of `len` bytes
 /// at `data` into the caller-provided `out` slot.
@@ -239,6 +259,8 @@ fn inflate_framed(op: Op, bytes: &[u8]) -> Result<alloc::vec::Vec<u8>, i32> {
         Op::Zlib => inflate_zlib(bytes, &limits),
         Op::Auto => inflate_auto(bytes, &limits),
         Op::Gzip => inflate_gzip(bytes, &limits),
+        Op::Brotli => crate::inflate_brotli(bytes, limits),
+        Op::Zstd => crate::inflate_zstd(bytes, limits),
     };
     result.map_err(|_| PITH_E_REJECTED)
 }
