@@ -1,0 +1,29 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/buffer",
+    "crates/ffi",
+    "tools/idl-gen",
+]
+
+[workspace.package]
+version = "0.2.0-beta.1"
+edition = "2024"
+rust-version = "1.85.0"
+authors = ["Sillstone Contributors"]
+license = "Apache-2.0"
+repository = "https://github.com/sillstone/sillstone"
+homepage = "https://github.com/sillstone/sillstone"
+readme = "README.md"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_docs = "deny"
+rust_2018_idioms = { level = "deny", priority = -1 }
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+correctness = { level = "deny", priority = -1 }
+suspicious = { level = "deny", priority = -1 }
+complexity = { level = "deny", priority = -1 }
+perf = { level = "deny", priority = -1 }

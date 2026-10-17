@@ -1,0 +1,7 @@
+# Sillstone ABI Definition v1
+# Pure declarative function signatures for multi-language code generation.
+
+fn sillstone_version_major() -> u32
+fn sillstone_version_minor() -> u32
+fn sillstone_version_patch() -> u32
+fn sillstone_buffer_checksum(ptr: *const u8, len: usize) -> u64

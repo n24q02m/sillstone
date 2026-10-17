@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Workspace Check
+        run: cargo check --workspace --all-targets
+
+      - name: Rust Workspace Test
+        run: cargo test --workspace
+
+      - name: IDL Generator Sync Check
+        run: cargo run -p sillstone-idl-gen -- --check
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Python SDK Tests
+        run: python -m unittest discover -s sdk/python/tests
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Node.js SDK Tests
+        run: node --test sdk/node/test/checksum.test.js
+
+      - name: Verify Zero Dependencies
+        run: python scripts/ci/check-zero-deps.py
+
+      - name: Verify Clean Identity Separation
+        run: python scripts/ci/check-forbidden-traces.py

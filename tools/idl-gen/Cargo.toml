@@ -1,0 +1,17 @@
+[package]
+name = "sillstone-idl-gen"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+description = "Pure-Rust deterministic code generator emitting C ABI and multi-language SDK bindings from IDL"
+
+[lints]
+workspace = true
+
+[dependencies]
+# Zero dependencies - pure std only

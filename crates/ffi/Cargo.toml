@@ -1,0 +1,22 @@
+[package]
+name = "sillstone-ffi"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+description = "C ABI and FFI bridge export for Sillstone"
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[lints.rust]
+unsafe_code = "allow"
+missing_docs = "deny"
+rust_2018_idioms = { level = "deny", priority = -1 }
+
+[dependencies]
+sillstone-buffer = { path = "../buffer" }

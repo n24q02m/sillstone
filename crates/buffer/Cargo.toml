@@ -1,0 +1,17 @@
+[package]
+name = "sillstone-buffer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+description = "Core contiguous memory and strided buffer primitives for Sillstone"
+
+[lints]
+workspace = true
+
+[dependencies]
+# Zero dependencies
