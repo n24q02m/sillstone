@@ -219,11 +219,22 @@ function signature(data) {
 }
 
 function findCdylib() {
-  const p = path.join(__dirname, "sillstone_napi.node");
-  if (fs.existsSync(p)) return p;
-  const p2 = path.resolve(__dirname, "..", "..", "target", "debug", "sillstone_ffi.dll");
-  if (fs.existsSync(p2)) return p2;
-  return p;
+  const explicit = process.env.SILLSTONE_CDYLIB;
+  if (explicit && fs.existsSync(explicit)) return path.resolve(explicit);
+  const candidates = [
+    path.join(__dirname, "build", "Release", "sillstone_napi.node"),
+    path.join(__dirname, "sillstone_napi.node"),
+    path.resolve(__dirname, "..", "..", "target", "debug", "libsillstone_ffi.so"),
+    path.resolve(__dirname, "..", "..", "target", "debug", "libsillstone_ffi.dylib"),
+    path.resolve(__dirname, "..", "..", "target", "debug", "sillstone_ffi.dll"),
+    path.resolve(__dirname, "..", "..", "target", "release", "libsillstone_ffi.so"),
+    path.resolve(__dirname, "..", "..", "target", "release", "libsillstone_ffi.dylib"),
+    path.resolve(__dirname, "..", "..", "target", "release", "sillstone_ffi.dll"),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  return candidates[0];
 }
 
 function describe(data) {

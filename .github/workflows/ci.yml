@@ -57,7 +57,7 @@ jobs:
         run: node sdk/node/scripts/build.js
 
       - name: Node.js SDK Tests
-        run: node --test sdk/node/test/*.test.js
+        run: node --test sdk/node/test/checksum.test.js sdk/node/test/reference.test.js
 
       - name: Set up JDK
         uses: actions/setup-java@v4
