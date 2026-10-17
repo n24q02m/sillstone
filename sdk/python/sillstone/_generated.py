@@ -5,7 +5,8 @@ import sys
 
 def _load_lib():
     ext = '.dll' if sys.platform == 'win32' else ('.dylib' if sys.platform == 'darwin' else '.so')
-    lib_name = f'sillstone_ffi{ext}'
+    prefix = '' if sys.platform == 'win32' else 'lib'
+    lib_name = f'{prefix}sillstone_ffi{ext}'
     dir_path = os.path.dirname(os.path.abspath(__file__))
     candidates = [
         os.path.join(dir_path, lib_name),

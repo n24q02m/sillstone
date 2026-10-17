@@ -106,7 +106,8 @@ fn gen_python(fns: &[Function]) -> String {
     out.push_str("import ctypes\nimport os\nimport sys\n\n");
     out.push_str("def _load_lib():\n");
     out.push_str("    ext = '.dll' if sys.platform == 'win32' else ('.dylib' if sys.platform == 'darwin' else '.so')\n");
-    out.push_str("    lib_name = f'sillstone_ffi{ext}'\n");
+    out.push_str("    prefix = '' if sys.platform == 'win32' else 'lib'\n");
+    out.push_str("    lib_name = f'{prefix}sillstone_ffi{ext}'\n");
     out.push_str("    dir_path = os.path.dirname(os.path.abspath(__file__))\n");
     out.push_str("    candidates = [\n");
     out.push_str("        os.path.join(dir_path, lib_name),\n");
@@ -288,15 +289,11 @@ fn main() {
     let mut any_mismatch = false;
     for (path, text) in &outputs {
         if check_mode {
-            if !path.exists() {
-                eprintln!("Missing generated file: {}", path.display());
+            let existing = fs::read_to_string(path).unwrap_or_default().replace("\r\n", "\n");
+            let expected = text.replace("\r\n", "\n");
+            if existing != expected {
+                eprintln!("Mismatch in generated file: {}", path.display());
                 any_mismatch = true;
-            } else {
-                let existing = fs::read_to_string(path).unwrap_or_default();
-                if existing != *text {
-                    eprintln!("Mismatch in generated file: {}", path.display());
-                    any_mismatch = true;
-                }
             }
         } else {
             if let Some(parent) = path.parent() {
