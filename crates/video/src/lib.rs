@@ -52,6 +52,8 @@ extern crate alloc;
 mod avcc;
 mod minhash;
 mod phash;
+pub mod scene_cut;
+pub use scene_cut::{SceneCutParams, scene_cuts};
 
 pub mod ffi;
 mod ffi_jni;

@@ -48,6 +48,8 @@ pub mod ffi;
 mod ffi_jni;
 pub mod reference;
 pub mod wav;
+pub mod fingerprint;
+pub use fingerprint::{fingerprint, resample_linear};
 
 pub use peaks::{
     BIN_MAX, BIN_MIN, BIN_STRIDE, HOP, Peak, SAMPLE_RATE, SLOT_COUNT, SLOT_MAX, SLOT_MIN,
