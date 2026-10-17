@@ -181,7 +181,7 @@ impl Hasher {
 
     fn chunk_cv(&self, buf_len: usize, counter: u64) -> [u32; 8] {
         let mut cv = self.key;
-        let num_blocks = if buf_len == 0 { 1 } else { (buf_len + 63) / 64 };
+        let num_blocks = if buf_len == 0 { 1 } else { buf_len.div_ceil(64) };
         for i in 0..num_blocks {
             let start = i * 64;
             let end = (start + 64).min(buf_len);
@@ -214,7 +214,7 @@ impl Hasher {
             // Single chunk root
             let mut cv = self.key;
             let buf_len = self.chunk_len;
-            let num_blocks = if buf_len == 0 { 1 } else { (buf_len + 63) / 64 };
+            let num_blocks = if buf_len == 0 { 1 } else { buf_len.div_ceil(64) };
             for i in 0..num_blocks.saturating_sub(1) {
                 let start = i * 64;
                 let end = (start + 64).min(buf_len);

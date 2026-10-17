@@ -81,44 +81,162 @@ func SillstoneDigestBlake3(data []byte) []byte {
 
 func SillstoneMathDst1(data []float64) []float64 {
     out := make([]float64, len(data))
-    if len(data) == 0 {
-        return out
+    var ptr *C.double
+    if len(data) > 0 {
+        ptr = (*C.double)(unsafe.Pointer(&data[0]))
     }
-    C.sillstone_math_dst1((*C.double)(unsafe.Pointer(&data[0])), C.size_t(len(data)), (*C.double)(unsafe.Pointer(&out[0])))
+    C.sillstone_math_dst1(ptr, C.size_t(len(data)), (*C.double)(unsafe.Pointer(&out[0])))
     return out
 }
 
 func SillstoneMathDst2(data []float64) []float64 {
     out := make([]float64, len(data))
-    if len(data) == 0 {
-        return out
+    var ptr *C.double
+    if len(data) > 0 {
+        ptr = (*C.double)(unsafe.Pointer(&data[0]))
     }
-    C.sillstone_math_dst2((*C.double)(unsafe.Pointer(&data[0])), C.size_t(len(data)), (*C.double)(unsafe.Pointer(&out[0])))
+    C.sillstone_math_dst2(ptr, C.size_t(len(data)), (*C.double)(unsafe.Pointer(&out[0])))
     return out
 }
 
 func SillstoneMathDst3(data []float64) []float64 {
     out := make([]float64, len(data))
-    if len(data) == 0 {
-        return out
+    var ptr *C.double
+    if len(data) > 0 {
+        ptr = (*C.double)(unsafe.Pointer(&data[0]))
     }
-    C.sillstone_math_dst3((*C.double)(unsafe.Pointer(&data[0])), C.size_t(len(data)), (*C.double)(unsafe.Pointer(&out[0])))
+    C.sillstone_math_dst3(ptr, C.size_t(len(data)), (*C.double)(unsafe.Pointer(&out[0])))
     return out
 }
 
-func SillstoneUnicodeGraphemeCount(data []byte) int {
+func SillstoneUnicodeGraphemeCount(data []byte) uint64 {
+    var count C.size_t
     var ptr *C.uint8_t
     if len(data) > 0 {
         ptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))
     }
-    var count C.size_t
     C.sillstone_unicode_grapheme_count(ptr, C.size_t(len(data)), &count)
-    return int(count)
+    return uint64(count)
 }
 
-func SillstoneUnicodeCharCategory(cp rune) uint8 {
+func SillstoneUnicodeCharCategory(cp uint32) uint8 {
     var cat C.uint8_t
     C.sillstone_unicode_char_category(C.uint32_t(cp), &cat)
     return uint8(cat)
+}
+
+func SillstoneCuratorDetect(data []byte) (uint32, uint32, uint32) {
+    var format, modality, pending C.uint32_t
+    var ptr *C.uint8_t
+    if len(data) > 0 { ptr = (*C.uint8_t)(unsafe.Pointer(&data[0])) }
+    C.sillstone_curator_detect(ptr, C.size_t(len(data)), &format, &modality, &pending)
+    return uint32(format), uint32(modality), uint32(pending)
+}
+
+func SillstoneCuratorContentHash(data []byte) []byte {
+    out := make([]byte, 32)
+    var ptr *C.uint8_t
+    if len(data) > 0 { ptr = (*C.uint8_t)(unsafe.Pointer(&data[0])) }
+    var outLen C.size_t
+    C.sillstone_curator_content_hash(ptr, C.size_t(len(data)), (*C.uint8_t)(unsafe.Pointer(&out[0])), C.size_t(len(out)), &outLen)
+    return out
+}
+
+func SillstoneCuratorSignature(data []byte) []byte {
+    var outPtr *C.uint8_t
+    var outLen C.size_t
+    var ptr *C.uint8_t
+    if len(data) > 0 { ptr = (*C.uint8_t)(unsafe.Pointer(&data[0])) }
+    status := C.sillstone_curator_signature(ptr, C.size_t(len(data)), &outPtr, &outLen)
+    if status != 0 || outPtr == nil { return nil }
+    res := C.GoBytes(unsafe.Pointer(outPtr), C.int(outLen))
+    C.sillstone_curator_free(outPtr, outLen)
+    return res
+}
+
+func SillstoneCuratorDescribe(data []byte) []byte {
+    var outPtr *C.uint8_t
+    var outLen C.size_t
+    var ptr *C.uint8_t
+    if len(data) > 0 { ptr = (*C.uint8_t)(unsafe.Pointer(&data[0])) }
+    status := C.sillstone_curator_describe(ptr, C.size_t(len(data)), &outPtr, &outLen)
+    if status != 0 || outPtr == nil { return nil }
+    res := C.GoBytes(unsafe.Pointer(outPtr), C.int(outLen))
+    C.sillstone_curator_free(outPtr, outLen)
+    return res
+}
+
+func SillstoneCuratorMatch(a []byte, b []byte) (uint32, []uint64, uint32) {
+    var tag C.uint32_t
+    slots := make([]C.uint64_t, 4)
+    var matched C.uint32_t
+    var ptrA, ptrB *C.uint8_t
+    if len(a) > 0 { ptrA = (*C.uint8_t)(unsafe.Pointer(&a[0])) }
+    if len(b) > 0 { ptrB = (*C.uint8_t)(unsafe.Pointer(&b[0])) }
+    C.sillstone_curator_match(ptrA, C.size_t(len(a)), ptrB, C.size_t(len(b)), &tag, &slots[0], C.size_t(len(slots)), &matched)
+    resSlots := make([]uint64, 4)
+    for i, s := range slots { resSlots[i] = uint64(s) }
+    return uint32(tag), resSlots, uint32(matched)
+}
+
+func SillstoneCuratorFree(ptr unsafe.Pointer, len uint64) {
+    C.sillstone_curator_free((*C.uint8_t)(ptr), C.size_t(len))
+}
+
+func SillstoneImagePhash(data []byte, width uint32, height uint32, layout uint32) uint64 {
+    var out C.uint64_t
+    var ptr *C.uint8_t
+    if len(data) > 0 { ptr = (*C.uint8_t)(unsafe.Pointer(&data[0])) }
+    C.sillstone_image_phash(ptr, C.size_t(len(data)), C.uint32_t(width), C.uint32_t(height), C.uint32_t(layout), &out)
+    return uint64(out)
+}
+
+func SillstoneImageAhash(data []byte, width uint32, height uint32, layout uint32) uint64 {
+    var out C.uint64_t
+    var ptr *C.uint8_t
+    if len(data) > 0 { ptr = (*C.uint8_t)(unsafe.Pointer(&data[0])) }
+    C.sillstone_image_ahash(ptr, C.size_t(len(data)), C.uint32_t(width), C.uint32_t(height), C.uint32_t(layout), &out)
+    return uint64(out)
+}
+
+func SillstoneImageDhash(data []byte, width uint32, height uint32, layout uint32) uint64 {
+    var out C.uint64_t
+    var ptr *C.uint8_t
+    if len(data) > 0 { ptr = (*C.uint8_t)(unsafe.Pointer(&data[0])) }
+    C.sillstone_image_dhash(ptr, C.size_t(len(data)), C.uint32_t(width), C.uint32_t(height), C.uint32_t(layout), &out)
+    return uint64(out)
+}
+
+func SillstoneImageWhash(data []byte, width uint32, height uint32, layout uint32) uint64 {
+    var out C.uint64_t
+    var ptr *C.uint8_t
+    if len(data) > 0 { ptr = (*C.uint8_t)(unsafe.Pointer(&data[0])) }
+    C.sillstone_image_whash(ptr, C.size_t(len(data)), C.uint32_t(width), C.uint32_t(height), C.uint32_t(layout), 3, &out)
+    return uint64(out)
+}
+
+func SillstoneImageColorhash(data []byte, width uint32, height uint32, layout uint32) uint64 {
+    var out C.uint64_t
+    var ptr *C.uint8_t
+    if len(data) > 0 { ptr = (*C.uint8_t)(unsafe.Pointer(&data[0])) }
+    C.sillstone_image_colorhash(ptr, C.size_t(len(data)), C.uint32_t(width), C.uint32_t(height), C.uint32_t(layout), 4, &out)
+    return uint64(out)
+}
+
+func SillstoneTextTlsh(data []byte) []byte {
+    out := make([]byte, 72)
+    var ptr *C.uint8_t
+    if len(data) > 0 { ptr = (*C.uint8_t)(unsafe.Pointer(&data[0])) }
+    C.sillstone_text_tlsh(ptr, C.size_t(len(data)), (*C.uint8_t)(unsafe.Pointer(&out[0])))
+    return out
+}
+
+func SillstoneTextTlshDistance(a []byte, b []byte) uint32 {
+    var out C.uint32_t
+    var ptrA, ptrB *C.uint8_t
+    if len(a) > 0 { ptrA = (*C.uint8_t)(unsafe.Pointer(&a[0])) }
+    if len(b) > 0 { ptrB = (*C.uint8_t)(unsafe.Pointer(&b[0])) }
+    C.sillstone_text_tlsh_distance(ptrA, ptrB, &out)
+    return uint32(out)
 }
 

@@ -106,8 +106,8 @@ pub fn encode_gray(image: &Image<Gray>) -> Result<Vec<u8>> {
     let dc_table = build_huffman_lut(&DC_LUM_BITS, &DC_LUM_VALS);
     let ac_table = build_huffman_lut(&AC_LUM_BITS, &AC_LUM_VALS);
 
-    let mcu_w = (width as usize + 7) / 8;
-    let mcu_h = (height as usize + 7) / 8;
+    let mcu_w = (width as usize).div_ceil(8);
+    let mcu_h = (height as usize).div_ceil(8);
     let mut prev_dc = 0i32;
 
     let pixels = image.as_slice();

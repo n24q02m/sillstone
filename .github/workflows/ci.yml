@@ -28,12 +28,16 @@ jobs:
       - name: Rust Workspace Check
         run: cargo check --workspace --all-targets
 
+      - name: Rust Workspace Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
       - name: Rust Workspace Test
         run: cargo test --workspace --lib --tests
-
       - name: IDL Generator Sync Check
         run: cargo run -p sillstone-idl-gen -- --check
 
+      - name: Verify Reference JSON
+        run: cargo run -p sillstone-curator --bin sillstone-curator-gen-ref -- verify
       - name: Build FFI Dynamic Library
         run: cargo build -p sillstone-ffi
       - name: Set up Python
@@ -49,8 +53,11 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Build Node.js N-API Addon
+        run: node sdk/node/scripts/build.js
+
       - name: Node.js SDK Tests
-        run: node --test sdk/node/test/checksum.test.js
+        run: node --test sdk/node/test/*.test.js
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -61,6 +68,18 @@ jobs:
       - name: Java SDK Tests
         working-directory: sdk/java
         run: mvn test -DargLine="-Djava.library.path=../../target/debug"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Go SDK Tests
+        working-directory: sdk/go/sillstone
+        run: go test -v ./...
+
+      - name: Verify Documentation & Parity
+        run: python scripts/check-docs-parity.py
       - name: Verify Zero Dependencies
         run: python scripts/ci/check-zero-deps.py
 

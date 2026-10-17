@@ -1,3 +1,4 @@
+#![allow(clippy::missing_safety_doc, clippy::needless_range_loop)]
 //! The C ABI surface of `sillstone-math`: the entry points the Python
 //! (ctypes), Node (koffi) and Go (cgo) SDKs bind through.
 //!

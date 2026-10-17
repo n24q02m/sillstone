@@ -309,3 +309,191 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1unic
     };
     sillstone_unicode::char_category(c) as jint
 }
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1phash(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    data: JArray,
+    width: jint,
+    height: jint,
+    layout: jint,
+) -> jlong {
+    let bytes = unsafe { get_input_bytes(env, data) };
+    let mut out = 0u64;
+    let status = unsafe {
+        sillstone_image::ffi::sillstone_image_phash(
+            bytes.as_ptr(),
+            bytes.len(),
+            width as u32,
+            height as u32,
+            layout as u32,
+            &mut out,
+        )
+    };
+    if status != 0 {
+        -1
+    } else {
+        out as jlong
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1ahash(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    data: JArray,
+    width: jint,
+    height: jint,
+    layout: jint,
+) -> jlong {
+    let bytes = unsafe { get_input_bytes(env, data) };
+    let mut out = 0u64;
+    let status = unsafe {
+        sillstone_image::ffi::sillstone_image_ahash(
+            bytes.as_ptr(),
+            bytes.len(),
+            width as u32,
+            height as u32,
+            layout as u32,
+            &mut out,
+        )
+    };
+    if status != 0 {
+        -1
+    } else {
+        out as jlong
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1dhash(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    data: JArray,
+    width: jint,
+    height: jint,
+    layout: jint,
+) -> jlong {
+    let bytes = unsafe { get_input_bytes(env, data) };
+    let mut out = 0u64;
+    let status = unsafe {
+        sillstone_image::ffi::sillstone_image_dhash(
+            bytes.as_ptr(),
+            bytes.len(),
+            width as u32,
+            height as u32,
+            layout as u32,
+            &mut out,
+        )
+    };
+    if status != 0 {
+        -1
+    } else {
+        out as jlong
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1whash(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    data: JArray,
+    width: jint,
+    height: jint,
+    layout: jint,
+) -> jlong {
+    let bytes = unsafe { get_input_bytes(env, data) };
+    let mut out = 0u64;
+    let status = unsafe {
+        sillstone_image::ffi::sillstone_image_whash(
+            bytes.as_ptr(),
+            bytes.len(),
+            width as u32,
+            height as u32,
+            layout as u32,
+            3,
+            &mut out,
+        )
+    };
+    if status != 0 {
+        -1
+    } else {
+        out as jlong
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1colorhash(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    data: JArray,
+    width: jint,
+    height: jint,
+    layout: jint,
+) -> jlong {
+    let bytes = unsafe { get_input_bytes(env, data) };
+    let mut out = 0u64;
+    let status = unsafe {
+        sillstone_image::ffi::sillstone_image_colorhash(
+            bytes.as_ptr(),
+            bytes.len(),
+            width as u32,
+            height as u32,
+            layout as u32,
+            4,
+            &mut out,
+        )
+    };
+    if status != 0 {
+        -1
+    } else {
+        out as jlong
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1text_1tlsh(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    data: JArray,
+) -> JArray {
+    let bytes = unsafe { get_input_bytes(env, data) };
+    let mut out = [0u8; 72];
+    let status = unsafe {
+        sillstone_text::ffi::sillstone_text_tlsh(
+            bytes.as_ptr(),
+            bytes.len(),
+            out.as_mut_ptr(),
+        )
+    };
+    if status != 0 {
+        core::ptr::null_mut()
+    } else {
+        unsafe { create_output_byte_array(env, &out) }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1text_1tlsh_1distance(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    a: JArray,
+    b: JArray,
+) -> jint {
+    let bytes_a = unsafe { get_input_bytes(env, a) };
+    let bytes_b = unsafe { get_input_bytes(env, b) };
+    let mut dist = 0u32;
+    let status = unsafe {
+        sillstone_text::ffi::sillstone_text_tlsh_distance(
+            bytes_a.as_ptr(),
+            bytes_b.as_ptr(),
+            &mut dist,
+        )
+    };
+    if status != 0 {
+        -1
+    } else {
+        dist as jint
+    }
+}

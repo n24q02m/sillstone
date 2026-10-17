@@ -64,8 +64,8 @@ fn keccak_p(state: &mut [u64; 25]) {
             d[x] = c[(x + 4) % 5] ^ c[(x + 1) % 5].rotate_left(1);
         }
         for x in 0..5 {
-            for y in 0..5 {
-                a[x][y] ^= d[x];
+            for item in &mut a[x] {
+                *item ^= d[x];
             }
         }
 

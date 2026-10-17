@@ -129,7 +129,7 @@ pub fn entries(data: &[u8], allow_escape: bool) -> Result<Vec<TarEntry>> {
         };
 
         let data_offset = pos + BLOCK_SIZE;
-        let content_blocks = (size + BLOCK_SIZE - 1) / BLOCK_SIZE;
+        let content_blocks = size.div_ceil(BLOCK_SIZE);
         let next_pos = data_offset
             .checked_add(content_blocks * BLOCK_SIZE)
             .ok_or(Error::BadValue("tar archive offset overflow"))?;

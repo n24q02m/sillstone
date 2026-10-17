@@ -86,10 +86,10 @@ pub fn fingerprint(samples: &[f32], sample_rate: u32) -> Result<Vec<u32>> {
     let bin_hz = FINGERPRINT_SAMPLE_RATE as f64 / FINGERPRINT_WINDOW as f64;
 
     let mut band_limits = [0usize; NUM_BANDS + 1];
-    for i in 0..=NUM_BANDS {
+    for (i, band) in band_limits.iter_mut().enumerate() {
         let freq = min_freq * (max_freq / min_freq).powf(i as f64 / NUM_BANDS as f64);
         let bin = (freq / bin_hz).round() as usize;
-        band_limits[i] = bin.max(1).min(FINGERPRINT_WINDOW / 2);
+        *band = bin.clamp(1, FINGERPRINT_WINDOW / 2);
     }
 
     // 4. Compute spectral band energies for each frame

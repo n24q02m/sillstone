@@ -39,15 +39,18 @@ fn parse_idl(content: &str) -> Vec<Function> {
             let open = sig.find('(').expect("missing ( in signature");
             let close = sig.find(')').expect("missing ) in signature");
             let name = sig[..open].trim().to_string();
-            let args_str = sig[open + 1..close].trim();
+            let args_part = &sig[open + 1..close];
 
             let mut args = Vec::new();
-            if !args_str.is_empty() {
-                for arg_part in args_str.split(',') {
-                    let kv: Vec<&str> = arg_part.split(':').collect();
+            if !args_part.trim().is_empty() {
+                for arg_str in args_part.split(',') {
+                    let arg_trimmed = arg_str.trim();
+                    let colon = arg_trimmed.find(':').expect("missing : in arg");
+                    let arg_name = arg_trimmed[..colon].trim().to_string();
+                    let arg_ty = arg_trimmed[colon + 1..].trim().to_string();
                     args.push(Arg {
-                        name: kv[0].trim().to_string(),
-                        ty: kv[1].trim().to_string(),
+                        name: arg_name,
+                        ty: arg_ty,
                     });
                 }
             }
@@ -69,7 +72,9 @@ fn is_unicode_grapheme_fn(name: &str) -> bool {
 fn is_unicode_category_fn(name: &str) -> bool {
     name == "sillstone_unicode_char_category"
 }
-
+fn is_image_hash_fn(name: &str) -> bool {
+    name.starts_with("sillstone_image_")
+}
 
 fn digest_len(name: &str) -> usize {
     if name.ends_with("_512") {
@@ -106,9 +111,12 @@ fn gen_c_header(fns: &[Function]) -> String {
                     let c_ty = match a.ty.as_str() {
                         "*const u8" => "const uint8_t *",
                         "*mut u8" => "uint8_t *",
+                        "*mut *mut u8" => "uint8_t **",
                         "*const f64" => "const double *",
                         "*mut f64" => "double *",
                         "*mut usize" => "size_t *",
+                        "*mut u32" => "uint32_t *",
+                        "*mut u64" => "uint64_t *",
                         "f64" => "double",
                         "usize" => "size_t",
                         "u32" => "uint32_t",
@@ -165,8 +173,9 @@ fn gen_python(fns: &[Function]) -> String {
             .args
             .iter()
             .map(|a| match a.ty.as_str() {
-                "*const u8" => "ctypes.c_char_p",
-                "*mut u8" => "ctypes.c_char_p",
+                "*const u8" => "ctypes.c_void_p",
+                "*mut u8" => "ctypes.c_void_p",
+                "*mut *mut u8" => "ctypes.POINTER(ctypes.c_void_p)",
                 "*const f64" => "ctypes.POINTER(ctypes.c_double)",
                 "*mut f64" => "ctypes.POINTER(ctypes.c_double)",
                 "f64" => "ctypes.c_double",
@@ -175,6 +184,8 @@ fn gen_python(fns: &[Function]) -> String {
                 "u64" => "ctypes.c_uint64",
                 "i32" => "ctypes.c_int32",
                 "*mut usize" => "ctypes.POINTER(ctypes.c_size_t)",
+                "*mut u32" => "ctypes.POINTER(ctypes.c_uint32)",
+                "*mut u64" => "ctypes.POINTER(ctypes.c_uint64)",
                 _ => "ctypes.c_void_p",
             })
             .collect();
@@ -205,44 +216,70 @@ fn gen_go(fns: &[Function]) -> String {
             .collect::<String>();
 
         if f.name == "sillstone_buffer_checksum" {
-            out.push_str(&format!(
-                "func {go_name}(data []byte) uint64 {{\n"
-            ));
-            out.push_str("    if len(data) == 0 {\n        return uint64(C.sillstone_buffer_checksum(nil, 0))\n    }\n");
+            out.push_str("func SillstoneBufferChecksum(data []byte) uint64 {\n");
+            out.push_str("    if len(data) == 0 {\n");
+            out.push_str("        return uint64(C.sillstone_buffer_checksum(nil, 0))\n");
+            out.push_str("    }\n");
             out.push_str("    return uint64(C.sillstone_buffer_checksum((*C.uint8_t)(unsafe.Pointer(&data[0])), C.size_t(len(data))))\n");
             out.push_str("}\n\n");
         } else if is_digest_fn(&f.name) {
             let out_len = digest_len(&f.name);
             out.push_str(&format!("func {go_name}(data []byte) []byte {{\n"));
             out.push_str(&format!("    out := make([]byte, {out_len})\n"));
-            out.push_str("    var ptr *C.uint8_t\n");
-            out.push_str("    if len(data) > 0 {\n        ptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))\n    }\n");
-            out.push_str(&format!(
-                "    C.{}(ptr, C.size_t(len(data)), (*C.uint8_t)(unsafe.Pointer(&out[0])))\n",
-                f.name
-            ));
+            out.push_str("    var ptr *C.uint8_t\n    if len(data) > 0 {\n");
+            out.push_str("        ptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))\n    }\n");
+            out.push_str(&format!("    C.{}(ptr, C.size_t(len(data)), (*C.uint8_t)(unsafe.Pointer(&out[0])))\n", f.name));
             out.push_str("    return out\n}\n\n");
         } else if is_math_dst_fn(&f.name) {
             out.push_str(&format!("func {go_name}(data []float64) []float64 {{\n"));
             out.push_str("    out := make([]float64, len(data))\n");
-            out.push_str("    if len(data) == 0 {\n        return out\n    }\n");
-            out.push_str(&format!(
-                "    C.{}((*C.double)(unsafe.Pointer(&data[0])), C.size_t(len(data)), (*C.double)(unsafe.Pointer(&out[0])))\n",
-                f.name
-            ));
+            out.push_str("    var ptr *C.double\n    if len(data) > 0 {\n");
+            out.push_str("        ptr = (*C.double)(unsafe.Pointer(&data[0]))\n    }\n");
+            out.push_str(&format!("    C.{}(ptr, C.size_t(len(data)), (*C.double)(unsafe.Pointer(&out[0])))\n", f.name));
             out.push_str("    return out\n}\n\n");
         } else if is_unicode_grapheme_fn(&f.name) {
-            out.push_str("func SillstoneUnicodeGraphemeCount(data []byte) int {\n");
-            out.push_str("    var ptr *C.uint8_t\n");
-            out.push_str("    if len(data) > 0 {\n        ptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))\n    }\n");
-            out.push_str("    var count C.size_t\n");
+            out.push_str("func SillstoneUnicodeGraphemeCount(data []byte) uint64 {\n");
+            out.push_str("    var count C.size_t\n    var ptr *C.uint8_t\n    if len(data) > 0 {\n");
+            out.push_str("        ptr = (*C.uint8_t)(unsafe.Pointer(&data[0]))\n    }\n");
             out.push_str("    C.sillstone_unicode_grapheme_count(ptr, C.size_t(len(data)), &count)\n");
-            out.push_str("    return int(count)\n}\n\n");
+            out.push_str("    return uint64(count)\n}\n\n");
         } else if is_unicode_category_fn(&f.name) {
-            out.push_str("func SillstoneUnicodeCharCategory(cp rune) uint8 {\n");
+            out.push_str("func SillstoneUnicodeCharCategory(cp uint32) uint8 {\n");
             out.push_str("    var cat C.uint8_t\n");
             out.push_str("    C.sillstone_unicode_char_category(C.uint32_t(cp), &cat)\n");
             out.push_str("    return uint8(cat)\n}\n\n");
+        } else if is_image_hash_fn(&f.name) {
+            if f.name == "sillstone_image_whash" {
+                out.push_str(&format!("func {go_name}(data []byte, width uint32, height uint32, layout uint32) uint64 {{\n"));
+                out.push_str("    var out C.uint64_t\n    var ptr *C.uint8_t\n    if len(data) > 0 { ptr = (*C.uint8_t)(unsafe.Pointer(&data[0])) }\n");
+                out.push_str("    C.sillstone_image_whash(ptr, C.size_t(len(data)), C.uint32_t(width), C.uint32_t(height), C.uint32_t(layout), 3, &out)\n");
+                out.push_str("    return uint64(out)\n}\n\n");
+            } else if f.name == "sillstone_image_colorhash" {
+                out.push_str(&format!("func {go_name}(data []byte, width uint32, height uint32, layout uint32) uint64 {{\n"));
+                out.push_str("    var out C.uint64_t\n    var ptr *C.uint8_t\n    if len(data) > 0 { ptr = (*C.uint8_t)(unsafe.Pointer(&data[0])) }\n");
+                out.push_str("    C.sillstone_image_colorhash(ptr, C.size_t(len(data)), C.uint32_t(width), C.uint32_t(height), C.uint32_t(layout), 4, &out)\n");
+                out.push_str("    return uint64(out)\n}\n\n");
+            } else {
+                out.push_str(&format!("func {go_name}(data []byte, width uint32, height uint32, layout uint32) uint64 {{\n"));
+                out.push_str("    var out C.uint64_t\n    var ptr *C.uint8_t\n    if len(data) > 0 { ptr = (*C.uint8_t)(unsafe.Pointer(&data[0])) }\n");
+                out.push_str(&format!("    C.{}(ptr, C.size_t(len(data)), C.uint32_t(width), C.uint32_t(height), C.uint32_t(layout), &out)\n", f.name));
+                out.push_str("    return uint64(out)\n}\n\n");
+            }
+        } else if f.name == "sillstone_text_tlsh" {
+            out.push_str("func SillstoneTextTlsh(data []byte) []byte {\n    out := make([]byte, 72)\n    var ptr *C.uint8_t\n    if len(data) > 0 { ptr = (*C.uint8_t)(unsafe.Pointer(&data[0])) }\n    C.sillstone_text_tlsh(ptr, C.size_t(len(data)), (*C.uint8_t)(unsafe.Pointer(&out[0])))\n    return out\n}\n\n");
+        } else if f.name == "sillstone_text_tlsh_distance" {
+            out.push_str("func SillstoneTextTlshDistance(a []byte, b []byte) uint32 {\n    var out C.uint32_t\n    var ptrA, ptrB *C.uint8_t\n    if len(a) > 0 { ptrA = (*C.uint8_t)(unsafe.Pointer(&a[0])) }\n    if len(b) > 0 { ptrB = (*C.uint8_t)(unsafe.Pointer(&b[0])) }\n    C.sillstone_text_tlsh_distance(ptrA, ptrB, &out)\n    return uint32(out)\n}\n\n");
+        } else if f.name == "sillstone_curator_content_hash" {
+            out.push_str("func SillstoneCuratorContentHash(data []byte) []byte {\n    out := make([]byte, 32)\n    var ptr *C.uint8_t\n    if len(data) > 0 { ptr = (*C.uint8_t)(unsafe.Pointer(&data[0])) }\n    var outLen C.size_t\n    C.sillstone_curator_content_hash(ptr, C.size_t(len(data)), (*C.uint8_t)(unsafe.Pointer(&out[0])), C.size_t(len(out)), &outLen)\n    return out\n}\n\n");
+        } else if f.name == "sillstone_curator_detect" {
+            out.push_str("func SillstoneCuratorDetect(data []byte) (uint32, uint32, uint32) {\n    var format, modality, pending C.uint32_t\n    var ptr *C.uint8_t\n    if len(data) > 0 { ptr = (*C.uint8_t)(unsafe.Pointer(&data[0])) }\n    C.sillstone_curator_detect(ptr, C.size_t(len(data)), &format, &modality, &pending)\n    return uint32(format), uint32(modality), uint32(pending)\n}\n\n");
+        } else if f.name == "sillstone_curator_signature" {
+            out.push_str("func SillstoneCuratorSignature(data []byte) []byte {\n    var outPtr *C.uint8_t\n    var outLen C.size_t\n    var ptr *C.uint8_t\n    if len(data) > 0 { ptr = (*C.uint8_t)(unsafe.Pointer(&data[0])) }\n    status := C.sillstone_curator_signature(ptr, C.size_t(len(data)), &outPtr, &outLen)\n    if status != 0 || outPtr == nil { return nil }\n    res := C.GoBytes(unsafe.Pointer(outPtr), C.int(outLen))\n    C.sillstone_curator_free(outPtr, outLen)\n    return res\n}\n\n");
+        } else if f.name == "sillstone_curator_describe" {
+            out.push_str("func SillstoneCuratorDescribe(data []byte) []byte {\n    var outPtr *C.uint8_t\n    var outLen C.size_t\n    var ptr *C.uint8_t\n    if len(data) > 0 { ptr = (*C.uint8_t)(unsafe.Pointer(&data[0])) }\n    status := C.sillstone_curator_describe(ptr, C.size_t(len(data)), &outPtr, &outLen)\n    if status != 0 || outPtr == nil { return nil }\n    res := C.GoBytes(unsafe.Pointer(outPtr), C.int(outLen))\n    C.sillstone_curator_free(outPtr, outLen)\n    return res\n}\n\n");
+        } else if f.name == "sillstone_curator_match" {
+            out.push_str("func SillstoneCuratorMatch(a []byte, b []byte) (uint32, []uint64, uint32) {\n    var tag C.uint32_t\n    slots := make([]C.uint64_t, 4)\n    var matched C.uint32_t\n    var ptrA, ptrB *C.uint8_t\n    if len(a) > 0 { ptrA = (*C.uint8_t)(unsafe.Pointer(&a[0])) }\n    if len(b) > 0 { ptrB = (*C.uint8_t)(unsafe.Pointer(&b[0])) }\n    C.sillstone_curator_match(ptrA, C.size_t(len(a)), ptrB, C.size_t(len(b)), &tag, &slots[0], C.size_t(len(slots)), &matched)\n    resSlots := make([]uint64, 4)\n    for i, s := range slots { resSlots[i] = uint64(s) }\n    return uint32(tag), resSlots, uint32(matched)\n}\n\n");
+            out.push_str("func SillstoneCuratorFree(ptr unsafe.Pointer, len uint64) {\n    C.sillstone_curator_free((*C.uint8_t)(ptr), C.size_t(len))\n}\n\n");
         } else if f.args.is_empty() {
             let go_ret = match f.ret.as_str() {
                 "u32" => "uint32",
@@ -260,7 +297,8 @@ fn gen_go(fns: &[Function]) -> String {
 fn gen_node_napi(fns: &[Function]) -> String {
     let mut out = String::new();
     out.push_str("/* Generated by sillstone-idl-gen. DO NOT EDIT. */\n");
-    out.push_str("#include <node_api.h>\n#include <stdint.h>\n#include <stddef.h>\n#include \"sillstone.h\"\n\n");
+    out.push_str("#include <node_api.h>\n#include <stdint.h>\n#include <stddef.h>\n#include <stdio.h>\n#include \"sillstone.h\"\n\n");
+    out.push_str("static void throw_status(napi_env env, int32_t status) {\n    char buf[16];\n    snprintf(buf, sizeof(buf), \"%d\", status);\n    napi_throw_error(env, buf, \"FFI error\");\n}\n\n");
 
     for f in fns {
         out.push_str(&format!("static napi_value n_{}(napi_env env, napi_callback_info info) {{\n", f.name));
@@ -301,6 +339,94 @@ fn gen_node_napi(fns: &[Function]) -> String {
             out.push_str("    uint32_t cp = 0;\n    if (argc > 0) {\n        napi_get_value_uint32(env, args[0], &cp);\n    }\n");
             out.push_str("    uint8_t cat = 0;\n    sillstone_unicode_char_category(cp, &cat);\n");
             out.push_str("    napi_value result;\n    napi_create_uint32(env, cat, &result);\n    return result;\n");
+        } else if is_image_hash_fn(&f.name) {
+            out.push_str("    size_t argc = 4;\n    napi_value args[4];\n");
+            out.push_str("    napi_get_cb_info(env, info, &argc, args, NULL, NULL);\n");
+            out.push_str("    void* data = NULL; size_t length = 0;\n");
+            out.push_str("    if (argc > 0) napi_get_buffer_info(env, args[0], &data, &length);\n");
+            out.push_str("    uint32_t width = 0, height = 0, layout = 0;\n");
+            out.push_str("    if (argc > 1) napi_get_value_uint32(env, args[1], &width);\n");
+            out.push_str("    if (argc > 2) napi_get_value_uint32(env, args[2], &height);\n");
+            out.push_str("    if (argc > 3) napi_get_value_uint32(env, args[3], &layout);\n");
+            out.push_str("    uint64_t hash_val = 0;\n");
+            if f.name == "sillstone_image_whash" {
+                out.push_str("    int32_t status = sillstone_image_whash((const uint8_t*)data, length, width, height, layout, 3, &hash_val);\n");
+            } else if f.name == "sillstone_image_colorhash" {
+                out.push_str("    int32_t status = sillstone_image_colorhash((const uint8_t*)data, length, width, height, layout, 4, &hash_val);\n");
+            } else {
+                out.push_str(&format!("    int32_t status = {}((const uint8_t*)data, length, width, height, layout, &hash_val);\n", f.name));
+            }
+            out.push_str("    if (status != 0) { napi_throw_error(env, NULL, \"image hash failed\"); return NULL; }\n");
+            out.push_str("    napi_value result;\n    napi_create_bigint_uint64(env, hash_val, &result);\n    return result;\n");
+        } else if f.name == "sillstone_text_tlsh" {
+            out.push_str("    size_t argc = 1;\n    napi_value args[1];\n    napi_get_cb_info(env, info, &argc, args, NULL, NULL);\n");
+            out.push_str("    void* data = NULL; size_t length = 0;\n    if (argc > 0) napi_get_buffer_info(env, args[0], &data, &length);\n");
+            out.push_str("    uint8_t out_buf[72];\n");
+            out.push_str("    int32_t status = sillstone_text_tlsh((const uint8_t*)data, length, out_buf);\n");
+            out.push_str("    if (status != 0) { napi_throw_error(env, NULL, \"tlsh failed\"); return NULL; }\n");
+            out.push_str("    napi_value result;\n    napi_create_buffer_copy(env, 72, out_buf, NULL, &result);\n    return result;\n");
+        } else if f.name == "sillstone_text_tlsh_distance" {
+            out.push_str("    size_t argc = 2;\n    napi_value args[2];\n    napi_get_cb_info(env, info, &argc, args, NULL, NULL);\n");
+            out.push_str("    void* a = NULL; size_t a_len = 0;\n    void* b = NULL; size_t b_len = 0;\n");
+            out.push_str("    if (argc > 0) napi_get_buffer_info(env, args[0], &a, &a_len);\n");
+            out.push_str("    if (argc > 1) napi_get_buffer_info(env, args[1], &b, &b_len);\n");
+            out.push_str("    uint32_t dist = 0;\n");
+            out.push_str("    int32_t status = sillstone_text_tlsh_distance((const uint8_t*)a, (const uint8_t*)b, &dist);\n");
+            out.push_str("    if (status != 0) { throw_status(env, status); return NULL; }\n");
+            out.push_str("    napi_value result;\n    napi_create_uint32(env, dist, &result);\n    return result;\n");
+        } else if f.name == "sillstone_curator_content_hash" {
+            out.push_str("    size_t argc = 1;\n    napi_value args[1];\n    napi_get_cb_info(env, info, &argc, args, NULL, NULL);\n");
+            out.push_str("    void* data = NULL; size_t length = 0;\n    if (argc > 0) napi_get_buffer_info(env, args[0], &data, &length);\n");
+            out.push_str("    uint8_t out_buf[32];\n    size_t out_len = 0;\n");
+            out.push_str("    int32_t status = sillstone_curator_content_hash((const uint8_t*)data, length, out_buf, 32, &out_len);\n");
+            out.push_str("    if (status != 0) { throw_status(env, status); return NULL; }\n");
+            out.push_str("    napi_value result;\n    napi_create_buffer_copy(env, 32, out_buf, NULL, &result);\n    return result;\n");
+        } else if f.name == "sillstone_curator_detect" {
+            out.push_str("    size_t argc = 1;\n    napi_value args[1];\n    napi_get_cb_info(env, info, &argc, args, NULL, NULL);\n");
+            out.push_str("    void* data = NULL; size_t length = 0;\n    if (argc > 0) napi_get_buffer_info(env, args[0], &data, &length);\n");
+            out.push_str("    uint32_t format = 0, modality = 0, pending = 0;\n");
+            out.push_str("    int32_t status = sillstone_curator_detect((const uint8_t*)data, length, &format, &modality, &pending);\n");
+            out.push_str("    if (status != 0) { throw_status(env, status); return NULL; }\n");
+            out.push_str("    napi_value result, v_fmt, v_mod, v_pend;\n");
+            out.push_str("    napi_create_object(env, &result);\n");
+            out.push_str("    napi_create_uint32(env, format, &v_fmt);\n    napi_set_named_property(env, result, \"format\", v_fmt);\n");
+            out.push_str("    napi_create_uint32(env, modality, &v_mod);\n    napi_set_named_property(env, result, \"modality\", v_mod);\n");
+            out.push_str("    napi_create_uint32(env, pending, &v_pend);\n    napi_set_named_property(env, result, \"pending\", v_pend);\n");
+            out.push_str("    return result;\n");
+        } else if f.name == "sillstone_curator_signature" {
+            out.push_str("    size_t argc = 1;\n    napi_value args[1];\n    napi_get_cb_info(env, info, &argc, args, NULL, NULL);\n");
+            out.push_str("    void* data = NULL; size_t length = 0;\n    if (argc > 0) napi_get_buffer_info(env, args[0], &data, &length);\n");
+            out.push_str("    uint8_t* out_ptr = NULL; size_t out_len = 0;\n");
+            out.push_str("    int32_t status = sillstone_curator_signature((const uint8_t*)data, length, &out_ptr, &out_len);\n");
+            out.push_str("    if (status != 0 || out_ptr == NULL) { throw_status(env, status != 0 ? status : -1); return NULL; }\n");
+            out.push_str("    napi_value result;\n    napi_create_buffer_copy(env, out_len, out_ptr, NULL, &result);\n");
+            out.push_str("    sillstone_curator_free(out_ptr, out_len);\n    return result;\n");
+        } else if f.name == "sillstone_curator_describe" {
+            out.push_str("    size_t argc = 1;\n    napi_value args[1];\n    napi_get_cb_info(env, info, &argc, args, NULL, NULL);\n");
+            out.push_str("    void* data = NULL; size_t length = 0;\n    if (argc > 0) napi_get_buffer_info(env, args[0], &data, &length);\n");
+            out.push_str("    uint8_t* out_ptr = NULL; size_t out_len = 0;\n");
+            out.push_str("    int32_t status = sillstone_curator_describe((const uint8_t*)data, length, &out_ptr, &out_len);\n");
+            out.push_str("    if (status != 0 || out_ptr == NULL) { throw_status(env, status != 0 ? status : -1); return NULL; }\n");
+            out.push_str("    napi_value result;\n    napi_create_buffer_copy(env, out_len, out_ptr, NULL, &result);\n");
+            out.push_str("    sillstone_curator_free(out_ptr, out_len);\n    return result;\n");
+        } else if f.name == "sillstone_curator_match" {
+            out.push_str("    size_t argc = 2;\n    napi_value args[2];\n    napi_get_cb_info(env, info, &argc, args, NULL, NULL);\n");
+            out.push_str("    void* a = NULL; size_t a_len = 0;\n    void* b = NULL; size_t b_len = 0;\n");
+            out.push_str("    if (argc > 0) napi_get_buffer_info(env, args[0], &a, &a_len);\n");
+            out.push_str("    if (argc > 1) napi_get_buffer_info(env, args[1], &b, &b_len);\n");
+            out.push_str("    uint32_t tag = 0, matched = 0; uint64_t slots[4] = {0};\n");
+            out.push_str("    int32_t status = sillstone_curator_match((const uint8_t*)a, a_len, (const uint8_t*)b, b_len, &tag, slots, 4, &matched);\n");
+            out.push_str("    if (status != 0) { throw_status(env, status); return NULL; }\n");
+            out.push_str("    napi_value result, v_tag, v_slots, v_matched;\n");
+            out.push_str("    napi_create_object(env, &result);\n");
+            out.push_str("    napi_create_uint32(env, tag, &v_tag);\n    napi_set_named_property(env, result, \"tag\", v_tag);\n");
+            out.push_str("    napi_create_array_with_length(env, 4, &v_slots);\n");
+            out.push_str("    for (uint32_t i = 0; i < 4; i++) {\n        napi_value sv;\n        napi_create_bigint_uint64(env, slots[i], &sv);\n        napi_set_element(env, v_slots, i, sv);\n    }\n");
+            out.push_str("    napi_set_named_property(env, result, \"slots\", v_slots);\n");
+            out.push_str("    napi_create_uint32(env, matched, &v_matched);\n    napi_set_named_property(env, result, \"matched\", v_matched);\n");
+            out.push_str("    return result;\n");
+        } else if f.name == "sillstone_curator_free" {
+            out.push_str("    napi_value result;\n    napi_get_undefined(env, &result);\n    return result;\n");
         } else {
             out.push_str(&format!("    uint32_t val = {}();\n", f.name));
             out.push_str("    napi_value result;\n    napi_create_uint32(env, val, &result);\n    return result;\n");
@@ -324,7 +450,7 @@ fn gen_java(fns: &[Function]) -> String {
     out.push_str("// Generated by sillstone-idl-gen. DO NOT EDIT.\n");
     out.push_str("package io.github.sillstone;\n\n");
     out.push_str("public final class Generated {\n");
-    out.push_str("    static {\n        System.loadLibrary(\"sillstone_ffi\");\n    }\n\n");
+    out.push_str("    static {\n        try {\n            System.loadLibrary(\"sillstone_ffi\");\n        } catch (UnsatisfiedLinkError e) {\n            System.load(SillstoneNative.findCdylib(\"sillstone_ffi\"));\n        }\n    }\n\n");
     for f in fns {
         if f.name == "sillstone_buffer_checksum" {
             out.push_str("    public static native long sillstone_buffer_checksum(byte[] data, long len);\n\n");
@@ -336,6 +462,24 @@ fn gen_java(fns: &[Function]) -> String {
             out.push_str("    public static native long sillstone_unicode_grapheme_count(byte[] data);\n\n");
         } else if is_unicode_category_fn(&f.name) {
             out.push_str("    public static native int sillstone_unicode_char_category(int cp);\n\n");
+        } else if is_image_hash_fn(&f.name) {
+            out.push_str(&format!("    public static native long {}(byte[] data, int width, int height, int layout);\n\n", f.name));
+        } else if f.name == "sillstone_text_tlsh" {
+            out.push_str("    public static native byte[] sillstone_text_tlsh(byte[] data);\n\n");
+        } else if f.name == "sillstone_text_tlsh_distance" {
+            out.push_str("    public static native int sillstone_text_tlsh_distance(byte[] a, byte[] b);\n\n");
+        } else if f.name == "sillstone_curator_content_hash" {
+            out.push_str("    public static native byte[] sillstone_curator_content_hash(byte[] data);\n\n");
+        } else if f.name == "sillstone_curator_detect" {
+            out.push_str("    public static native int[] sillstone_curator_detect(byte[] data);\n\n");
+        } else if f.name == "sillstone_curator_signature" {
+            out.push_str("    public static native byte[] sillstone_curator_signature(byte[] data);\n\n");
+        } else if f.name == "sillstone_curator_describe" {
+            out.push_str("    public static native byte[] sillstone_curator_describe(byte[] data);\n\n");
+        } else if f.name == "sillstone_curator_match" {
+            out.push_str("    public static native long[] sillstone_curator_match(byte[] a, byte[] b);\n\n");
+        } else if f.name == "sillstone_curator_free" {
+            out.push_str("    public static native void sillstone_curator_free(long ptr, long len);\n\n");
         } else {
             out.push_str(&format!("    public static native int {}();\n\n", f.name));
         }

@@ -300,6 +300,107 @@ pub unsafe extern "system" fn Java_hash_pith_PithHash_contentHash(
     }
 }
 
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneHash_detect(
+    env: *mut JNIEnv,
+    class: JClass,
+    input: JbyteArray,
+) -> JintArray {
+    unsafe { Java_hash_pith_PithHash_detect(env, class, input) }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneHash_signature(
+    env: *mut JNIEnv,
+    class: JClass,
+    input: JbyteArray,
+) -> JbyteArray {
+    unsafe { Java_hash_pith_PithHash_signature(env, class, input) }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneHash_describe(
+    env: *mut JNIEnv,
+    class: JClass,
+    input: JbyteArray,
+) -> JbyteArray {
+    unsafe { Java_hash_pith_PithHash_describe(env, class, input) }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneHash_match(
+    env: *mut JNIEnv,
+    class: JClass,
+    a: JbyteArray,
+    b: JbyteArray,
+) -> JlongArray {
+    unsafe { Java_hash_pith_PithHash_match(env, class, a, b) }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneHash_contentHash(
+    env: *mut JNIEnv,
+    class: JClass,
+    input: JbyteArray,
+) -> JbyteArray {
+    unsafe { Java_hash_pith_PithHash_contentHash(env, class, input) }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1curator_1detect(
+    env: *mut JNIEnv,
+    class: JClass,
+    input: JbyteArray,
+) -> JintArray {
+    unsafe { Java_hash_pith_PithHash_detect(env, class, input) }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1curator_1signature(
+    env: *mut JNIEnv,
+    class: JClass,
+    input: JbyteArray,
+) -> JbyteArray {
+    unsafe { Java_hash_pith_PithHash_signature(env, class, input) }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1curator_1describe(
+    env: *mut JNIEnv,
+    class: JClass,
+    input: JbyteArray,
+) -> JbyteArray {
+    unsafe { Java_hash_pith_PithHash_describe(env, class, input) }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1curator_1match(
+    env: *mut JNIEnv,
+    class: JClass,
+    a: JbyteArray,
+    b: JbyteArray,
+) -> JlongArray {
+    unsafe { Java_hash_pith_PithHash_match(env, class, a, b) }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1curator_1content_1hash(
+    env: *mut JNIEnv,
+    class: JClass,
+    input: JbyteArray,
+) -> JbyteArray {
+    unsafe { Java_hash_pith_PithHash_contentHash(env, class, input) }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1curator_1free(
+    _env: *mut JNIEnv,
+    _class: JClass,
+    _ptr: Jlong,
+    _len: Jlong,
+) {
+}
+
 /// Reads a Java `byte[]` through `env` into a native buffer. `None`
 /// for a null `env` or a null array — the caller maps that to `-1`.
 ///
@@ -435,7 +536,7 @@ unsafe fn throw_status(env: *mut JNIEnv, op: &str, status: i32) {
         return;
     };
     let class = unsafe {
-        (table.find_class.expect("FindClass slot"))(env, c"hash/pith/PithFfiException".as_ptr())
+        (table.find_class.expect("FindClass slot"))(env, c"io/github/sillstone/SillstoneFfiException".as_ptr())
     };
     if class.is_null() {
         unsafe { throw_runtime(env, table, &text) };

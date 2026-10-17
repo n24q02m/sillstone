@@ -16,6 +16,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+*.dll
+*.dylib
+*.node
+*.a
 .venv/
 build/
 dist/

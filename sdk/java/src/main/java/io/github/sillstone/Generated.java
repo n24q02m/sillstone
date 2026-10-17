@@ -3,7 +3,11 @@ package io.github.sillstone;
 
 public final class Generated {
     static {
-        System.loadLibrary("sillstone_ffi");
+        try {
+            System.loadLibrary("sillstone_ffi");
+        } catch (UnsatisfiedLinkError e) {
+            System.load(SillstoneNative.findCdylib("sillstone_ffi"));
+        }
     }
 
     public static native int sillstone_version_major();
@@ -33,5 +37,31 @@ public final class Generated {
     public static native long sillstone_unicode_grapheme_count(byte[] data);
 
     public static native int sillstone_unicode_char_category(int cp);
+
+    public static native int[] sillstone_curator_detect(byte[] data);
+
+    public static native byte[] sillstone_curator_content_hash(byte[] data);
+
+    public static native byte[] sillstone_curator_signature(byte[] data);
+
+    public static native byte[] sillstone_curator_describe(byte[] data);
+
+    public static native long[] sillstone_curator_match(byte[] a, byte[] b);
+
+    public static native void sillstone_curator_free(long ptr, long len);
+
+    public static native long sillstone_image_phash(byte[] data, int width, int height, int layout);
+
+    public static native long sillstone_image_ahash(byte[] data, int width, int height, int layout);
+
+    public static native long sillstone_image_dhash(byte[] data, int width, int height, int layout);
+
+    public static native long sillstone_image_whash(byte[] data, int width, int height, int layout);
+
+    public static native long sillstone_image_colorhash(byte[] data, int width, int height, int layout);
+
+    public static native byte[] sillstone_text_tlsh(byte[] data);
+
+    public static native int sillstone_text_tlsh_distance(byte[] a, byte[] b);
 
 }

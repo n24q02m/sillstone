@@ -2,7 +2,14 @@
 #include <node_api.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <stdio.h>
 #include "sillstone.h"
+
+static void throw_status(napi_env env, int32_t status) {
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%d", status);
+    napi_throw_error(env, buf, "FFI error");
+}
 
 static napi_value n_sillstone_version_major(napi_env env, napi_callback_info info) {
     uint32_t val = sillstone_version_major();
@@ -200,6 +207,224 @@ static napi_value n_sillstone_unicode_char_category(napi_env env, napi_callback_
     return result;
 }
 
+static napi_value n_sillstone_curator_detect(napi_env env, napi_callback_info info) {
+    size_t argc = 1;
+    napi_value args[1];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    void* data = NULL; size_t length = 0;
+    if (argc > 0) napi_get_buffer_info(env, args[0], &data, &length);
+    uint32_t format = 0, modality = 0, pending = 0;
+    int32_t status = sillstone_curator_detect((const uint8_t*)data, length, &format, &modality, &pending);
+    if (status != 0) { throw_status(env, status); return NULL; }
+    napi_value result, v_fmt, v_mod, v_pend;
+    napi_create_object(env, &result);
+    napi_create_uint32(env, format, &v_fmt);
+    napi_set_named_property(env, result, "format", v_fmt);
+    napi_create_uint32(env, modality, &v_mod);
+    napi_set_named_property(env, result, "modality", v_mod);
+    napi_create_uint32(env, pending, &v_pend);
+    napi_set_named_property(env, result, "pending", v_pend);
+    return result;
+}
+
+static napi_value n_sillstone_curator_content_hash(napi_env env, napi_callback_info info) {
+    size_t argc = 1;
+    napi_value args[1];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    void* data = NULL; size_t length = 0;
+    if (argc > 0) napi_get_buffer_info(env, args[0], &data, &length);
+    uint8_t out_buf[32];
+    size_t out_len = 0;
+    int32_t status = sillstone_curator_content_hash((const uint8_t*)data, length, out_buf, 32, &out_len);
+    if (status != 0) { throw_status(env, status); return NULL; }
+    napi_value result;
+    napi_create_buffer_copy(env, 32, out_buf, NULL, &result);
+    return result;
+}
+
+static napi_value n_sillstone_curator_signature(napi_env env, napi_callback_info info) {
+    size_t argc = 1;
+    napi_value args[1];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    void* data = NULL; size_t length = 0;
+    if (argc > 0) napi_get_buffer_info(env, args[0], &data, &length);
+    uint8_t* out_ptr = NULL; size_t out_len = 0;
+    int32_t status = sillstone_curator_signature((const uint8_t*)data, length, &out_ptr, &out_len);
+    if (status != 0 || out_ptr == NULL) { throw_status(env, status != 0 ? status : -1); return NULL; }
+    napi_value result;
+    napi_create_buffer_copy(env, out_len, out_ptr, NULL, &result);
+    sillstone_curator_free(out_ptr, out_len);
+    return result;
+}
+
+static napi_value n_sillstone_curator_describe(napi_env env, napi_callback_info info) {
+    size_t argc = 1;
+    napi_value args[1];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    void* data = NULL; size_t length = 0;
+    if (argc > 0) napi_get_buffer_info(env, args[0], &data, &length);
+    uint8_t* out_ptr = NULL; size_t out_len = 0;
+    int32_t status = sillstone_curator_describe((const uint8_t*)data, length, &out_ptr, &out_len);
+    if (status != 0 || out_ptr == NULL) { throw_status(env, status != 0 ? status : -1); return NULL; }
+    napi_value result;
+    napi_create_buffer_copy(env, out_len, out_ptr, NULL, &result);
+    sillstone_curator_free(out_ptr, out_len);
+    return result;
+}
+
+static napi_value n_sillstone_curator_match(napi_env env, napi_callback_info info) {
+    size_t argc = 2;
+    napi_value args[2];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    void* a = NULL; size_t a_len = 0;
+    void* b = NULL; size_t b_len = 0;
+    if (argc > 0) napi_get_buffer_info(env, args[0], &a, &a_len);
+    if (argc > 1) napi_get_buffer_info(env, args[1], &b, &b_len);
+    uint32_t tag = 0, matched = 0; uint64_t slots[4] = {0};
+    int32_t status = sillstone_curator_match((const uint8_t*)a, a_len, (const uint8_t*)b, b_len, &tag, slots, 4, &matched);
+    if (status != 0) { throw_status(env, status); return NULL; }
+    napi_value result, v_tag, v_slots, v_matched;
+    napi_create_object(env, &result);
+    napi_create_uint32(env, tag, &v_tag);
+    napi_set_named_property(env, result, "tag", v_tag);
+    napi_create_array_with_length(env, 4, &v_slots);
+    for (uint32_t i = 0; i < 4; i++) {
+        napi_value sv;
+        napi_create_bigint_uint64(env, slots[i], &sv);
+        napi_set_element(env, v_slots, i, sv);
+    }
+    napi_set_named_property(env, result, "slots", v_slots);
+    napi_create_uint32(env, matched, &v_matched);
+    napi_set_named_property(env, result, "matched", v_matched);
+    return result;
+}
+
+static napi_value n_sillstone_curator_free(napi_env env, napi_callback_info info) {
+    napi_value result;
+    napi_get_undefined(env, &result);
+    return result;
+}
+
+static napi_value n_sillstone_image_phash(napi_env env, napi_callback_info info) {
+    size_t argc = 4;
+    napi_value args[4];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    void* data = NULL; size_t length = 0;
+    if (argc > 0) napi_get_buffer_info(env, args[0], &data, &length);
+    uint32_t width = 0, height = 0, layout = 0;
+    if (argc > 1) napi_get_value_uint32(env, args[1], &width);
+    if (argc > 2) napi_get_value_uint32(env, args[2], &height);
+    if (argc > 3) napi_get_value_uint32(env, args[3], &layout);
+    uint64_t hash_val = 0;
+    int32_t status = sillstone_image_phash((const uint8_t*)data, length, width, height, layout, &hash_val);
+    if (status != 0) { napi_throw_error(env, NULL, "image hash failed"); return NULL; }
+    napi_value result;
+    napi_create_bigint_uint64(env, hash_val, &result);
+    return result;
+}
+
+static napi_value n_sillstone_image_ahash(napi_env env, napi_callback_info info) {
+    size_t argc = 4;
+    napi_value args[4];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    void* data = NULL; size_t length = 0;
+    if (argc > 0) napi_get_buffer_info(env, args[0], &data, &length);
+    uint32_t width = 0, height = 0, layout = 0;
+    if (argc > 1) napi_get_value_uint32(env, args[1], &width);
+    if (argc > 2) napi_get_value_uint32(env, args[2], &height);
+    if (argc > 3) napi_get_value_uint32(env, args[3], &layout);
+    uint64_t hash_val = 0;
+    int32_t status = sillstone_image_ahash((const uint8_t*)data, length, width, height, layout, &hash_val);
+    if (status != 0) { napi_throw_error(env, NULL, "image hash failed"); return NULL; }
+    napi_value result;
+    napi_create_bigint_uint64(env, hash_val, &result);
+    return result;
+}
+
+static napi_value n_sillstone_image_dhash(napi_env env, napi_callback_info info) {
+    size_t argc = 4;
+    napi_value args[4];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    void* data = NULL; size_t length = 0;
+    if (argc > 0) napi_get_buffer_info(env, args[0], &data, &length);
+    uint32_t width = 0, height = 0, layout = 0;
+    if (argc > 1) napi_get_value_uint32(env, args[1], &width);
+    if (argc > 2) napi_get_value_uint32(env, args[2], &height);
+    if (argc > 3) napi_get_value_uint32(env, args[3], &layout);
+    uint64_t hash_val = 0;
+    int32_t status = sillstone_image_dhash((const uint8_t*)data, length, width, height, layout, &hash_val);
+    if (status != 0) { napi_throw_error(env, NULL, "image hash failed"); return NULL; }
+    napi_value result;
+    napi_create_bigint_uint64(env, hash_val, &result);
+    return result;
+}
+
+static napi_value n_sillstone_image_whash(napi_env env, napi_callback_info info) {
+    size_t argc = 4;
+    napi_value args[4];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    void* data = NULL; size_t length = 0;
+    if (argc > 0) napi_get_buffer_info(env, args[0], &data, &length);
+    uint32_t width = 0, height = 0, layout = 0;
+    if (argc > 1) napi_get_value_uint32(env, args[1], &width);
+    if (argc > 2) napi_get_value_uint32(env, args[2], &height);
+    if (argc > 3) napi_get_value_uint32(env, args[3], &layout);
+    uint64_t hash_val = 0;
+    int32_t status = sillstone_image_whash((const uint8_t*)data, length, width, height, layout, 3, &hash_val);
+    if (status != 0) { napi_throw_error(env, NULL, "image hash failed"); return NULL; }
+    napi_value result;
+    napi_create_bigint_uint64(env, hash_val, &result);
+    return result;
+}
+
+static napi_value n_sillstone_image_colorhash(napi_env env, napi_callback_info info) {
+    size_t argc = 4;
+    napi_value args[4];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    void* data = NULL; size_t length = 0;
+    if (argc > 0) napi_get_buffer_info(env, args[0], &data, &length);
+    uint32_t width = 0, height = 0, layout = 0;
+    if (argc > 1) napi_get_value_uint32(env, args[1], &width);
+    if (argc > 2) napi_get_value_uint32(env, args[2], &height);
+    if (argc > 3) napi_get_value_uint32(env, args[3], &layout);
+    uint64_t hash_val = 0;
+    int32_t status = sillstone_image_colorhash((const uint8_t*)data, length, width, height, layout, 4, &hash_val);
+    if (status != 0) { napi_throw_error(env, NULL, "image hash failed"); return NULL; }
+    napi_value result;
+    napi_create_bigint_uint64(env, hash_val, &result);
+    return result;
+}
+
+static napi_value n_sillstone_text_tlsh(napi_env env, napi_callback_info info) {
+    size_t argc = 1;
+    napi_value args[1];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    void* data = NULL; size_t length = 0;
+    if (argc > 0) napi_get_buffer_info(env, args[0], &data, &length);
+    uint8_t out_buf[72];
+    int32_t status = sillstone_text_tlsh((const uint8_t*)data, length, out_buf);
+    if (status != 0) { napi_throw_error(env, NULL, "tlsh failed"); return NULL; }
+    napi_value result;
+    napi_create_buffer_copy(env, 72, out_buf, NULL, &result);
+    return result;
+}
+
+static napi_value n_sillstone_text_tlsh_distance(napi_env env, napi_callback_info info) {
+    size_t argc = 2;
+    napi_value args[2];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    void* a = NULL; size_t a_len = 0;
+    void* b = NULL; size_t b_len = 0;
+    if (argc > 0) napi_get_buffer_info(env, args[0], &a, &a_len);
+    if (argc > 1) napi_get_buffer_info(env, args[1], &b, &b_len);
+    uint32_t dist = 0;
+    int32_t status = sillstone_text_tlsh_distance((const uint8_t*)a, (const uint8_t*)b, &dist);
+    if (status != 0) { throw_status(env, status); return NULL; }
+    napi_value result;
+    napi_create_uint32(env, dist, &result);
+    return result;
+}
+
 NAPI_MODULE_INIT() {
     napi_value fn_sillstone_version_major;
     napi_create_function(env, NULL, 0, n_sillstone_version_major, NULL, &fn_sillstone_version_major);
@@ -243,5 +468,44 @@ NAPI_MODULE_INIT() {
     napi_value fn_sillstone_unicode_char_category;
     napi_create_function(env, NULL, 0, n_sillstone_unicode_char_category, NULL, &fn_sillstone_unicode_char_category);
     napi_set_named_property(env, exports, "sillstone_unicode_char_category", fn_sillstone_unicode_char_category);
+    napi_value fn_sillstone_curator_detect;
+    napi_create_function(env, NULL, 0, n_sillstone_curator_detect, NULL, &fn_sillstone_curator_detect);
+    napi_set_named_property(env, exports, "sillstone_curator_detect", fn_sillstone_curator_detect);
+    napi_value fn_sillstone_curator_content_hash;
+    napi_create_function(env, NULL, 0, n_sillstone_curator_content_hash, NULL, &fn_sillstone_curator_content_hash);
+    napi_set_named_property(env, exports, "sillstone_curator_content_hash", fn_sillstone_curator_content_hash);
+    napi_value fn_sillstone_curator_signature;
+    napi_create_function(env, NULL, 0, n_sillstone_curator_signature, NULL, &fn_sillstone_curator_signature);
+    napi_set_named_property(env, exports, "sillstone_curator_signature", fn_sillstone_curator_signature);
+    napi_value fn_sillstone_curator_describe;
+    napi_create_function(env, NULL, 0, n_sillstone_curator_describe, NULL, &fn_sillstone_curator_describe);
+    napi_set_named_property(env, exports, "sillstone_curator_describe", fn_sillstone_curator_describe);
+    napi_value fn_sillstone_curator_match;
+    napi_create_function(env, NULL, 0, n_sillstone_curator_match, NULL, &fn_sillstone_curator_match);
+    napi_set_named_property(env, exports, "sillstone_curator_match", fn_sillstone_curator_match);
+    napi_value fn_sillstone_curator_free;
+    napi_create_function(env, NULL, 0, n_sillstone_curator_free, NULL, &fn_sillstone_curator_free);
+    napi_set_named_property(env, exports, "sillstone_curator_free", fn_sillstone_curator_free);
+    napi_value fn_sillstone_image_phash;
+    napi_create_function(env, NULL, 0, n_sillstone_image_phash, NULL, &fn_sillstone_image_phash);
+    napi_set_named_property(env, exports, "sillstone_image_phash", fn_sillstone_image_phash);
+    napi_value fn_sillstone_image_ahash;
+    napi_create_function(env, NULL, 0, n_sillstone_image_ahash, NULL, &fn_sillstone_image_ahash);
+    napi_set_named_property(env, exports, "sillstone_image_ahash", fn_sillstone_image_ahash);
+    napi_value fn_sillstone_image_dhash;
+    napi_create_function(env, NULL, 0, n_sillstone_image_dhash, NULL, &fn_sillstone_image_dhash);
+    napi_set_named_property(env, exports, "sillstone_image_dhash", fn_sillstone_image_dhash);
+    napi_value fn_sillstone_image_whash;
+    napi_create_function(env, NULL, 0, n_sillstone_image_whash, NULL, &fn_sillstone_image_whash);
+    napi_set_named_property(env, exports, "sillstone_image_whash", fn_sillstone_image_whash);
+    napi_value fn_sillstone_image_colorhash;
+    napi_create_function(env, NULL, 0, n_sillstone_image_colorhash, NULL, &fn_sillstone_image_colorhash);
+    napi_set_named_property(env, exports, "sillstone_image_colorhash", fn_sillstone_image_colorhash);
+    napi_value fn_sillstone_text_tlsh;
+    napi_create_function(env, NULL, 0, n_sillstone_text_tlsh, NULL, &fn_sillstone_text_tlsh);
+    napi_set_named_property(env, exports, "sillstone_text_tlsh", fn_sillstone_text_tlsh);
+    napi_value fn_sillstone_text_tlsh_distance;
+    napi_create_function(env, NULL, 0, n_sillstone_text_tlsh_distance, NULL, &fn_sillstone_text_tlsh_distance);
+    napi_set_named_property(env, exports, "sillstone_text_tlsh_distance", fn_sillstone_text_tlsh_distance);
     return exports;
 }

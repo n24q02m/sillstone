@@ -189,10 +189,8 @@ impl<'a> Iterator for Graphemes<'a> {
 
             if is_extended_pictographic(next_cp) {
                 extpic_state = true;
-            } else if extpic_state {
-                if next_gb != Gbp::Extend && next_gb != Gbp::ZWJ {
-                    extpic_state = false;
-                }
+            } else if extpic_state && next_gb != Gbp::Extend && next_gb != Gbp::ZWJ {
+                extpic_state = false;
             }
 
             if incb_len < incb_buf.len() {
@@ -261,10 +259,8 @@ fn should_break(
         return false;
     }
     // GB12/13: sot (RI RI)* RI x RI
-    if p == Gbp::Regional_Indicator && n == Gbp::Regional_Indicator {
-        if ri_count % 2 == 1 {
-            return false;
-        }
+    if p == Gbp::Regional_Indicator && n == Gbp::Regional_Indicator && ri_count % 2 == 1 {
+        return false;
     }
     // GB999: Any ÷ Any
     true

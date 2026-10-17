@@ -23,3 +23,6 @@ sillstone-buffer = { path = "../buffer" }
 sillstone-digest = { path = "../digest" }
 sillstone-math = { path = "../math" }
 sillstone-unicode = { path = "../unicode" }
+sillstone-curator = { path = "../curator" }
+sillstone-image = { path = "../image" }
+sillstone-text = { path = "../text" }

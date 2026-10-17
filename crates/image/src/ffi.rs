@@ -1,3 +1,4 @@
+#![allow(clippy::missing_safety_doc)]
 //! The C ABI surface of `sillstone-image`: the entry points the Python
 //! (ctypes), Node (koffi) and Go (cgo) SDKs bind through.
 //!

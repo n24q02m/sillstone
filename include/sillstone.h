@@ -37,6 +37,32 @@ int32_t sillstone_unicode_grapheme_count(const uint8_t *data, size_t len, size_t
 
 int32_t sillstone_unicode_char_category(uint32_t cp, uint8_t *out);
 
+int32_t sillstone_curator_detect(const uint8_t *data, size_t len, uint32_t *out_format, uint32_t *out_modality, uint32_t *out_pending);
+
+int32_t sillstone_curator_content_hash(const uint8_t *data, size_t len, uint8_t *out, size_t out_cap, size_t *out_len);
+
+int32_t sillstone_curator_signature(const uint8_t *data, size_t len, uint8_t **out, size_t *out_len);
+
+int32_t sillstone_curator_describe(const uint8_t *data, size_t len, uint8_t **out, size_t *out_len);
+
+int32_t sillstone_curator_match(const uint8_t *a, size_t a_len, const uint8_t *b, size_t b_len, uint32_t *out_tag, uint64_t *out_slots, size_t slots_cap, uint32_t *out_matched);
+
+void sillstone_curator_free(uint8_t *ptr, size_t len);
+
+int32_t sillstone_image_phash(const uint8_t *data, size_t len, uint32_t width, uint32_t height, uint32_t layout, uint64_t *out);
+
+int32_t sillstone_image_ahash(const uint8_t *data, size_t len, uint32_t width, uint32_t height, uint32_t layout, uint64_t *out);
+
+int32_t sillstone_image_dhash(const uint8_t *data, size_t len, uint32_t width, uint32_t height, uint32_t layout, uint64_t *out);
+
+int32_t sillstone_image_whash(const uint8_t *data, size_t len, uint32_t width, uint32_t height, uint32_t layout, uint32_t level, uint64_t *out);
+
+int32_t sillstone_image_colorhash(const uint8_t *data, size_t len, uint32_t width, uint32_t height, uint32_t layout, uint32_t bins, uint64_t *out);
+
+int32_t sillstone_text_tlsh(const uint8_t *data, size_t len, uint8_t *out);
+
+int32_t sillstone_text_tlsh_distance(const uint8_t *hash_a, const uint8_t *hash_b, uint32_t *out);
+
 #ifdef __cplusplus
 }
 #endif

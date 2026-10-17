@@ -40,6 +40,23 @@ pub unsafe extern "C" fn sillstone_buffer_checksum(ptr: *const u8, len: usize) -
 }
 
 
+#[doc(hidden)]
+pub fn _touch_deps() {
+    let _ = sillstone_curator::ffi::sillstone_curator_detect as *const () as usize;
+    let _ = sillstone_curator::ffi::sillstone_curator_content_hash as *const () as usize;
+    let _ = sillstone_curator::ffi::sillstone_curator_signature as *const () as usize;
+    let _ = sillstone_curator::ffi::sillstone_curator_describe as *const () as usize;
+    let _ = sillstone_curator::ffi::sillstone_curator_match as *const () as usize;
+    let _ = sillstone_curator::ffi::sillstone_curator_free as *const () as usize;
+    let _ = sillstone_image::ffi::sillstone_image_phash as *const () as usize;
+    let _ = sillstone_image::ffi::sillstone_image_ahash as *const () as usize;
+    let _ = sillstone_image::ffi::sillstone_image_dhash as *const () as usize;
+    let _ = sillstone_image::ffi::sillstone_image_whash as *const () as usize;
+    let _ = sillstone_image::ffi::sillstone_image_colorhash as *const () as usize;
+    let _ = sillstone_text::ffi::sillstone_text_tlsh as *const () as usize;
+    let _ = sillstone_text::ffi::sillstone_text_tlsh_distance as *const () as usize;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

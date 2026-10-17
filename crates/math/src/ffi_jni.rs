@@ -1,3 +1,4 @@
+#![allow(clippy::missing_safety_doc, clippy::needless_range_loop)]
 //! The JNI surface of `sillstone-math`: the entry points the Java SDK binds
 //! through `System.loadLibrary("sillstone_math")`.
 //!
