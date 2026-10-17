@@ -62,6 +62,7 @@ mod crc;
 
 pub mod ffi;
 mod header;
+pub mod id3;
 mod hufftab;
 mod layer12;
 mod layer3;
@@ -73,6 +74,7 @@ use alloc::vec::Vec;
 use sillstone_digest::{Error, Result};
 
 pub use crate::header::{Header, Layer, Mode};
+pub use crate::id3::{Id3Picture, Id3v1, Id3v2, parse_id3v1, parse_id3v2};
 use crate::layer3::{Overlap, Reservoir};
 use crate::synthesis::Synthesis;
 /// Ceilings a caller imposes on one decode call.

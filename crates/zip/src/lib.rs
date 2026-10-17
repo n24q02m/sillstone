@@ -41,12 +41,16 @@
 // language SDKs bind through: raw pointers exist only at that boundary,
 // and every exported function is a documented `unsafe extern "C"` fn.
 #![deny(unsafe_code)]
+extern crate alloc;
+
 
 mod reader;
+pub mod writer;
 mod xml;
 
 pub mod ffi;
 pub mod reference;
 
 pub use reader::{ZipArchive, ZipEntry};
+pub use writer::ZipWriter;
 pub use xml::{XmlEvent, XmlReader};

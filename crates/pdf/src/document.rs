@@ -214,6 +214,11 @@ impl<'a> Document<'a> {
         self.encrypt
     }
 
+    /// Trailer dictionary.
+    pub(crate) fn trailer(&self) -> &[(Vec<u8>, Obj)] {
+        &self.xref.trailer
+    }
+
     /// Page count.
     pub fn pages(&self) -> usize {
         self.pages.len()

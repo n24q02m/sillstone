@@ -33,6 +33,7 @@ extern crate alloc;
 
 mod crc;
 mod frame;
+pub mod metadata;
 mod reader;
 
 pub mod ffi;
@@ -42,6 +43,7 @@ use alloc::vec::Vec;
 use sillstone_digest::{Error, Result};
 
 use crate::reader::FlacReader;
+pub use metadata::{Picture, VorbisComment, parse_picture, parse_vorbis_comment};
 
 /// The four magic bytes every native FLAC stream opens with.
 const MAGIC: &[u8; 4] = b"fLaC";

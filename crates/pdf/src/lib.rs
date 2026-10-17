@@ -55,6 +55,7 @@
 
 extern crate alloc;
 
+pub mod acroform;
 pub mod cmap;
 mod content;
 mod document;
@@ -67,6 +68,7 @@ mod xref;
 
 pub use document::{Document, Error, Result};
 pub use object::{Obj, Ref, decode_stream};
+pub use acroform::{AcroForm, FieldType, FormField};
 
 /// Extract all text from a PDF byte buffer (pages joined by `\x0c`).
 ///
