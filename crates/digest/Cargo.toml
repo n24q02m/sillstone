@@ -1,0 +1,28 @@
+[package]
+name = "sillstone-digest"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+description = "Pure-Rust cryptographic and non-cryptographic hash algorithms (SHA-256, SHA-512, SHA-1, Murmur3, CRC32c, xxHash64)."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+
+[features]
+default = ["std"]
+std = []
+
+[[bin]]
+name = "sillstone-digest-gen-ref"
+path = "tools/gen-reference/main.rs"
+
+[lints.rust]
+unsafe_code = "allow"
+missing_docs = "deny"

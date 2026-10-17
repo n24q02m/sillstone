@@ -2,6 +2,10 @@
 resolver = "2"
 members = [
     "crates/buffer",
+    "crates/digest",
+    "crates/math",
+    "crates/inflate",
+    "crates/unicode",
     "crates/ffi",
     "tools/idl-gen",
 ]

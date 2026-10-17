@@ -1,0 +1,30 @@
+[package]
+name = "sillstone-unicode"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+description = "Pure-Rust Unicode NFC normalisation and table lookup."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+
+[dev-dependencies]
+sillstone-digest = { path = "../digest" }
+[[bin]]
+name = "sillstone-unicode-gen-ref"
+path = "tools/gen-reference/main.rs"
+
+[[bin]]
+name = "sillstone-unicode-gen-ucd"
+path = "tools/gen-ucd/main.rs"
+
+[lints.rust]
+unsafe_code = "allow"
+missing_docs = "deny"

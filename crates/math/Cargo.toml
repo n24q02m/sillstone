@@ -1,0 +1,27 @@
+[package]
+name = "sillstone-math"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+description = "Pure-Rust FFT, DCT, linear algebra, median, and numeric transforms."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+
+[dev-dependencies]
+sillstone-digest = { path = "../digest" }
+
+[[bin]]
+name = "sillstone-math-gen-ref"
+path = "tools/gen-reference/main.rs"
+
+[lints.rust]
+unsafe_code = "allow"
+missing_docs = "deny"

@@ -1,0 +1,29 @@
+[package]
+name = "sillstone-inflate"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+description = "Pure-Rust DEFLATE and zlib stream decoding conforming to RFC 1951 and RFC 1950."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+sillstone-digest = { path = "../digest" }
+
+[features]
+default = ["std"]
+std = []
+
+[[bin]]
+name = "sillstone-inflate-gen-ref"
+path = "tools/gen-reference/main.rs"
+
+[lints.rust]
+unsafe_code = "allow"
+missing_docs = "deny"
