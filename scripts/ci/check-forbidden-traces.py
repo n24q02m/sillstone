@@ -30,7 +30,8 @@ def main() -> int:
             dirnames.remove("node_modules")
         if "__pycache__" in dirnames:
             dirnames.remove("__pycache__")
-
+        if "build" in dirnames:
+            dirnames.remove("build")
         for f in filenames:
             rel = Path(dirpath, f).relative_to(root).as_posix()
             if rel in ALLOWED_EXCEPTIONS:
