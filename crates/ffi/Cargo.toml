@@ -11,7 +11,7 @@ readme = "README.md"
 description = "C ABI and FFI bridge export for Sillstone"
 
 [lib]
-crate-type = ["cdylib", "staticlib", "rlib"]
+crate-type = ["cdylib", "rlib"]
 
 [lints.rust]
 unsafe_code = "allow"

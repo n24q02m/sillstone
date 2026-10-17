@@ -5,6 +5,8 @@
 #![allow(unsafe_code)]
 #![deny(missing_docs)]
 
+mod jni;
+
 /// Returns the major version of the Sillstone library.
 #[cfg_attr(not(test), unsafe(no_mangle))]
 pub extern "C" fn sillstone_version_major() -> u32 {

@@ -5,7 +5,7 @@ hashed into `reference.json`. Their bytes are a crate contract: the
 `.gitattributes` `* text=auto eol=lf` pin keeps every checkout LF, and a
 CRLF checkout would silently change every vector derived from them.
 
-Source: `n24q02m/modhash` @ `main` (89ed581), `lab/differential/corpus/text/`,
+Source: `upstream/modhash` @ `main` (89ed581), `lab/differential/corpus/text/`,
 copied byte-identical. SHA-256 at copy time:
 
 | file | sha256 |

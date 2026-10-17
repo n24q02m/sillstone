@@ -2,8 +2,9 @@
 package sillstone
 
 /*
-#cgo CFLAGS: -I../../include
-#cgo LDFLAGS: -L../../target/debug -L../../target/release -lsillstone_ffi
+#cgo CFLAGS: -I../../../include
+#cgo LDFLAGS: -L../../../target/debug -L../../../target/release -lsillstone_ffi
+#cgo windows LDFLAGS: -lws2_32 -luserenv -lntdll -lbcrypt
 #include "sillstone.h"
 */
 import "C"

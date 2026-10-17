@@ -29,7 +29,7 @@ jobs:
         run: cargo check --workspace --all-targets
 
       - name: Rust Workspace Test
-        run: cargo test --workspace
+        run: cargo test --workspace --lib --tests
 
       - name: IDL Generator Sync Check
         run: cargo run -p sillstone-idl-gen -- --check
@@ -52,6 +52,15 @@ jobs:
       - name: Node.js SDK Tests
         run: node --test sdk/node/test/checksum.test.js
 
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Java SDK Tests
+        working-directory: sdk/java
+        run: mvn test
       - name: Verify Zero Dependencies
         run: python scripts/ci/check-zero-deps.py
 

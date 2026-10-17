@@ -15,7 +15,7 @@ uint32_t sillstone_version_minor(void);
 
 uint32_t sillstone_version_patch(void);
 
-uint64_t sillstone_buffer_checksum(const uint8_t *ptr, size_tlen);
+uint64_t sillstone_buffer_checksum(const uint8_t *ptr, size_t len);
 
 #ifdef __cplusplus
 }
