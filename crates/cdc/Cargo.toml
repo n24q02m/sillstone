@@ -1,0 +1,42 @@
+[[bin]]
+name = "sillstone-cdc-gen-ref"
+path = "tools/gen-reference/main.rs"
+
+[package]
+name = "sillstone-cdc"
+description = "FastCDC content-defined chunking with a 16-level gear mask table (zero-dep Rust)"
+readme = "README.md"
+license = "Apache-2.0"
+categories = [ "algorithms", "cryptography",]
+
+[lib]
+crate-type = [ "cdylib", "rlib",]
+
+[features]
+default = [ "std",]
+std = []
+
+[package.version]
+workspace = true
+
+[package.edition]
+workspace = true
+
+[package.rust-version]
+workspace = true
+
+[package.authors]
+workspace = true
+
+[package.repository]
+workspace = true
+
+[package.homepage]
+workspace = true
+
+[dependencies.sillstone-digest]
+path = "../digest"
+
+[lints.rust]
+missing_docs = "deny"
+unsafe_code = "allow"

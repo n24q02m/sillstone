@@ -1,0 +1,51 @@
+[[bin]]
+name = "sillstone-video-gen-ref"
+path = "tools/gen-reference/main.rs"
+
+[package]
+name = "sillstone-video"
+license = "Apache-2.0"
+description = "Video fingerprints: mp4 demux, H.264 decode, 2 fps pHash frames and MinHash chain signature (zero-dep Rust)"
+readme = "README.md"
+categories = [ "algorithms", "cryptography",]
+keywords = [ "video", "phash", "minhash", "fingerprint", "hashing",]
+
+[lib]
+crate-type = [ "cdylib", "rlib",]
+
+[package.version]
+workspace = true
+
+[package.edition]
+workspace = true
+
+[package.rust-version]
+workspace = true
+
+[package.repository]
+workspace = true
+
+[package.authors]
+workspace = true
+
+[package.homepage]
+workspace = true
+
+[dependencies.sillstone-digest]
+path = "../digest"
+
+[dependencies.sillstone-image]
+path = "../image"
+
+[dependencies.sillstone-text]
+path = "../text"
+
+[dependencies.sillstone-mp4]
+path = "../mp4"
+
+[dependencies.sillstone-h264]
+path = "../h264"
+
+[lints.rust]
+missing_docs = "deny"
+unsafe_code = "allow"
