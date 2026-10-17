@@ -51,6 +51,10 @@ pub mod ffi;
 #[cfg(all(not(test), feature = "std"))]
 mod ffi_jni;
 pub mod reference;
+pub mod ngram;
+pub mod tlsh;
+pub use ngram::{ngram_jaccard, ngrams};
+pub use tlsh::{Tlsh, tlsh, tlsh_distance};
 
 /// Number of words per shingle (spec §4: "3 từ liên tiếp").
 const SHINGLE_WORDS: usize = 3;

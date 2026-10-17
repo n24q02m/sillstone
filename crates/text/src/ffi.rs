@@ -219,6 +219,81 @@ unsafe fn read_words(ptr: *const u64, words: usize) -> Result<Vec<u64>, i32> {
     Ok(out)
 }
 
+/// Computes the TLSH hash of `data` (`len` bytes) into `out` (must have room for 72 bytes).
+///
+/// # Safety
+///
+/// `out` must point to at least 72 writable bytes. If `len > 0`, `data` must point to `len`
+/// readable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_text_tlsh(
+    data: *const u8,
+    len: usize,
+    out: *mut u8,
+) -> i32 {
+    if out.is_null() {
+        return PITH_E_INVALID;
+    }
+    if len > 0 && data.is_null() {
+        return PITH_E_INVALID;
+    }
+    let slice = if len == 0 {
+        &[]
+    } else {
+        unsafe { core::slice::from_raw_parts(data, len) }
+    };
+
+    match crate::tlsh::tlsh(slice) {
+        Ok(t) => {
+            let bytes = t.as_str().as_bytes();
+            debug_assert_eq!(bytes.len(), 72);
+            unsafe {
+                core::ptr::copy_nonoverlapping(bytes.as_ptr(), out, 72);
+            }
+            PITH_OK
+        }
+        Err(_) => PITH_E_REJECTED,
+    }
+}
+
+/// Computes the distance score between two 72-byte TLSH hashes.
+///
+/// # Safety
+///
+/// `hash_a` and `hash_b` must point to 72 readable ASCII bytes. `out` must point to a writable `u32`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_text_tlsh_distance(
+    hash_a: *const u8,
+    hash_b: *const u8,
+    out: *mut u32,
+) -> i32 {
+    if hash_a.is_null() || hash_b.is_null() || out.is_null() {
+        return PITH_E_INVALID;
+    }
+    let slice_a = unsafe { core::slice::from_raw_parts(hash_a, 72) };
+    let slice_b = unsafe { core::slice::from_raw_parts(hash_b, 72) };
+
+    let Ok(str_a) = core::str::from_utf8(slice_a) else {
+        return PITH_E_INVALID;
+    };
+    let Ok(str_b) = core::str::from_utf8(slice_b) else {
+        return PITH_E_INVALID;
+    };
+
+    let Ok(t_a) = crate::tlsh::Tlsh::parse(str_a) else {
+        return PITH_E_INVALID;
+    };
+    let Ok(t_b) = crate::tlsh::Tlsh::parse(str_b) else {
+        return PITH_E_INVALID;
+    };
+
+    let dist = t_a.distance(&t_b);
+    unsafe {
+        *out = dist;
+    }
+    PITH_OK
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::vec::Vec;
