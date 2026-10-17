@@ -34,6 +34,9 @@
 // their `alloc`-only buffer code unchanged.
 extern crate alloc;
 
+pub mod ahash;
+pub mod colorhash;
+pub mod dhash;
 pub mod bmp;
 pub mod ffi;
 // The Java SDK's native-method surface: `Java_hash_sillstone_image_*`
@@ -49,3 +52,10 @@ pub mod phash;
 pub mod raster;
 pub mod reference;
 pub mod tier3;
+pub mod whash;
+
+pub use ahash::image_ahash;
+pub use colorhash::image_colorhash;
+pub use dhash::image_dhash;
+pub use phash::image_phash;
+pub use whash::image_whash;

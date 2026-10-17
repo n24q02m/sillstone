@@ -21,8 +21,13 @@
 
 #![allow(unsafe_code)]
 
+use crate::ahash::image_ahash;
+use crate::colorhash::image_colorhash;
+use crate::dhash::image_dhash;
 use crate::phash::image_phash;
 use crate::raster::{Gray, Image, Layout, Rgb, Rgba};
+use crate::whash::image_whash;
+use sillstone_digest::Error;
 
 /// Status: success.
 pub const PITH_OK: i32 = 0;
@@ -83,23 +88,148 @@ pub unsafe extern "C" fn sillstone_image_phash(
     }
 }
 
-/// The safe core of [`sillstone_image_phash`]: validates the dump against
-/// the declared geometry and runs the pHash pipeline.
-fn phash_of_dump(dump: &[u8], width: u32, height: u32, layout: u32) -> Result<u64, i32> {
+/// Computes the 64-bit Average Hash (aHash) of a raw pixel dump.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_image_ahash(
+    data: *const u8,
+    len: usize,
+    width: u32,
+    height: u32,
+    layout: u32,
+    out: *mut u64,
+) -> i32 {
+    if data.is_null() || out.is_null() {
+        return PITH_E_INVALID;
+    }
+    let dump = unsafe { core::slice::from_raw_parts(data, len) };
+    match ahash_of_dump(dump, width, height, layout) {
+        Ok(hash) => {
+            unsafe { *out = hash };
+            PITH_OK
+        }
+        Err(status) => status,
+    }
+}
+
+/// Computes the 64-bit Difference Hash (dHash) of a raw pixel dump.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_image_dhash(
+    data: *const u8,
+    len: usize,
+    width: u32,
+    height: u32,
+    layout: u32,
+    out: *mut u64,
+) -> i32 {
+    if data.is_null() || out.is_null() {
+        return PITH_E_INVALID;
+    }
+    let dump = unsafe { core::slice::from_raw_parts(data, len) };
+    match dhash_of_dump(dump, width, height, layout) {
+        Ok(hash) => {
+            unsafe { *out = hash };
+            PITH_OK
+        }
+        Err(status) => status,
+    }
+}
+
+/// Computes the 64-bit Wavelet Hash (wHash) of a raw pixel dump.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_image_whash(
+    data: *const u8,
+    len: usize,
+    width: u32,
+    height: u32,
+    layout: u32,
+    level: u32,
+    out: *mut u64,
+) -> i32 {
+    if data.is_null() || out.is_null() {
+        return PITH_E_INVALID;
+    }
+    let dump = unsafe { core::slice::from_raw_parts(data, len) };
+    match whash_of_dump(dump, width, height, layout, level) {
+        Ok(hash) => {
+            unsafe { *out = hash };
+            PITH_OK
+        }
+        Err(status) => status,
+    }
+}
+
+/// Computes the 64-bit Color Hash of a raw pixel dump.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_image_colorhash(
+    data: *const u8,
+    len: usize,
+    width: u32,
+    height: u32,
+    layout: u32,
+    bins: u32,
+    out: *mut u64,
+) -> i32 {
+    if data.is_null() || out.is_null() {
+        return PITH_E_INVALID;
+    }
+    let dump = unsafe { core::slice::from_raw_parts(data, len) };
+    match colorhash_of_dump(dump, width, height, layout, bins) {
+        Ok(hash) => {
+            unsafe { *out = hash };
+            PITH_OK
+        }
+        Err(status) => status,
+    }
+}
+
+fn ahash_of_dump(dump: &[u8], width: u32, height: u32, layout: u32) -> Result<u64, i32> {
     match layout {
-        PITH_LAYOUT_GRAY8 => phash_8::<Gray>(dump, width, height, 1),
-        PITH_LAYOUT_GRAY16 => phash_16::<Gray>(dump, width, height, 1),
-        PITH_LAYOUT_RGB8 => phash_8::<Rgb>(dump, width, height, 3),
-        PITH_LAYOUT_RGB16 => phash_16::<Rgb>(dump, width, height, 3),
-        PITH_LAYOUT_RGBA8 => phash_8::<Rgba>(dump, width, height, 4),
+        PITH_LAYOUT_GRAY8 => hash_8::<Gray, _>(dump, width, height, 1, image_ahash),
+        PITH_LAYOUT_GRAY16 => hash_16::<Gray, _>(dump, width, height, 1, image_ahash),
+        PITH_LAYOUT_RGB8 => hash_8::<Rgb, _>(dump, width, height, 3, image_ahash),
+        PITH_LAYOUT_RGB16 => hash_16::<Rgb, _>(dump, width, height, 3, image_ahash),
+        PITH_LAYOUT_RGBA8 => hash_8::<Rgba, _>(dump, width, height, 4, image_ahash),
         _ => Err(PITH_E_INVALID),
     }
 }
 
-/// Builds an 8-bit [`Image`] of `channels` samples per pixel and hashes
-/// it. A dump whose length disagrees with the geometry is
-/// [`PITH_E_INVALID`].
-fn phash_8<L: Layout>(dump: &[u8], width: u32, height: u32, channels: usize) -> Result<u64, i32> {
+fn dhash_of_dump(dump: &[u8], width: u32, height: u32, layout: u32) -> Result<u64, i32> {
+    match layout {
+        PITH_LAYOUT_GRAY8 => hash_8::<Gray, _>(dump, width, height, 1, image_dhash),
+        PITH_LAYOUT_GRAY16 => hash_16::<Gray, _>(dump, width, height, 1, image_dhash),
+        PITH_LAYOUT_RGB8 => hash_8::<Rgb, _>(dump, width, height, 3, image_dhash),
+        PITH_LAYOUT_RGB16 => hash_16::<Rgb, _>(dump, width, height, 3, image_dhash),
+        PITH_LAYOUT_RGBA8 => hash_8::<Rgba, _>(dump, width, height, 4, image_dhash),
+        _ => Err(PITH_E_INVALID),
+    }
+}
+
+fn whash_of_dump(dump: &[u8], width: u32, height: u32, layout: u32, level: u32) -> Result<u64, i32> {
+    match layout {
+        PITH_LAYOUT_GRAY8 => hash_8::<Gray, _>(dump, width, height, 1, |img| image_whash(img, level)),
+        PITH_LAYOUT_GRAY16 => hash_16::<Gray, _>(dump, width, height, 1, |img| image_whash(img, level)),
+        PITH_LAYOUT_RGB8 => hash_8::<Rgb, _>(dump, width, height, 3, |img| image_whash(img, level)),
+        PITH_LAYOUT_RGB16 => hash_16::<Rgb, _>(dump, width, height, 3, |img| image_whash(img, level)),
+        PITH_LAYOUT_RGBA8 => hash_8::<Rgba, _>(dump, width, height, 4, |img| image_whash(img, level)),
+        _ => Err(PITH_E_INVALID),
+    }
+}
+
+fn colorhash_of_dump(dump: &[u8], width: u32, height: u32, layout: u32, bins: u32) -> Result<u64, i32> {
+    match layout {
+        PITH_LAYOUT_GRAY8 => hash_8::<Gray, _>(dump, width, height, 1, |img| image_colorhash(img, bins)),
+        PITH_LAYOUT_GRAY16 => hash_16::<Gray, _>(dump, width, height, 1, |img| image_colorhash(img, bins)),
+        PITH_LAYOUT_RGB8 => hash_8::<Rgb, _>(dump, width, height, 3, |img| image_colorhash(img, bins)),
+        PITH_LAYOUT_RGB16 => hash_16::<Rgb, _>(dump, width, height, 3, |img| image_colorhash(img, bins)),
+        PITH_LAYOUT_RGBA8 => hash_8::<Rgba, _>(dump, width, height, 4, |img| image_colorhash(img, bins)),
+        _ => Err(PITH_E_INVALID),
+    }
+}
+
+fn hash_8<L: Layout, F>(dump: &[u8], width: u32, height: u32, channels: usize, f: F) -> Result<u64, i32>
+where
+    F: FnOnce(&Image<L, u8>) -> Result<u64, Error>,
+{
     let Some(samples) = expected_samples(width, height, channels, 1) else {
         return Err(PITH_E_INVALID);
     };
@@ -107,13 +237,13 @@ fn phash_8<L: Layout>(dump: &[u8], width: u32, height: u32, channels: usize) -> 
         return Err(PITH_E_INVALID);
     }
     let img = Image::<L, u8>::from_vec(width, height, dump.to_vec()).map_err(|_| PITH_E_INVALID)?;
-    image_phash(&img).map_err(|_| PITH_E_REJECTED)
+    f(&img).map_err(|_| PITH_E_REJECTED)
 }
 
-/// Builds a 16-bit [`Image`] from a little-endian dump of `channels`
-/// samples per pixel and hashes it. A dump whose length disagrees with
-/// the geometry is [`PITH_E_INVALID`].
-fn phash_16<L: Layout>(dump: &[u8], width: u32, height: u32, channels: usize) -> Result<u64, i32> {
+fn hash_16<L: Layout, F>(dump: &[u8], width: u32, height: u32, channels: usize, f: F) -> Result<u64, i32>
+where
+    F: FnOnce(&Image<L, u16>) -> Result<u64, Error>,
+{
     let Some(samples) = expected_samples(width, height, channels, 2) else {
         return Err(PITH_E_INVALID);
     };
@@ -125,7 +255,20 @@ fn phash_16<L: Layout>(dump: &[u8], width: u32, height: u32, channels: usize) ->
         pixels.push(u16::from_le_bytes([chunk[0], chunk[1]]));
     }
     let img = Image::<L, u16>::from_vec(width, height, pixels).map_err(|_| PITH_E_INVALID)?;
-    image_phash(&img).map_err(|_| PITH_E_REJECTED)
+    f(&img).map_err(|_| PITH_E_REJECTED)
+}
+
+/// The safe core of [`sillstone_image_phash`]: validates the dump against
+/// the declared geometry and runs the pHash pipeline.
+fn phash_of_dump(dump: &[u8], width: u32, height: u32, layout: u32) -> Result<u64, i32> {
+    match layout {
+        PITH_LAYOUT_GRAY8 => hash_8::<Gray, _>(dump, width, height, 1, image_phash),
+        PITH_LAYOUT_GRAY16 => hash_16::<Gray, _>(dump, width, height, 1, image_phash),
+        PITH_LAYOUT_RGB8 => hash_8::<Rgb, _>(dump, width, height, 3, image_phash),
+        PITH_LAYOUT_RGB16 => hash_16::<Rgb, _>(dump, width, height, 3, image_phash),
+        PITH_LAYOUT_RGBA8 => hash_8::<Rgba, _>(dump, width, height, 4, image_phash),
+        _ => Err(PITH_E_INVALID),
+    }
 }
 
 /// `width * height * channels * bytes_per_sample`, or `None` on
