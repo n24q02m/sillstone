@@ -808,3 +808,42 @@ fn calibrate_refuses_on_either_side_of_a_pair() {
         .expect("spawn");
     assert_eq!(out.status.code(), Some(1));
 }
+#[test]
+fn test_cli_digest_subcommand() {
+    let sb = Sandbox {
+        dir: TempDir::new("cli-digest"),
+    };
+    let p = sb.dir.write("test.txt", b"abc");
+    // Default sha256
+    let out = bin().arg("digest").arg(&p).output().expect("spawn");
+    assert_eq!(out.status.code(), Some(0));
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(
+        text.trim(),
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    );
+
+    // blake3 with --json
+    let out_b3 = bin()
+        .args(["digest", "--alg", "blake3", "--json"])
+        .arg(&p)
+        .output()
+        .expect("spawn");
+    assert_eq!(out_b3.status.code(), Some(0));
+    let text_b3 = String::from_utf8_lossy(&out_b3.stdout);
+    assert!(text_b3.contains("\"alg\": \"blake3\""));
+    assert!(text_b3.contains("\"digest\": \"6437b3ac38465133ffb63b75273a8db548c558465d79db03fd359c6cd5bd9d85\""));
+}
+
+#[test]
+fn test_cli_image_subcommand() {
+    let sb = Sandbox {
+        dir: TempDir::new("cli-image"),
+    };
+    let p = sb.dir.write("test.bmp", &bmp(0x42, 32, 32));
+    let out = bin().args(["image", "--alg", "ahash", "--json"]).arg(&p).output().expect("spawn");
+    assert_eq!(out.status.code(), Some(0));
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(text.contains("\"alg\": \"ahash\""));
+    assert!(text.contains("\"hash\": \"0x"));
+}

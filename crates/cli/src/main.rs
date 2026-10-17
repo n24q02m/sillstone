@@ -54,6 +54,8 @@ fn main() -> ExitCode {
         "dedup" => cmd_dedup(&rest),
         "bench" => cmd_bench(&rest),
         "calibrate" => cmd_calibrate(&rest),
+        "digest" => cmd_digest(&rest),
+        "image" => cmd_image(&rest),
         other => {
             eprintln!("pith: unknown command `{other}`\n");
             eprint!("{USAGE_TEXT}");
@@ -81,6 +83,8 @@ struct Opts {
     profile: Option<String>,
     /// `--iters N` (bench).
     iters: Option<u32>,
+    /// `--alg NAME` (digest, image).
+    alg: Option<String>,
 }
 
 impl Opts {
@@ -92,6 +96,7 @@ impl Opts {
             threshold: None,
             profile: None,
             iters: None,
+            alg: None,
         };
         let mut it = args.iter().peekable();
         while let Some(a) = it.next() {
@@ -109,6 +114,10 @@ impl Opts {
                 "--iters" => {
                     let v = it.next().ok_or("--iters needs a value")?;
                     o.iters = Some(v.parse().map_err(|_| format!("bad --iters `{v}`"))?);
+                }
+                "--alg" => {
+                    let v = it.next().ok_or("--alg needs a value")?;
+                    o.alg = Some(v.clone());
                 }
                 "-h" | "--help" => o.pos.push("help".to_string()),
                 other if other.starts_with("--") => return Err(format!("unknown flag `{other}`")),
@@ -322,6 +331,133 @@ fn cmd_hash(args: &[String]) -> u8 {
 }
 
 // ---------------------------------------------------------------------
+const DIGEST_HELP: &str = "\
+usage: pith digest <file> [--alg sha256|sha3-256|sha3-512|blake2b|blake3] [--json]
+
+Computes cryptographic digest of raw file bytes using the specified algorithm (default sha256).
+
+exit: 0 ok | 1 refused | 2 usage/io
+";
+
+fn cmd_digest(args: &[String]) -> u8 {
+    let Ok(o) = Opts::parse(args).map_err(|e| {
+        eprintln!("pith digest: {e}");
+    }) else {
+        return USAGE;
+    };
+    if o.pos.first().is_some_and(|s| s == "help") {
+        print!("{DIGEST_HELP}");
+        return OK;
+    }
+    let Some(path) = o.pos.first() else {
+        eprint!("{DIGEST_HELP}");
+        return USAGE;
+    };
+    let Ok(bytes) = must_read(path) else {
+        return USAGE;
+    };
+    let alg = o.alg.as_deref().unwrap_or("sha256");
+    let hex_digest = match alg {
+        "sha256" => sillstone_digest::sha256(&bytes).map(|d| d.to_string()),
+        "sha3-256" | "sha3_256" => sillstone_digest::sha3_256(&bytes).map(|d| d.to_string()),
+        "sha3-512" | "sha3_512" => sillstone_digest::sha3_512(&bytes).map(|d| d.to_string()),
+        "blake2b" | "blake2b-512" | "blake2b_512" => {
+            sillstone_digest::blake2b_512(&bytes).map(|d| d.to_string())
+        }
+        "blake3" => sillstone_digest::blake3(&bytes).map(|d| d.to_string()),
+        other => {
+            eprintln!("pith digest: unknown algorithm `{other}`");
+            return USAGE;
+        }
+    };
+
+    match hex_digest {
+        Ok(h) => {
+            if o.json {
+                println!(
+                    "{{\"file\": {}, \"alg\": \"{}\", \"digest\": \"{}\"}}",
+                    sillstone_cli::json_string(path),
+                    alg,
+                    h
+                );
+            } else {
+                println!("{h}");
+            }
+            OK
+        }
+        Err(e) => {
+            eprintln!("pith digest: {path}: {e}");
+            FAILED
+        }
+    }
+}
+
+const IMAGE_HELP: &str = "\
+usage: pith image <file> [--alg phash|ahash|dhash|whash|colorhash] [--json]
+
+Computes perceptual image hash using the specified algorithm (default phash).
+
+exit: 0 ok | 1 refused | 2 usage/io
+";
+
+fn cmd_image(args: &[String]) -> u8 {
+    let Ok(o) = Opts::parse(args).map_err(|e| {
+        eprintln!("pith image: {e}");
+    }) else {
+        return USAGE;
+    };
+    if o.pos.first().is_some_and(|s| s == "help") {
+        print!("{IMAGE_HELP}");
+        return OK;
+    }
+    let Some(path) = o.pos.first() else {
+        eprint!("{IMAGE_HELP}");
+        return USAGE;
+    };
+    let Ok(bytes) = must_read(path) else {
+        return USAGE;
+    };
+    let det = sillstone_curator::detect(&bytes);
+    let img = match sillstone_curator::decode_image_rgb8(&bytes, det.format) {
+        Ok(i) => i,
+        Err(e) => return refuse("image", path, &e),
+    };
+
+    let alg = o.alg.as_deref().unwrap_or("phash");
+    let hash_val: Result<u64, sillstone_digest::Error> = match alg {
+        "phash" => sillstone_image::image_phash(&img),
+        "ahash" => sillstone_image::image_ahash(&img),
+        "dhash" => sillstone_image::image_dhash(&img),
+        "whash" => sillstone_image::image_whash(&img, 1),
+        "colorhash" | "color-hash" => sillstone_image::image_colorhash(&img, 4),
+        other => {
+            eprintln!("pith image: unknown algorithm `{other}`");
+            return USAGE;
+        }
+    };
+
+    match hash_val {
+        Ok(h) => {
+            let hex_str = format!("{h:#018x}");
+            if o.json {
+                println!(
+                    "{{\"file\": {}, \"alg\": \"{}\", \"hash\": \"{}\"}}",
+                    sillstone_cli::json_string(path),
+                    alg,
+                    hex_str
+                );
+            } else {
+                println!("{hex_str}");
+            }
+            OK
+        }
+        Err(e) => {
+            eprintln!("pith image: {path}: {e}");
+            FAILED
+        }
+    }
+}
+
 // match
 // ---------------------------------------------------------------------
 

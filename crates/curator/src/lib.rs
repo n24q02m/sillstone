@@ -297,7 +297,7 @@ fn rgb8_to_gray(img: &Image<Rgb, u8>) -> Result<Image<sillstone_image::raster::G
 }
 
 /// Decodes an image container to canonical `Image<Rgb, u8>` (kit.md §2).
-fn decode_image_rgb8(bytes: &[u8], format: Format) -> Result<Image<Rgb, u8>> {
+pub fn decode_image_rgb8(bytes: &[u8], format: Format) -> Result<Image<Rgb, u8>> {
     let err = |e: sillstone_digest::Error| decode_err(Modality::Image, e);
     match format {
         Format::Png => {

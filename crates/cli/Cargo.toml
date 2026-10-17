@@ -30,6 +30,11 @@ workspace = true
 
 [dependencies.sillstone-curator]
 path = "../curator"
+[dependencies.sillstone-digest]
+path = "../digest"
+
+[dependencies.sillstone-image]
+path = "../image"
 
 [lints.rust]
 unsafe_code = "forbid"
