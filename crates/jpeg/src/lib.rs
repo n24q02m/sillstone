@@ -48,10 +48,12 @@ mod idct;
 mod parser;
 mod progressive;
 mod upsample;
+pub mod encode;
 
 pub mod ffi;
 pub mod reference;
 
+pub use encode::{encode_gray, encode_rgb};
 use alloc::vec::Vec;
 
 use sillstone_digest::{Error, Result};
