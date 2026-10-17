@@ -34,6 +34,11 @@ mod error;
 
 pub mod ffi;
 mod ffi_jni;
+pub mod office;
+pub mod tar;
+
+pub use office::{docx_text, xlsx_cells, xlsx_text};
+pub use tar::{TarEntry, entries as tar_entries, is_path_traversal, read as tar_read};
 
 use alloc::collections::BTreeSet;
 use alloc::vec::Vec;

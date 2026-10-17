@@ -43,6 +43,8 @@ path = "../cdc"
 
 [dependencies.sillstone-pdf]
 path = "../pdf"
+[dependencies.sillstone-zip]
+path = "../zip"
 
 [lints.rust]
 missing_docs = "deny"
