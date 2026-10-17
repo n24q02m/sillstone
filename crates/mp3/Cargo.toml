@@ -1,0 +1,43 @@
+[[bin]]
+name = "sillstone-mp3-gen-ref"
+path = "tools/gen-reference/main.rs"
+
+[package]
+name = "sillstone-mp3"
+license = "Apache-2.0"
+description = "MP3 decoding for layers I/II/III including the bit reservoir."
+readme = "README.md"
+categories = [ "algorithms", "cryptography",]
+
+[lib]
+crate-type = [ "cdylib", "rlib",]
+
+[features]
+default = [ "std",]
+std = []
+fuzz = []
+
+[package.version]
+workspace = true
+
+[package.edition]
+workspace = true
+
+[package.rust-version]
+workspace = true
+
+[package.repository]
+workspace = true
+
+[package.homepage]
+workspace = true
+
+[package.authors]
+workspace = true
+
+[dependencies.sillstone-digest]
+path = "../digest"
+
+[lints.rust]
+missing_docs = "deny"
+unsafe_code = "allow"

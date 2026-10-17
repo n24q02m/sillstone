@@ -162,7 +162,7 @@ fn reference_json() -> String {
     let mut out = String::with_capacity(96 * 1024);
     out.push_str("{\n");
     out.push_str("  \"schema\": 2,\n");
-    out.push_str("  \"crate\": \"sillstone-inflate\",\n");
+    out.push_str("  \"crate\": \"pith-inflate\",\n");
     out.push_str(
         "  \"description\": \"hex-exact DEFLATE/zlib/gzip reference vectors: every \
 tests/vectors.rs corpus entry decoded by sillstone-inflate, raw/zlib outputs pinned by \

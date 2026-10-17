@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "vectors": {
+    "base_444": "8d0a3f411ee50f7a",
+    "phash_adam7_37x29": "8b4bd90bf426b4f0",
+    "phash_gray16_36x28": "d38604056df8c37f",
+    "phash_gray8_40x32": "d3c706284777fc81",
+    "phash_pal8_trns_52x44": "f260e731eb4a3ce0",
+    "phash_rgb16_40x24": "a82d435d3c7d7059",
+    "phash_rgb8_48x40": "c21b869527e1a74f",
+    "phash_rgba8_48x40": "84334f9d2c5af4a9",
+    "phash_small_13x9": "aa27a317f85ca316"
+  }
+}

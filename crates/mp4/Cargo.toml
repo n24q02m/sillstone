@@ -1,0 +1,41 @@
+[[bin]]
+name = "sillstone-mp4-gen-ref"
+path = "tools/gen-reference/main.rs"
+
+[package]
+name = "sillstone-mp4"
+license = "Apache-2.0"
+description = "pith foundation: mp4 (zero-dep Rust)"
+readme = "README.md"
+
+[lib]
+crate-type = [ "cdylib", "rlib",]
+
+[features]
+default = [ "std",]
+std = []
+
+[package.version]
+workspace = true
+
+[package.edition]
+workspace = true
+
+[package.rust-version]
+workspace = true
+
+[package.repository]
+workspace = true
+
+[package.authors]
+workspace = true
+
+[package.homepage]
+workspace = true
+
+[dependencies.sillstone-digest]
+path = "../digest"
+
+[lints.rust]
+missing_docs = "deny"
+unsafe_code = "allow"

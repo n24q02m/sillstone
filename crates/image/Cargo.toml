@@ -1,0 +1,40 @@
+[[bin]]
+name = "sillstone-image-gen-ref"
+path = "tools/gen-reference/main.rs"
+
+[package]
+name = "sillstone-image"
+description = "pith image lane: raster buffers, BMP decode, tier-3 features, pHash (zero-dep Rust)"
+readme = "README.md"
+license = "Apache-2.0"
+
+[lib]
+crate-type = [ "cdylib", "rlib",]
+
+[package.version]
+workspace = true
+
+[package.edition]
+workspace = true
+
+[package.rust-version]
+workspace = true
+
+[package.repository]
+workspace = true
+
+[package.homepage]
+workspace = true
+
+[package.authors]
+workspace = true
+
+[dependencies.sillstone-digest]
+path = "../digest"
+
+[dependencies.sillstone-math]
+path = "../math"
+
+[lints.rust]
+missing_docs = "deny"
+unsafe_code = "allow"

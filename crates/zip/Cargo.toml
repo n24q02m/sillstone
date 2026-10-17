@@ -1,0 +1,40 @@
+[[bin]]
+name = "sillstone-zip-gen-ref"
+path = "tools/gen-reference/main.rs"
+
+[package]
+name = "sillstone-zip"
+description = "ZIP container reading: stored and deflated entries, plus a minimal XML reader"
+readme = "README.md"
+license = "Apache-2.0"
+
+[lib]
+crate-type = [ "cdylib", "rlib",]
+
+[package.version]
+workspace = true
+
+[package.edition]
+workspace = true
+
+[package.rust-version]
+workspace = true
+
+[package.authors]
+workspace = true
+
+[package.repository]
+workspace = true
+
+[package.homepage]
+workspace = true
+
+[dependencies.sillstone-digest]
+path = "../digest"
+
+[dependencies.sillstone-inflate]
+path = "../inflate"
+
+[lints.rust]
+missing_docs = "deny"
+unsafe_code = "allow"

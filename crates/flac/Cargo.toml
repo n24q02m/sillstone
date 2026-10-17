@@ -1,0 +1,43 @@
+[[bin]]
+name = "sillstone-flac-gen-ref"
+path = "tools/gen-reference/main.rs"
+
+[package]
+name = "sillstone-flac"
+license = "Apache-2.0"
+description = "FLAC subset decoding: STREAMINFO, constant/verbatim/fixed subframes, both Rice methods (RFC 9639)"
+readme = "README.md"
+categories = [ "algorithms", "cryptography",]
+keywords = [ "flac", "audio", "decoder", "pcm", "hashing",]
+
+[lib]
+crate-type = [ "cdylib", "rlib",]
+
+[features]
+default = [ "std",]
+std = []
+
+[package.version]
+workspace = true
+
+[package.edition]
+workspace = true
+
+[package.rust-version]
+workspace = true
+
+[package.repository]
+workspace = true
+
+[package.homepage]
+workspace = true
+
+[package.authors]
+workspace = true
+
+[dependencies.sillstone-digest]
+path = "../digest"
+
+[lints.rust]
+missing_docs = "deny"
+unsafe_code = "allow"

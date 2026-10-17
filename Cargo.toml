@@ -6,6 +6,15 @@ members = [
     "crates/math",
     "crates/inflate",
     "crates/unicode",
+    "crates/flac",
+    "crates/mp3",
+    "crates/zip",
+    "crates/pdf",
+    "crates/mp4",
+    "crates/h264",
+    "crates/image",
+    "crates/png",
+    "crates/jpeg",
     "crates/ffi",
     "tools/idl-gen",
 ]
@@ -31,3 +40,5 @@ correctness = { level = "deny", priority = -1 }
 suspicious = { level = "deny", priority = -1 }
 complexity = { level = "deny", priority = -1 }
 perf = { level = "deny", priority = -1 }
+[profile.test]
+opt-level = 2
