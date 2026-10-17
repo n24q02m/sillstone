@@ -33,6 +33,7 @@ extern crate alloc;
 mod boxes;
 mod demux;
 mod sample_table;
+pub mod fragmented;
 
 pub mod ffi;
 

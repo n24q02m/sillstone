@@ -206,7 +206,7 @@ pub fn demux(data: &[u8]) -> Result<Mp4> {
 /// Reads `ftyp`: major brand, minor version, compatible brands (§4.3).
 /// Every listed brand must be one this demuxer recognises, because a brand
 /// is a claim about which spec the file follows.
-fn parse_ftyp(data: &[u8]) -> Result<(Four, Vec<Four>)> {
+pub(crate) fn parse_ftyp(data: &[u8]) -> Result<(Four, Vec<Four>)> {
     let mut r = Reader::new(data);
     let major = r.four("ftyp major brand")?;
     r.u32("ftyp minor version")?;
@@ -224,7 +224,7 @@ fn parse_ftyp(data: &[u8]) -> Result<(Four, Vec<Four>)> {
 
 /// Reads `mvhd` timescale and duration (§8.2.2); both v0 (32-bit) and v1
 /// (64-bit) headers.
-fn parse_mvhd(data: &[u8]) -> Result<(u32, u64)> {
+pub(crate) fn parse_mvhd(data: &[u8]) -> Result<(u32, u64)> {
     let mut r = Reader::new(data);
     let (version, _) = full_box(&mut r, "mvhd")?;
     match version {
@@ -326,7 +326,7 @@ fn parse_hdlr(data: &[u8]) -> Result<Four> {
 
 /// Assembles one `trak` subtree: headers from `tkhd`/`mdhd`/`hdlr`, sample
 /// geometry from `mdia → minf → stbl`.
-fn parse_trak(data: &[u8], range: core::ops::Range<usize>) -> Result<Track> {
+pub(crate) fn parse_trak(data: &[u8], range: core::ops::Range<usize>) -> Result<Track> {
     let mut id = 0u32;
     let mut width = 0u32;
     let mut height = 0u32;
