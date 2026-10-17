@@ -169,13 +169,15 @@ def check_pypi(name: str, version: str, get: Fetch, content: bool = False) -> li
     info = doc.get("info") or {}
     if _norm_py(info.get("name") or "") != _norm_py(name):
         problems.append(f"registry names this project {info.get('name')!r}, not {name!r}")
-    files = (doc.get("releases") or {}).get(version) or []
+    releases = doc.get("releases") or {}
+    py_ver = re.sub(r"-beta\.(\d+)", r"b\1", version)
+    files = releases.get(version) or releases.get(py_ver) or []
     if not files:
-        have = sorted((doc.get("releases") or {}).keys())
+        have = sorted(releases.keys())
         return problems + [f"version {version} has no files (registry has: {', '.join(have) or 'none'})"]
     if all(f.get("yanked") for f in files):
         problems.append(f"every file of version {version} is yanked")
-    if info.get("version") != version and not version.startswith("0.2.0-beta"):
+    if info.get("version") not in (version, py_ver):
         problems.append(f"current version is {info.get('version')!r}, expected {version}")
     if content:
         problems += _wheel_contents(name, files, get)
