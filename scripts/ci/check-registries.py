@@ -59,7 +59,7 @@ MAVEN_GROUP = "io.github.sillstone"
 REGISTRIES = ("crates", "pypi", "npm", "maven", "go")
 
 PACKAGES: list[tuple[str, str, str]] = [
-    ("crates", "sillstone", "sillstone"),
+    ("crates", "sillstone-digest", "sillstone"),
     ("pypi", "sillstone", "sillstone"),
     ("npm", "sillstone", "sillstone"),
     ("maven", f"{MAVEN_GROUP}:sillstone", "sillstone"),

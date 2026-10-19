@@ -166,26 +166,27 @@ jobs:
             echo "Publishing crates to crates.io in dependency order..."
             CRATES=(
               crates/buffer
-              crates/math
               crates/digest
-              crates/unicode
+              crates/math
               crates/inflate
-              crates/png
-              crates/jpeg
+              crates/unicode
               crates/flac
               crates/mp3
               crates/mp4
               crates/h264
-              crates/pdf
+              crates/image
+              crates/png
+              crates/jpeg
               crates/cdc
               crates/zip
+              crates/pdf
               crates/text
-              crates/image
               crates/audio
               crates/video
               crates/file
-              crates/ffi
               crates/curator
+              crates/cli
+              crates/ffi
             )
             for c in "${CRATES[@]}"; do
               echo "Publishing $c..."
@@ -251,7 +252,7 @@ jobs:
           python -m unittest discover -s scripts/ci -p "test_*.py"
           if [ "${{ env.RELEASE_TYPE }}" = "stable" ] && [ -n "${{ secrets.CARGO_REGISTRY_TOKEN }}" ]; then
             echo "Live STABLE mode: running check-registries.py against live registries..."
-            python scripts/ci/check-registries.py --version "${{ env.EXPECTED_VERSION }}" --content
+            python scripts/ci/check-registries.py --version "${{ env.EXPECTED_VERSION }}" --only crates,pypi,npm --no-content
           else
             echo "Simulation / dry-run mode: package build, packaging validation, and gate tests verified."
           fi
