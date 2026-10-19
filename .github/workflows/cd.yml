@@ -11,10 +11,10 @@ on:
           - beta
           - stable
       expected_version:
-        description: "Expected version to publish (e.g. 0.2.0 or 0.2.0)"
+        description: "Expected version to publish (e.g. 0.2.1)"
         required: false
         type: string
-        default: "0.2.0"
+        default: "0.2.1"
 
 env:
   RELEASE_TYPE: ${{ inputs.release_type }}
