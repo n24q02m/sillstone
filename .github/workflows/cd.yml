@@ -133,6 +133,9 @@ jobs:
     name: Publish Packages to Registries
     needs: [package-sdks]
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - name: Download cdylib artifacts
@@ -149,6 +152,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          registry-url: 'https://registry.npmjs.org'
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
@@ -159,7 +163,7 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
           if [ -n "$CARGO_REGISTRY_TOKEN" ]; then
-            echo "Publishing crates to crates.io..."
+            echo "Publishing crates to crates.io in dependency order..."
             CRATES=(
               crates/buffer
               crates/math
@@ -168,43 +172,40 @@ jobs:
               crates/inflate
               crates/png
               crates/jpeg
-              crates/image
-              crates/audio
-              crates/video
-              crates/text
-              crates/cdc
-              crates/file
-              crates/zip
               crates/flac
               crates/mp3
               crates/mp4
               crates/h264
               crates/pdf
+              crates/cdc
+              crates/zip
+              crates/text
+              crates/image
+              crates/audio
+              crates/video
+              crates/file
               crates/ffi
               crates/curator
               crates/core
             )
             for c in "${CRATES[@]}"; do
               echo "Publishing $c..."
-              cargo publish --manifest-path "$c/Cargo.toml" --no-verify || true
+              cargo publish --manifest-path "$c/Cargo.toml" || true
+              sleep 5
             done
           else
             echo "CARGO_REGISTRY_TOKEN not configured. Running dry-run validation."
             cargo publish --manifest-path crates/buffer/Cargo.toml --dry-run
           fi
-      - name: Publish Python Wheel to PyPI
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+      - name: Build Python Wheel
         run: |
-          python -m pip install --upgrade pip build twine
-          if [ -n "$TWINE_PASSWORD" ]; then
-            echo "Publishing to PyPI..."
-            cd sdk/python && python -m build && python -m twine upload dist/*
-          else
-            echo "PYPI_API_TOKEN not configured. Running wheel build validation."
-            cd sdk/python && python -m build
-          fi
+          python -m pip install --upgrade pip build
+          cd sdk/python && python -m build
+      - name: Publish Python Wheel to PyPI via Trusted Publisher
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: sdk/python/dist/
+        continue-on-error: true
       - name: Publish npm package
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

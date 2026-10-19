@@ -31,9 +31,11 @@ workspace = true
 
 [dependencies.sillstone-digest]
 path = "../digest"
+version = "0.2.0-beta.1"
 
 [dependencies.sillstone-math]
 path = "../math"
+version = "0.2.0-beta.1"
 
 [lints.rust]
 missing_docs = "deny"
