@@ -26,3 +26,4 @@ sillstone-unicode = { version = "0.2.1", path = "../unicode" }
 sillstone-curator = { version = "0.2.1", path = "../curator" }
 sillstone-image = { version = "0.2.1", path = "../image" }
 sillstone-text = { version = "0.2.1", path = "../text" }
+sillstone-tensor = { version = "0.2.1", path = "../tensor" }

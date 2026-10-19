@@ -6,6 +6,7 @@ extern crate alloc;
 
 pub mod broadcast;
 pub mod dtype;
+pub mod ffi;
 pub mod layout;
 pub mod linalg;
 pub mod ops;

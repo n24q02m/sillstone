@@ -53,6 +53,45 @@ def _canonical_dtype(dt: Any) -> str:
     elif dt is bool:
         return "bool"
     return "float64"
+try:
+    from ._generated import LIB
+except Exception:
+    LIB = None
+
+_native_matmul_f64 = None
+_native_add_f64 = None
+_native_sum_f64 = None
+
+if LIB is not None:
+    try:
+        _native_matmul_f64 = getattr(LIB, "sillstone_tensor_matmul_f64")
+        _native_matmul_f64.argtypes = [
+            ctypes.c_void_p, ctypes.c_size_t, ctypes.c_size_t,
+            ctypes.c_void_p, ctypes.c_size_t, ctypes.c_size_t,
+            ctypes.c_void_p,
+        ]
+        _native_matmul_f64.restype = ctypes.c_int32
+    except AttributeError:
+        pass
+
+    try:
+        _native_add_f64 = getattr(LIB, "sillstone_tensor_add_f64")
+        _native_add_f64.argtypes = [
+            ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p,
+        ]
+        _native_add_f64.restype = ctypes.c_int32
+    except AttributeError:
+        pass
+
+    try:
+        _native_sum_f64 = getattr(LIB, "sillstone_tensor_sum_f64")
+        _native_sum_f64.argtypes = [
+            ctypes.c_void_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_double),
+        ]
+        _native_sum_f64.restype = ctypes.c_int32
+    except AttributeError:
+        pass
+
 
 
 def _compute_c_strides(shape: Sequence[int], itemsize: int) -> List[int]:
@@ -311,6 +350,18 @@ class Array:
         return Array(shape=target_shape, dtype=self._dtype, buffer=self._buffer, strides=new_strides, offset=self._offset)
 
     def __add__(self, other: Any) -> "Array":
+        if _native_add_f64 is not None and isinstance(other, Array) and self._dtype == "float64" and other._dtype == "float64":
+            if self._shape == other._shape and self._is_contiguous() and other._is_contiguous():
+                out = Array(shape=self._shape, dtype="float64")
+                buf_a = (ctypes.c_char * len(self._buffer)).from_buffer(self._buffer)
+                buf_b = (ctypes.c_char * len(other._buffer)).from_buffer(other._buffer)
+                buf_c = (ctypes.c_char * len(out._buffer)).from_buffer(out._buffer)
+                ptr_a = ctypes.addressof(buf_a) + self._offset
+                ptr_b = ctypes.addressof(buf_b) + other._offset
+                ptr_c = ctypes.addressof(buf_c)
+                status = _native_add_f64(ptr_a, ptr_b, self._size, ptr_c)
+                if status == 0:
+                    return out
         return self._binary_op(other, lambda a, b: a + b)
 
     def __radd__(self, other: Any) -> "Array":
@@ -352,6 +403,19 @@ class Array:
         if k1 != k2:
             raise ValueError(f"shapes ({m}, {k1}) and ({k2}, {n}) not aligned")
 
+        if _native_matmul_f64 is not None and self._dtype == "float64" and other._dtype == "float64":
+            if self._is_contiguous() and other._is_contiguous():
+                out = Array(shape=(m, n), dtype="float64")
+                buf_a = (ctypes.c_char * len(self._buffer)).from_buffer(self._buffer)
+                buf_b = (ctypes.c_char * len(other._buffer)).from_buffer(other._buffer)
+                buf_c = (ctypes.c_char * len(out._buffer)).from_buffer(out._buffer)
+                ptr_a = ctypes.addressof(buf_a) + self._offset
+                ptr_b = ctypes.addressof(buf_b) + other._offset
+                ptr_c = ctypes.addressof(buf_c)
+                status = _native_matmul_f64(ptr_a, m, k1, ptr_b, k2, n, ptr_c)
+                if status == 0:
+                    return out
+
         out = Array(shape=(m, n), dtype=self._dtype)
         for i in range(m):
             for j in range(n):
@@ -363,6 +427,13 @@ class Array:
 
     def sum(self, axis: Optional[int] = None) -> Union[float, int, "Array"]:
         if axis is None:
+            if _native_sum_f64 is not None and self._dtype == "float64" and self._is_contiguous():
+                buf = (ctypes.c_char * len(self._buffer)).from_buffer(self._buffer)
+                ptr = ctypes.addressof(buf) + self._offset
+                out_val = ctypes.c_double()
+                status = _native_sum_f64(ptr, self._size, ctypes.byref(out_val))
+                if status == 0:
+                    return out_val.value
             return sum(self[idx] for idx in self._ndindex())
         if axis < 0:
             axis += self._ndim
