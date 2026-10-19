@@ -36,11 +36,11 @@ workspace = true
 workspace = true
 
 [dependencies.sillstone-digest]
-version = "0.2.0-beta.1"
+version = "0.2.0"
 path = "../digest"
 
 [dependencies.sillstone-unicode]
-version = "0.2.0-beta.1"
+version = "0.2.0"
 path = "../unicode"
 
 [lints.rust]

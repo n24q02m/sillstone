@@ -52,7 +52,7 @@ pith-hash = "0.1.1"
 
 # New (recommended)
 [dependencies]
-sillstone = "0.2.0-beta.1"
+sillstone = "0.2.0"
 ```
 
 ---
@@ -171,7 +171,7 @@ func main() {
 <dependency>
     <groupId>io.github.sillstone</groupId>
     <artifactId>sillstone</artifactId>
-    <version>0.2.0-beta.1</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 

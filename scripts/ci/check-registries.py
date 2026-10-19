@@ -17,7 +17,7 @@ Registries:
   Go proxy   proxy.golang.org resolves exact version tag and go.mod declares module
 
 Usage:
-    python scripts/ci/check-registries.py [--version 0.2.0-beta.1] [--only crates,pypi] [--[no-]content]
+    python scripts/ci/check-registries.py [--version 0.2.0] [--only crates,pypi] [--[no-]content]
 """
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ CONTENT_PLATFORMS = list(pc.PLATFORMS)
 CONTENT_FROM = (0, 2, 0)
 JAR_PREFIX = "github/sillstone/native"
 
-EXPECTED_VERSION = "0.2.0-beta.1"
+EXPECTED_VERSION = "0.2.0"
 USER_AGENT = "sillstone-registry-readback (github.com/sillstone/sillstone)"
 ORG = "sillstone"
 MAVEN_GROUP = "io.github.sillstone"
