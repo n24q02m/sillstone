@@ -6,7 +6,7 @@ doc = false
 [package]
 name = "sillstone-cli"
 description = "The `pith` command line interface over the pith-hash suite facade."
-readme = "../README.md"
+readme = "README.md"
 license = "Apache-2.0"
 categories = [ "algorithms", "cryptography",]
 
