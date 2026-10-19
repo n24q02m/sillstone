@@ -25,7 +25,10 @@ class FfiError extends Error {
 }
 
 let native = null;
+const platformKey = `${process.platform}-${process.arch}`;
 const candidates = [
+  path.join(__dirname, "prebuilds", platformKey, "sillstone_napi.node"),
+  path.join(__dirname, "prebuilds", platformKey, process.platform === "win32" ? "sillstone_ffi.dll" : (process.platform === "darwin" ? "libsillstone_ffi.dylib" : "libsillstone_ffi.so")),
   path.join(__dirname, "sillstone_napi.node"),
   path.join(__dirname, "build", "Release", "sillstone_napi.node"),
   path.join(__dirname, "build", "Debug", "sillstone_napi.node"),

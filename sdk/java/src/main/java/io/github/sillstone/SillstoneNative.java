@@ -20,7 +20,7 @@ import java.util.Locale;
  *       or {@code libsillstone_ffi.dylib}); relative values are resolved
  *       against the working directory and its ancestors;</li>
  *   <li>the native library bundled in this JAR under
- *       {@code hash/pith/native/<platform>/}, extracted to a private temp
+ *       {@code io/github/sillstone/native/<platform>/}, extracted to a private temp
  *       directory;</li>
  *   <li>the {@code target/release} directory of the working directory
  *       or one of its ancestors (a plain repository checkout).</li>
@@ -30,7 +30,8 @@ final class SillstoneNative {
     private SillstoneNative() {
     }
 
-    private static final String RESOURCE_ROOT = "/hash/pith/native/";
+    private static final String RESOURCE_ROOT = "/io/github/sillstone/native/";
+    private static final String FALLBACK_RESOURCE_ROOT = "/hash/pith/native/";
 
     /** Node-style platform id, e.g. {@code linux-x64}; the same ids the npm prebuilds use. */
     static String platformId(String osName, String osArch) {
@@ -57,18 +58,23 @@ final class SillstoneNative {
      */
     static String extractBundled(String platformId, String fileName) {
         String resource = RESOURCE_ROOT + platformId + "/" + fileName;
-        try (InputStream in = SillstoneNative.class.getResourceAsStream(resource)) {
-            if (in == null) {
-                return null;
-            }
-            Path dir = Files.createTempDirectory("pith-native-");
+        InputStream in = SillstoneNative.class.getResourceAsStream(resource);
+        if (in == null) {
+            resource = FALLBACK_RESOURCE_ROOT + platformId + "/" + fileName;
+            in = SillstoneNative.class.getResourceAsStream(resource);
+        }
+        if (in == null) {
+            return null;
+        }
+        try (InputStream stream = in) {
+            Path dir = Files.createTempDirectory("sillstone-native-");
             try {
                 Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwx------"));
             } catch (UnsupportedOperationException ignored) {
                 // Windows: the per-user temp directory is already private.
             }
             Path file = dir.resolve(fileName);
-            Files.copy(in, file, StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(stream, file, StandardCopyOption.REPLACE_EXISTING);
             file.toFile().deleteOnExit();
             dir.toFile().deleteOnExit();
             return file.toAbsolutePath().toString();

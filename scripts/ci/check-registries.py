@@ -51,7 +51,7 @@ CONTENT_PLATFORMS = list(pc.PLATFORMS)
 CONTENT_FROM = (0, 2, 0)
 JAR_PREFIX = "github/sillstone/native"
 
-EXPECTED_VERSION = "0.2.0"
+EXPECTED_VERSION = "0.2.1"
 USER_AGENT = "sillstone-registry-readback (github.com/sillstone/sillstone)"
 ORG = "sillstone"
 MAVEN_GROUP = "io.github.sillstone"

@@ -1,0 +1,100 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Sillstone Contributors
+"""Build backend glue for the sillstone ctypes wheel.
+
+The wheel carries the Rust cdylib built by ``cargo build -p sillstone-ffi --release``:
+``SILLSTONE_CDYLIB_DIR`` (default ``target/release`` at the repository root)
+is scanned for the cdylib and copied into the wheel by a ``build_py``
+hook. ``BinaryDistribution`` marks the distribution non-pure so the
+wheel is tagged per platform, and ``bdist_wheel_py3_none`` narrows the tag
+to ``py3-none-<platform>`` — the CD matrix builds one wheel per platform
+and publish-pypi uploads them together.
+"""
+
+from __future__ import annotations
+
+import os
+import platform as host
+import shutil
+from pathlib import Path
+
+from setuptools import Distribution, setup
+from setuptools.command.bdist_wheel import bdist_wheel
+from setuptools.command.build_py import build_py
+
+#: Every cdylib file name cargo may drop into the build directory, per
+#: platform (windows / linux / macOS).
+CDYLIB_NAMES = ("sillstone_ffi.dll", "libsillstone_ffi.so", "libsillstone_ffi.dylib")
+
+
+class BinaryDistribution(Distribution):
+    """A distribution that always carries a binary, so wheels get a
+    platform tag instead of ``py3-none-any``."""
+
+    def has_ext_modules(self) -> bool:
+        return True
+
+
+def native_platform_tag(platform: str, machine: str) -> str:
+    """Narrow a macOS tag or handle cross-compiled architecture."""
+    target_arch = os.environ.get("SILLSTONE_TARGET_ARCH")
+    if target_arch:
+        machine = target_arch
+    if target_arch and platform.startswith("macosx_"):
+        parts = platform.split("_")
+        parts[-1] = target_arch
+        return "_".join(parts)
+    if not (platform.startswith("macosx_") and platform.endswith("_universal2")):
+        return platform
+    arch = {"arm64": "arm64", "aarch64": "arm64", "x86_64": "x86_64", "amd64": "x86_64"}.get(machine.lower())
+    if arch is None:
+        raise RuntimeError(f"sillstone: cannot narrow {platform} for host architecture {machine!r}")
+    return platform[: -len("universal2")] + arch
+
+class bdist_wheel_py3_none(bdist_wheel):
+    """Tags the wheel ``py3-none-<platform>``.
+
+    The cdylib is loaded through ctypes and never links the Python C API, so
+    one wheel per platform is valid for every CPython 3.x. The platform half
+    of the tag is what setuptools computed for the build host, with a macOS
+    ``universal2`` narrowed to the single architecture the cdylib was built for.
+    """
+
+    def get_tag(self):
+        _python, _abi, platform = super().get_tag()
+        return "py3", "none", native_platform_tag(platform, host.machine())
+
+
+class build_py_with_cdylib(build_py):
+    """Copies the cdylib from ``SILLSTONE_CDYLIB_DIR`` into the wheel."""
+
+    def run(self) -> None:
+        super().run()
+        repo_root = Path(__file__).resolve().parent.parent.parent
+        env_dir = os.environ.get("SILLSTONE_CDYLIB_DIR")
+        candidates = [Path(env_dir)] if env_dir else []
+        if not env_dir or not Path(env_dir).is_absolute():
+            candidates.append(repo_root / (env_dir or "target/release"))
+        candidates.append(repo_root / "target" / "release")
+        pkg_dir = Path(self.build_lib) / "sillstone"
+        copied = 0
+        for candidate in candidates:
+            for name in CDYLIB_NAMES:
+                src = candidate / name
+                if src.is_file():
+                    self.mkpath(str(pkg_dir))
+                    shutil.copy2(src, pkg_dir / name)
+                    copied += 1
+            if copied:
+                break
+        if copied == 0:
+            raise SystemExit(
+                f"no cdylib (any of {', '.join(CDYLIB_NAMES)}) found in "
+                f"{', '.join(str(c) for c in candidates)}; run `cargo build -p sillstone-ffi --release` first"
+            )
+
+
+setup(
+    cmdclass={"build_py": build_py_with_cdylib, "bdist_wheel": bdist_wheel_py3_none},
+    distclass=BinaryDistribution,
+)

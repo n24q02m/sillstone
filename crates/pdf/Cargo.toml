@@ -36,11 +36,11 @@ workspace = true
 workspace = true
 
 [dependencies.sillstone-digest]
-version = "0.2.0"
+version = "0.2.1"
 path = "../digest"
 
 [dependencies.sillstone-inflate]
-version = "0.2.0"
+version = "0.2.1"
 path = "../inflate"
 
 [lints.rust]
