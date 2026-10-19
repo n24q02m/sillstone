@@ -217,9 +217,9 @@ jobs:
         shell: bash
         run: |
           mkdir -p sdk/python/dist sdk/node sdk/java/target
-          cp artifacts/*.whl sdk/python/dist/ || true
-          cp artifacts/*.tgz sdk/node/ || true
-          cp artifacts/*.jar sdk/java/target/ || true
+          find artifacts -name "*.whl" -exec cp {} sdk/python/dist/ \;
+          find artifacts -name "*.tgz" -exec cp {} sdk/node/ \;
+          find artifacts -name "*.jar" -exec cp {} sdk/java/target/ \;
           ls -la sdk/python/dist sdk/node sdk/java/target
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
