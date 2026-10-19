@@ -186,7 +186,6 @@ jobs:
               crates/file
               crates/ffi
               crates/curator
-              crates/core
             )
             for c in "${CRATES[@]}"; do
               echo "Publishing $c..."
