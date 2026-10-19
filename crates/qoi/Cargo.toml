@@ -1,0 +1,40 @@
+[package]
+name = "sillstone-qoi"
+license = "Apache-2.0"
+description = "QOI (Quite OK Image format) pure-Rust lossless encoder and decoder (zero-dep Rust)"
+readme = "README.md"
+categories = ["algorithms", "multimedia::encoding"]
+keywords = ["qoi", "image", "lossless", "codec"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["std"]
+std = []
+
+[package.version]
+workspace = true
+
+[package.edition]
+workspace = true
+
+[package.rust-version]
+workspace = true
+
+[package.repository]
+workspace = true
+
+[package.homepage]
+workspace = true
+
+[package.authors]
+workspace = true
+
+[dependencies.sillstone-digest]
+version = "0.2.1"
+path = "../digest"
+
+[lints.rust]
+missing_docs = "deny"
+unsafe_code = "allow"

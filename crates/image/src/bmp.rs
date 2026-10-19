@@ -569,3 +569,91 @@ fn decode_rle8(data: &[u8], h: &Header, img: &mut Image<Rgba, u8>) -> Result<()>
     // A stream that runs out without an EOF escape decodes as EOF.
     Ok(())
 }
+
+/// Encodes an RGB [`Image`] into a standard 24-bit uncompressed BMP file.
+pub fn encode_bmp_rgb(img: &Image<crate::raster::Rgb, u8>) -> Result<alloc::vec::Vec<u8>> {
+    let w = img.width() as usize;
+    let h = img.height() as usize;
+    let row_stride = (w * 3 + 3) & !3; // 4-byte aligned
+    let image_size = row_stride * h;
+    let file_size = 14 + 40 + image_size;
+
+    let mut out = alloc::vec::Vec::with_capacity(file_size);
+    // BITMAPFILEHEADER (14 bytes)
+    out.extend_from_slice(b"BM");
+    out.extend_from_slice(&(file_size as u32).to_le_bytes());
+    out.extend_from_slice(&0u32.to_le_bytes()); // reserved
+    out.extend_from_slice(&54u32.to_le_bytes()); // bfOffBits = 14 + 40
+
+    // BITMAPINFOHEADER (40 bytes)
+    out.extend_from_slice(&40u32.to_le_bytes()); // biSize
+    out.extend_from_slice(&(w as i32).to_le_bytes());
+    out.extend_from_slice(&(h as i32).to_le_bytes()); // positive: bottom-up
+    out.extend_from_slice(&1u16.to_le_bytes()); // biPlanes
+    out.extend_from_slice(&24u16.to_le_bytes()); // biBitCount
+    out.extend_from_slice(&0u32.to_le_bytes()); // biCompression = BI_RGB
+    out.extend_from_slice(&(image_size as u32).to_le_bytes());
+    out.extend_from_slice(&2835u32.to_le_bytes()); // biXPelsPerMeter (72 DPI)
+    out.extend_from_slice(&2835u32.to_le_bytes()); // biYPelsPerMeter (72 DPI)
+    out.extend_from_slice(&0u32.to_le_bytes()); // biClrUsed
+    out.extend_from_slice(&0u32.to_le_bytes()); // biClrImportant
+
+    // Pixel data (bottom-up, BGR order)
+    let src = img.as_slice();
+    let pad_len = row_stride - (w * 3);
+    for y in (0..h).rev() {
+        let row_start = y * w * 3;
+        for x in 0..w {
+            let px_idx = row_start + x * 3;
+            out.push(src[px_idx + 2]); // B
+            out.push(src[px_idx + 1]); // G
+            out.push(src[px_idx]);     // R
+        }
+        out.extend(core::iter::repeat_n(0u8, pad_len));
+    }
+
+    Ok(out)
+}
+
+/// Encodes an RGBA [`Image`] into a standard 32-bit uncompressed BMP file (BGRA).
+pub fn encode_bmp_rgba(img: &Image<crate::raster::Rgba, u8>) -> Result<alloc::vec::Vec<u8>> {
+    let w = img.width() as usize;
+    let h = img.height() as usize;
+    let row_stride = w * 4;
+    let image_size = row_stride * h;
+    let file_size = 14 + 40 + image_size;
+
+    let mut out = alloc::vec::Vec::with_capacity(file_size);
+    // BITMAPFILEHEADER
+    out.extend_from_slice(b"BM");
+    out.extend_from_slice(&(file_size as u32).to_le_bytes());
+    out.extend_from_slice(&0u32.to_le_bytes());
+    out.extend_from_slice(&54u32.to_le_bytes());
+
+    // BITMAPINFOHEADER
+    out.extend_from_slice(&40u32.to_le_bytes());
+    out.extend_from_slice(&(w as i32).to_le_bytes());
+    out.extend_from_slice(&(h as i32).to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&32u16.to_le_bytes());
+    out.extend_from_slice(&0u32.to_le_bytes()); // BI_RGB
+    out.extend_from_slice(&(image_size as u32).to_le_bytes());
+    out.extend_from_slice(&2835u32.to_le_bytes());
+    out.extend_from_slice(&2835u32.to_le_bytes());
+    out.extend_from_slice(&0u32.to_le_bytes());
+    out.extend_from_slice(&0u32.to_le_bytes());
+
+    let src = img.as_slice();
+    for y in (0..h).rev() {
+        let row_start = y * w * 4;
+        for x in 0..w {
+            let px_idx = row_start + x * 4;
+            out.push(src[px_idx + 2]); // B
+            out.push(src[px_idx + 1]); // G
+            out.push(src[px_idx]);     // R
+            out.push(src[px_idx + 3]); // A
+        }
+    }
+
+    Ok(out)
+}

@@ -395,6 +395,82 @@ static napi_value n_sillstone_image_colorhash(napi_env env, napi_callback_info i
     return result;
 }
 
+static napi_value n_sillstone_image_resize(napi_env env, napi_callback_info info) {
+    uint32_t val = sillstone_image_resize();
+    napi_value result;
+    napi_create_uint32(env, val, &result);
+    return result;
+}
+
+static napi_value n_sillstone_image_crop(napi_env env, napi_callback_info info) {
+    uint32_t val = sillstone_image_crop();
+    napi_value result;
+    napi_create_uint32(env, val, &result);
+    return result;
+}
+
+static napi_value n_sillstone_image_transpose(napi_env env, napi_callback_info info) {
+    uint32_t val = sillstone_image_transpose();
+    napi_value result;
+    napi_create_uint32(env, val, &result);
+    return result;
+}
+
+static napi_value n_sillstone_image_rotate(napi_env env, napi_callback_info info) {
+    uint32_t val = sillstone_image_rotate();
+    napi_value result;
+    napi_create_uint32(env, val, &result);
+    return result;
+}
+
+static napi_value n_sillstone_image_filter(napi_env env, napi_callback_info info) {
+    uint32_t val = sillstone_image_filter();
+    napi_value result;
+    napi_create_uint32(env, val, &result);
+    return result;
+}
+
+static napi_value n_sillstone_image_adjust(napi_env env, napi_callback_info info) {
+    uint32_t val = sillstone_image_adjust();
+    napi_value result;
+    napi_create_uint32(env, val, &result);
+    return result;
+}
+
+static napi_value n_sillstone_image_color_convert(napi_env env, napi_callback_info info) {
+    uint32_t val = sillstone_image_color_convert();
+    napi_value result;
+    napi_create_uint32(env, val, &result);
+    return result;
+}
+
+static napi_value n_sillstone_image_qoi_encode(napi_env env, napi_callback_info info) {
+    uint32_t val = sillstone_image_qoi_encode();
+    napi_value result;
+    napi_create_uint32(env, val, &result);
+    return result;
+}
+
+static napi_value n_sillstone_image_qoi_decode(napi_env env, napi_callback_info info) {
+    uint32_t val = sillstone_image_qoi_decode();
+    napi_value result;
+    napi_create_uint32(env, val, &result);
+    return result;
+}
+
+static napi_value n_sillstone_image_bmp_encode(napi_env env, napi_callback_info info) {
+    uint32_t val = sillstone_image_bmp_encode();
+    napi_value result;
+    napi_create_uint32(env, val, &result);
+    return result;
+}
+
+static napi_value n_sillstone_image_free_bytes(napi_env env, napi_callback_info info) {
+    napi_value result;
+    napi_get_undefined(env, &result);
+    return result;
+}
+
 static napi_value n_sillstone_text_tlsh(napi_env env, napi_callback_info info) {
     size_t argc = 1;
     napi_value args[1];
@@ -501,6 +577,39 @@ NAPI_MODULE_INIT() {
     napi_value fn_sillstone_image_colorhash;
     napi_create_function(env, NULL, 0, n_sillstone_image_colorhash, NULL, &fn_sillstone_image_colorhash);
     napi_set_named_property(env, exports, "sillstone_image_colorhash", fn_sillstone_image_colorhash);
+    napi_value fn_sillstone_image_resize;
+    napi_create_function(env, NULL, 0, n_sillstone_image_resize, NULL, &fn_sillstone_image_resize);
+    napi_set_named_property(env, exports, "sillstone_image_resize", fn_sillstone_image_resize);
+    napi_value fn_sillstone_image_crop;
+    napi_create_function(env, NULL, 0, n_sillstone_image_crop, NULL, &fn_sillstone_image_crop);
+    napi_set_named_property(env, exports, "sillstone_image_crop", fn_sillstone_image_crop);
+    napi_value fn_sillstone_image_transpose;
+    napi_create_function(env, NULL, 0, n_sillstone_image_transpose, NULL, &fn_sillstone_image_transpose);
+    napi_set_named_property(env, exports, "sillstone_image_transpose", fn_sillstone_image_transpose);
+    napi_value fn_sillstone_image_rotate;
+    napi_create_function(env, NULL, 0, n_sillstone_image_rotate, NULL, &fn_sillstone_image_rotate);
+    napi_set_named_property(env, exports, "sillstone_image_rotate", fn_sillstone_image_rotate);
+    napi_value fn_sillstone_image_filter;
+    napi_create_function(env, NULL, 0, n_sillstone_image_filter, NULL, &fn_sillstone_image_filter);
+    napi_set_named_property(env, exports, "sillstone_image_filter", fn_sillstone_image_filter);
+    napi_value fn_sillstone_image_adjust;
+    napi_create_function(env, NULL, 0, n_sillstone_image_adjust, NULL, &fn_sillstone_image_adjust);
+    napi_set_named_property(env, exports, "sillstone_image_adjust", fn_sillstone_image_adjust);
+    napi_value fn_sillstone_image_color_convert;
+    napi_create_function(env, NULL, 0, n_sillstone_image_color_convert, NULL, &fn_sillstone_image_color_convert);
+    napi_set_named_property(env, exports, "sillstone_image_color_convert", fn_sillstone_image_color_convert);
+    napi_value fn_sillstone_image_qoi_encode;
+    napi_create_function(env, NULL, 0, n_sillstone_image_qoi_encode, NULL, &fn_sillstone_image_qoi_encode);
+    napi_set_named_property(env, exports, "sillstone_image_qoi_encode", fn_sillstone_image_qoi_encode);
+    napi_value fn_sillstone_image_qoi_decode;
+    napi_create_function(env, NULL, 0, n_sillstone_image_qoi_decode, NULL, &fn_sillstone_image_qoi_decode);
+    napi_set_named_property(env, exports, "sillstone_image_qoi_decode", fn_sillstone_image_qoi_decode);
+    napi_value fn_sillstone_image_bmp_encode;
+    napi_create_function(env, NULL, 0, n_sillstone_image_bmp_encode, NULL, &fn_sillstone_image_bmp_encode);
+    napi_set_named_property(env, exports, "sillstone_image_bmp_encode", fn_sillstone_image_bmp_encode);
+    napi_value fn_sillstone_image_free_bytes;
+    napi_create_function(env, NULL, 0, n_sillstone_image_free_bytes, NULL, &fn_sillstone_image_free_bytes);
+    napi_set_named_property(env, exports, "sillstone_image_free_bytes", fn_sillstone_image_free_bytes);
     napi_value fn_sillstone_text_tlsh;
     napi_create_function(env, NULL, 0, n_sillstone_text_tlsh, NULL, &fn_sillstone_text_tlsh);
     napi_set_named_property(env, exports, "sillstone_text_tlsh", fn_sillstone_text_tlsh);

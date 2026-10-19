@@ -223,6 +223,50 @@ func SillstoneImageColorhash(data []byte, width uint32, height uint32, layout ui
     return uint64(out)
 }
 
+func SillstoneImageResize(data unsafe.Pointer, len uint64, in_w uint32, in_h uint32, layout uint32, out_w uint32, out_h uint32, filter uint32, out_buf unsafe.Pointer, out_len uint64) int32 {
+    return int32(C.sillstone_image_resize((*C.uint8_t)(data), C.size_t(len), C.uint32_t(in_w), C.uint32_t(in_h), C.uint32_t(layout), C.uint32_t(out_w), C.uint32_t(out_h), C.uint32_t(filter), (*C.uint8_t)(out_buf), C.size_t(out_len)))
+}
+
+func SillstoneImageCrop(data unsafe.Pointer, len uint64, in_w uint32, in_h uint32, layout uint32, x0 uint32, y0 uint32, x1 uint32, y1 uint32, out_buf unsafe.Pointer, out_len uint64) int32 {
+    return int32(C.sillstone_image_crop((*C.uint8_t)(data), C.size_t(len), C.uint32_t(in_w), C.uint32_t(in_h), C.uint32_t(layout), C.uint32_t(x0), C.uint32_t(y0), C.uint32_t(x1), C.uint32_t(y1), (*C.uint8_t)(out_buf), C.size_t(out_len)))
+}
+
+func SillstoneImageTranspose(data unsafe.Pointer, len uint64, in_w uint32, in_h uint32, layout uint32, method uint32, out_buf unsafe.Pointer, out_len uint64) int32 {
+    return int32(C.sillstone_image_transpose((*C.uint8_t)(data), C.size_t(len), C.uint32_t(in_w), C.uint32_t(in_h), C.uint32_t(layout), C.uint32_t(method), (*C.uint8_t)(out_buf), C.size_t(out_len)))
+}
+
+func SillstoneImageRotate(data unsafe.Pointer, len uint64, in_w uint32, in_h uint32, layout uint32, angle float64, expand uint32, filter uint32, out_buf unsafe.Pointer, out_len uint64) int32 {
+    return int32(C.sillstone_image_rotate((*C.uint8_t)(data), C.size_t(len), C.uint32_t(in_w), C.uint32_t(in_h), C.uint32_t(layout), C.double(angle), C.uint32_t(expand), C.uint32_t(filter), (*C.uint8_t)(out_buf), C.size_t(out_len)))
+}
+
+func SillstoneImageFilter(data unsafe.Pointer, len uint64, in_w uint32, in_h uint32, layout uint32, filter_id uint32, out_buf unsafe.Pointer, out_len uint64) int32 {
+    return int32(C.sillstone_image_filter((*C.uint8_t)(data), C.size_t(len), C.uint32_t(in_w), C.uint32_t(in_h), C.uint32_t(layout), C.uint32_t(filter_id), (*C.uint8_t)(out_buf), C.size_t(out_len)))
+}
+
+func SillstoneImageAdjust(data unsafe.Pointer, len uint64, in_w uint32, in_h uint32, layout uint32, op_id uint32, factor float64, out_buf unsafe.Pointer, out_len uint64) int32 {
+    return int32(C.sillstone_image_adjust((*C.uint8_t)(data), C.size_t(len), C.uint32_t(in_w), C.uint32_t(in_h), C.uint32_t(layout), C.uint32_t(op_id), C.double(factor), (*C.uint8_t)(out_buf), C.size_t(out_len)))
+}
+
+func SillstoneImageColorConvert(data unsafe.Pointer, len uint64, in_w uint32, in_h uint32, from_layout uint32, to_layout uint32, out_buf unsafe.Pointer, out_len uint64) int32 {
+    return int32(C.sillstone_image_color_convert((*C.uint8_t)(data), C.size_t(len), C.uint32_t(in_w), C.uint32_t(in_h), C.uint32_t(from_layout), C.uint32_t(to_layout), (*C.uint8_t)(out_buf), C.size_t(out_len)))
+}
+
+func SillstoneImageQoiEncode(data unsafe.Pointer, len uint64, in_w uint32, in_h uint32, layout uint32, out_ptr *unsafe.Pointer, out_len *uint64) int32 {
+    return int32(C.sillstone_image_qoi_encode((*C.uint8_t)(data), C.size_t(len), C.uint32_t(in_w), C.uint32_t(in_h), C.uint32_t(layout), (**C.uint8_t)(unsafe.Pointer(out_ptr)), (*C.size_t)(unsafe.Pointer(out_len))))
+}
+
+func SillstoneImageQoiDecode(data unsafe.Pointer, len uint64, out_w *uint32, out_h *uint32, out_layout *uint32, out_ptr *unsafe.Pointer, out_len *uint64) int32 {
+    return int32(C.sillstone_image_qoi_decode((*C.uint8_t)(data), C.size_t(len), (*C.uint32_t)(unsafe.Pointer(out_w)), (*C.uint32_t)(unsafe.Pointer(out_h)), (*C.uint32_t)(unsafe.Pointer(out_layout)), (**C.uint8_t)(unsafe.Pointer(out_ptr)), (*C.size_t)(unsafe.Pointer(out_len))))
+}
+
+func SillstoneImageBmpEncode(data unsafe.Pointer, len uint64, in_w uint32, in_h uint32, layout uint32, out_ptr *unsafe.Pointer, out_len *uint64) int32 {
+    return int32(C.sillstone_image_bmp_encode((*C.uint8_t)(data), C.size_t(len), C.uint32_t(in_w), C.uint32_t(in_h), C.uint32_t(layout), (**C.uint8_t)(unsafe.Pointer(out_ptr)), (*C.size_t)(unsafe.Pointer(out_len))))
+}
+
+func SillstoneImageFreeBytes(ptr unsafe.Pointer, len uint64) {
+    C.sillstone_image_free_bytes((*C.uint8_t)(ptr), C.size_t(len))
+}
+
 func SillstoneTextTlsh(data []byte) []byte {
     out := make([]byte, 72)
     var ptr *C.uint8_t

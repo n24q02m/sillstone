@@ -54,6 +54,10 @@ path = "../png"
 version = "0.2.1"
 path = "../jpeg"
 
+[dependencies.sillstone-qoi]
+version = "0.2.1"
+path = "../qoi"
+
 [dependencies.sillstone-text]
 version = "0.2.1"
 path = "../text"

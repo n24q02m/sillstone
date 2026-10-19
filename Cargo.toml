@@ -15,6 +15,7 @@ members = [
     "crates/image",
     "crates/png",
     "crates/jpeg",
+    "crates/qoi",
     "crates/audio",
     "crates/text",
     "crates/cdc",
@@ -22,6 +23,7 @@ members = [
     "crates/video",
     "crates/curator",
     "crates/cli",
+    "crates/tensor",
     "crates/ffi",
     "tools/idl-gen",
 ]

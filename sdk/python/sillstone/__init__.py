@@ -37,10 +37,24 @@ from ._generated import (
     sillstone_curator_match_raw,
     sillstone_curator_free_raw,
 )
-
+from .image import Image, ImageFilter, Resampling, Transpose
+from .array import Array, array, asarray, zeros, ones, arange, linspace, matmul, dot
 __version__ = "0.2.1"
 
 __all__ = [
+    "Image",
+    "ImageFilter",
+    "Resampling",
+    "Transpose",
+    "Array",
+    "array",
+    "asarray",
+    "zeros",
+    "ones",
+    "arange",
+    "linspace",
+    "matmul",
+    "dot",
     "version",
     "buffer_checksum",
     "sha256",

@@ -59,6 +59,28 @@ int32_t sillstone_image_whash(const uint8_t *data, size_t len, uint32_t width, u
 
 int32_t sillstone_image_colorhash(const uint8_t *data, size_t len, uint32_t width, uint32_t height, uint32_t layout, uint32_t bins, uint64_t *out);
 
+int32_t sillstone_image_resize(const uint8_t *data, size_t len, uint32_t in_w, uint32_t in_h, uint32_t layout, uint32_t out_w, uint32_t out_h, uint32_t filter, uint8_t *out_buf, size_t out_len);
+
+int32_t sillstone_image_crop(const uint8_t *data, size_t len, uint32_t in_w, uint32_t in_h, uint32_t layout, uint32_t x0, uint32_t y0, uint32_t x1, uint32_t y1, uint8_t *out_buf, size_t out_len);
+
+int32_t sillstone_image_transpose(const uint8_t *data, size_t len, uint32_t in_w, uint32_t in_h, uint32_t layout, uint32_t method, uint8_t *out_buf, size_t out_len);
+
+int32_t sillstone_image_rotate(const uint8_t *data, size_t len, uint32_t in_w, uint32_t in_h, uint32_t layout, double angle, uint32_t expand, uint32_t filter, uint8_t *out_buf, size_t out_len);
+
+int32_t sillstone_image_filter(const uint8_t *data, size_t len, uint32_t in_w, uint32_t in_h, uint32_t layout, uint32_t filter_id, uint8_t *out_buf, size_t out_len);
+
+int32_t sillstone_image_adjust(const uint8_t *data, size_t len, uint32_t in_w, uint32_t in_h, uint32_t layout, uint32_t op_id, double factor, uint8_t *out_buf, size_t out_len);
+
+int32_t sillstone_image_color_convert(const uint8_t *data, size_t len, uint32_t in_w, uint32_t in_h, uint32_t from_layout, uint32_t to_layout, uint8_t *out_buf, size_t out_len);
+
+int32_t sillstone_image_qoi_encode(const uint8_t *data, size_t len, uint32_t in_w, uint32_t in_h, uint32_t layout, uint8_t **out_ptr, size_t *out_len);
+
+int32_t sillstone_image_qoi_decode(const uint8_t *data, size_t len, uint32_t *out_w, uint32_t *out_h, uint32_t *out_layout, uint8_t **out_ptr, size_t *out_len);
+
+int32_t sillstone_image_bmp_encode(const uint8_t *data, size_t len, uint32_t in_w, uint32_t in_h, uint32_t layout, uint8_t **out_ptr, size_t *out_len);
+
+void sillstone_image_free_bytes(uint8_t *ptr, size_t len);
+
 int32_t sillstone_text_tlsh(const uint8_t *data, size_t len, uint8_t *out);
 
 int32_t sillstone_text_tlsh_distance(const uint8_t *hash_a, const uint8_t *hash_b, uint32_t *out);

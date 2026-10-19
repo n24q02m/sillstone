@@ -424,4 +424,40 @@ module.exports = {
     if (!native || !native.sillstone_text_tlsh_distance) throw new Error("Native N-API addon not loaded");
     return native.sillstone_text_tlsh_distance(a, b);
   },
+  tensor: function (shape, data) {
+    const size = shape.reduce((a, b) => a * b, 1);
+    const buf = (data instanceof Float64Array) ? data : (Array.isArray(data) ? Float64Array.from(data) : new Float64Array(size));
+    return {
+      shape: shape.slice(),
+      ndim: shape.length,
+      size: size,
+      data: buf,
+      reshape: function (...newShape) {
+        const target = Array.isArray(newShape[0]) ? newShape[0] : newShape;
+        const targetSize = target.reduce((a, b) => a * b, 1);
+        if (targetSize !== size) throw new Error("reshape size mismatch");
+        return module.exports.tensor(target, buf);
+      },
+      matmul: function (other) {
+        if (shape.length !== 2 || other.shape.length !== 2) throw new Error("matmul requires 2D tensors");
+        const [m, k1] = shape;
+        const [k2, n] = other.shape;
+        if (k1 !== k2) throw new Error("matmul dimension mismatch");
+        const out = new Float64Array(m * n);
+        for (let i = 0; i < m; i++) {
+          for (let j = 0; j < n; j++) {
+            let acc = 0;
+            for (let p = 0; p < k1; p++) {
+              acc += buf[i * k1 + p] * other.data[p * n + j];
+            }
+            out[i * n + j] = acc;
+          }
+        }
+        return module.exports.tensor([m, n], out);
+      },
+      sum: function () {
+        return buf.reduce((a, b) => a + b, 0);
+      },
+    };
+  },
 };

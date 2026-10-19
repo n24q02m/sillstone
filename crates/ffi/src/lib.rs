@@ -53,6 +53,17 @@ pub fn _touch_deps() {
     let _ = sillstone_image::ffi::sillstone_image_dhash as *const () as usize;
     let _ = sillstone_image::ffi::sillstone_image_whash as *const () as usize;
     let _ = sillstone_image::ffi::sillstone_image_colorhash as *const () as usize;
+    let _ = sillstone_image::ffi::sillstone_image_resize as *const () as usize;
+    let _ = sillstone_image::ffi::sillstone_image_crop as *const () as usize;
+    let _ = sillstone_image::ffi::sillstone_image_transpose as *const () as usize;
+    let _ = sillstone_image::ffi::sillstone_image_rotate as *const () as usize;
+    let _ = sillstone_image::ffi::sillstone_image_filter as *const () as usize;
+    let _ = sillstone_image::ffi::sillstone_image_adjust as *const () as usize;
+    let _ = sillstone_image::ffi::sillstone_image_color_convert as *const () as usize;
+    let _ = sillstone_image::ffi::sillstone_image_qoi_encode as *const () as usize;
+    let _ = sillstone_image::ffi::sillstone_image_qoi_decode as *const () as usize;
+    let _ = sillstone_image::ffi::sillstone_image_bmp_encode as *const () as usize;
+    let _ = sillstone_image::ffi::sillstone_image_free_bytes as *const () as usize;
     let _ = sillstone_text::ffi::sillstone_text_tlsh as *const () as usize;
     let _ = sillstone_text::ffi::sillstone_text_tlsh_distance as *const () as usize;
 }

@@ -23,8 +23,11 @@ mod exif;
 #[allow(clippy::module_inception)]
 mod raster;
 mod resample;
-
-pub use self::color::luma_bt601;
+mod tensor_bridge;
+pub use self::color::{
+    cmyk_to_rgb, luma_bt601, rgb_to_cmyk, rgb_to_ycbcr, rgb_to_yuv420p_pixel, ycbcr_to_rgb,
+    yuv420p_to_rgb_pixel,
+};
 pub use self::exif::apply_orientation;
-pub use self::raster::{Gray, Image, Layout, MAX_BUFFER_BYTES, Rgb, Rgba, Sample};
-pub use self::resample::box_average;
+pub use self::raster::{Cmyk, Gray, Image, La, Layout, MAX_BUFFER_BYTES, Rgb, Rgba, Sample};
+pub use self::resample::{ResamplingFilter, box_average, resize};

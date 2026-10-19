@@ -281,6 +281,559 @@ fn expected_samples(width: u32, height: u32, channels: usize, bytes: usize) -> O
         .checked_mul(bytes)
 }
 
+
+/// Resizes a raw image buffer using the specified resampling filter.
+/// Filter: 0=Nearest, 1=Box, 2=Bilinear, 3=Bicubic, 4=Lanczos.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_image_resize(
+    data: *const u8,
+    len: usize,
+    in_w: u32,
+    in_h: u32,
+    layout: u32,
+    out_w: u32,
+    out_h: u32,
+    filter: u32,
+    out_buf: *mut u8,
+    out_len: usize,
+) -> i32 {
+    if data.is_null() || out_buf.is_null() {
+        return PITH_E_INVALID;
+    }
+    let r_filter = match filter {
+        0 => crate::raster::ResamplingFilter::Nearest,
+        1 => crate::raster::ResamplingFilter::Box,
+        2 => crate::raster::ResamplingFilter::Bilinear,
+        3 => crate::raster::ResamplingFilter::Bicubic,
+        4 => crate::raster::ResamplingFilter::Lanczos,
+        _ => return PITH_E_INVALID,
+    };
+
+    let channels = match layout {
+        PITH_LAYOUT_GRAY8 => 1,
+        PITH_LAYOUT_RGB8 => 3,
+        PITH_LAYOUT_RGBA8 => 4,
+        _ => return PITH_E_INVALID,
+    };
+
+    if len != (in_w as usize) * (in_h as usize) * channels {
+        return PITH_E_INVALID;
+    }
+    let expected_out_len = (out_w as usize) * (out_h as usize) * channels;
+    if out_len < expected_out_len {
+        return PITH_E_INVALID;
+    }
+
+    let src_slice = unsafe { core::slice::from_raw_parts(data, len) };
+    let out_slice = unsafe { core::slice::from_raw_parts_mut(out_buf, expected_out_len) };
+
+    match layout {
+        PITH_LAYOUT_GRAY8 => {
+            let img = match Image::<Gray, u8>::from_vec(in_w, in_h, src_slice.to_vec()) {
+                Ok(im) => im,
+                Err(_) => return PITH_E_REJECTED,
+            };
+            let res = match crate::raster::resize(&img, out_w, out_h, r_filter) {
+                Ok(r) => r,
+                Err(_) => return PITH_E_REJECTED,
+            };
+            out_slice.copy_from_slice(res.as_slice());
+        }
+        PITH_LAYOUT_RGB8 => {
+            let img = match Image::<Rgb, u8>::from_vec(in_w, in_h, src_slice.to_vec()) {
+                Ok(im) => im,
+                Err(_) => return PITH_E_REJECTED,
+            };
+            let res = match crate::raster::resize(&img, out_w, out_h, r_filter) {
+                Ok(r) => r,
+                Err(_) => return PITH_E_REJECTED,
+            };
+            out_slice.copy_from_slice(res.as_slice());
+        }
+        PITH_LAYOUT_RGBA8 => {
+            let img = match Image::<Rgba, u8>::from_vec(in_w, in_h, src_slice.to_vec()) {
+                Ok(im) => im,
+                Err(_) => return PITH_E_REJECTED,
+            };
+            let res = match crate::raster::resize(&img, out_w, out_h, r_filter) {
+                Ok(r) => r,
+                Err(_) => return PITH_E_REJECTED,
+            };
+            out_slice.copy_from_slice(res.as_slice());
+        }
+        _ => return PITH_E_INVALID,
+    }
+
+    PITH_OK
+}
+
+/// Crops a rectangular box `[x0, y0, x1, y1)` from an image.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_image_crop(
+    data: *const u8,
+    len: usize,
+    in_w: u32,
+    in_h: u32,
+    layout: u32,
+    x0: u32,
+    y0: u32,
+    x1: u32,
+    y1: u32,
+    out_buf: *mut u8,
+    out_len: usize,
+) -> i32 {
+    if data.is_null() || out_buf.is_null() || x0 >= x1 || y0 >= y1 || x1 > in_w || y1 > in_h {
+        return PITH_E_INVALID;
+    }
+    let channels = match layout {
+        PITH_LAYOUT_GRAY8 => 1,
+        PITH_LAYOUT_RGB8 => 3,
+        PITH_LAYOUT_RGBA8 => 4,
+        _ => return PITH_E_INVALID,
+    };
+    let out_w = x1 - x0;
+    let out_h = y1 - y0;
+    let needed = (out_w as usize) * (out_h as usize) * channels;
+    if out_len < needed {
+        return PITH_E_INVALID;
+    }
+
+    let src = unsafe { core::slice::from_raw_parts(data, len) };
+    let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, needed) };
+
+    let mut offset = 0usize;
+    for y in y0..y1 {
+        let start = (y as usize * in_w as usize + x0 as usize) * channels;
+        let end = start + (out_w as usize) * channels;
+        dst[offset..offset + (end - start)].copy_from_slice(&src[start..end]);
+        offset += end - start;
+    }
+    PITH_OK
+}
+
+/// Transposes or rotates by 90-degree steps.
+/// Method: 0=FlipH, 1=FlipV, 2=Rot90, 3=Rot180, 4=Rot270, 5=Transpose, 6=Transverse.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_image_transpose(
+    data: *const u8,
+    len: usize,
+    in_w: u32,
+    in_h: u32,
+    layout: u32,
+    method: u32,
+    out_buf: *mut u8,
+    out_len: usize,
+) -> i32 {
+    if data.is_null() || out_buf.is_null() {
+        return PITH_E_INVALID;
+    }
+    let t_method = match method {
+        0 => crate::transform::TransposeMethod::FlipHorizontal,
+        1 => crate::transform::TransposeMethod::FlipVertical,
+        2 => crate::transform::TransposeMethod::Rotate90,
+        3 => crate::transform::TransposeMethod::Rotate180,
+        4 => crate::transform::TransposeMethod::Rotate270,
+        5 => crate::transform::TransposeMethod::Transpose,
+        6 => crate::transform::TransposeMethod::Transverse,
+        _ => return PITH_E_INVALID,
+    };
+
+    let channels = match layout {
+        PITH_LAYOUT_GRAY8 => 1,
+        PITH_LAYOUT_RGB8 => 3,
+        PITH_LAYOUT_RGBA8 => 4,
+        _ => return PITH_E_INVALID,
+    };
+    let total_samples = (in_w as usize) * (in_h as usize) * channels;
+    if len != total_samples || out_len < total_samples {
+        return PITH_E_INVALID;
+    }
+
+    let src = unsafe { core::slice::from_raw_parts(data, len) };
+    let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_samples) };
+
+    macro_rules! do_transpose {
+        ($layout_ty:ty) => {{
+            let img = match Image::<$layout_ty, u8>::from_vec(in_w, in_h, src.to_vec()) {
+                Ok(im) => im,
+                Err(_) => return PITH_E_REJECTED,
+            };
+            let res = match crate::transform::transpose(&img, t_method) {
+                Ok(r) => r,
+                Err(_) => return PITH_E_REJECTED,
+            };
+            dst.copy_from_slice(res.as_slice());
+        }};
+    }
+
+    match layout {
+        PITH_LAYOUT_GRAY8 => do_transpose!(Gray),
+        PITH_LAYOUT_RGB8 => do_transpose!(Rgb),
+        PITH_LAYOUT_RGBA8 => do_transpose!(Rgba),
+        _ => return PITH_E_INVALID,
+    }
+
+    PITH_OK
+}
+
+/// Rotates an image counter-clockwise by arbitrary angle.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_image_rotate(
+    data: *const u8,
+    len: usize,
+    in_w: u32,
+    in_h: u32,
+    layout: u32,
+    angle: f64,
+    expand: u32,
+    filter: u32,
+    out_buf: *mut u8,
+    out_len: usize,
+) -> i32 {
+    if data.is_null() || out_buf.is_null() {
+        return PITH_E_INVALID;
+    }
+    let r_filter = match filter {
+        0 => crate::raster::ResamplingFilter::Nearest,
+        _ => crate::raster::ResamplingFilter::Bilinear,
+    };
+    let _channels = match layout {
+        PITH_LAYOUT_GRAY8 => 1,
+        PITH_LAYOUT_RGB8 => 3,
+        PITH_LAYOUT_RGBA8 => 4,
+        _ => return PITH_E_INVALID,
+    };
+    let src = unsafe { core::slice::from_raw_parts(data, len) };
+
+    macro_rules! do_rotate {
+        ($layout_ty:ty) => {{
+            let img = match Image::<$layout_ty, u8>::from_vec(in_w, in_h, src.to_vec()) {
+                Ok(im) => im,
+                Err(_) => return PITH_E_REJECTED,
+            };
+            let res = match crate::transform::rotate(&img, angle, expand != 0, r_filter) {
+                Ok(r) => r,
+                Err(_) => return PITH_E_REJECTED,
+            };
+            let res_bytes = res.as_slice().len();
+            if out_len < res_bytes {
+                return PITH_E_INVALID;
+            }
+            let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, res_bytes) };
+            dst.copy_from_slice(res.as_slice());
+        }};
+    }
+
+    match layout {
+        PITH_LAYOUT_GRAY8 => do_rotate!(Gray),
+        PITH_LAYOUT_RGB8 => do_rotate!(Rgb),
+        PITH_LAYOUT_RGBA8 => do_rotate!(Rgba),
+        _ => return PITH_E_INVALID,
+    }
+
+    PITH_OK
+}
+
+/// Applies built-in 2D convolution filters.
+/// Filter ID: 0=Blur, 1=Sharpen, 2=Contour, 3=Detail, 4=EdgeEnhance, 5=FindEdges, 6=Emboss.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_image_filter(
+    data: *const u8,
+    len: usize,
+    in_w: u32,
+    in_h: u32,
+    layout: u32,
+    filter_id: u32,
+    out_buf: *mut u8,
+    out_len: usize,
+) -> i32 {
+    if data.is_null() || out_buf.is_null() || out_len < len {
+        return PITH_E_INVALID;
+    }
+    let builtin = match filter_id {
+        0 => crate::filter::BuiltinFilter::Blur,
+        1 => crate::filter::BuiltinFilter::Sharpen,
+        2 => crate::filter::BuiltinFilter::Contour,
+        3 => crate::filter::BuiltinFilter::Detail,
+        4 => crate::filter::BuiltinFilter::EdgeEnhance,
+        5 => crate::filter::BuiltinFilter::FindEdges,
+        6 => crate::filter::BuiltinFilter::Emboss,
+        _ => return PITH_E_INVALID,
+    };
+
+    let src = unsafe { core::slice::from_raw_parts(data, len) };
+    let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, len) };
+
+    macro_rules! do_filter {
+        ($layout_ty:ty) => {{
+            let img = match Image::<$layout_ty, u8>::from_vec(in_w, in_h, src.to_vec()) {
+                Ok(im) => im,
+                Err(_) => return PITH_E_REJECTED,
+            };
+            let res = match crate::filter::apply_filter(&img, builtin) {
+                Ok(r) => r,
+                Err(_) => return PITH_E_REJECTED,
+            };
+            dst.copy_from_slice(res.as_slice());
+        }};
+    }
+
+    match layout {
+        PITH_LAYOUT_GRAY8 => do_filter!(Gray),
+        PITH_LAYOUT_RGB8 => do_filter!(Rgb),
+        PITH_LAYOUT_RGBA8 => do_filter!(Rgba),
+        _ => return PITH_E_INVALID,
+    }
+
+    PITH_OK
+}
+
+/// Adjusts image properties: 0=brightness, 1=invert.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_image_adjust(
+    data: *const u8,
+    len: usize,
+    in_w: u32,
+    in_h: u32,
+    layout: u32,
+    op_id: u32,
+    factor: f64,
+    out_buf: *mut u8,
+    out_len: usize,
+) -> i32 {
+    if data.is_null() || out_buf.is_null() || out_len < len {
+        return PITH_E_INVALID;
+    }
+    let src = unsafe { core::slice::from_raw_parts(data, len) };
+    let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, len) };
+
+    macro_rules! do_adjust {
+        ($layout_ty:ty) => {{
+            let img = match Image::<$layout_ty, u8>::from_vec(in_w, in_h, src.to_vec()) {
+                Ok(im) => im,
+                Err(_) => return PITH_E_REJECTED,
+            };
+            let res = match op_id {
+                0 => crate::filter::adjust_brightness(&img, factor),
+                1 => crate::filter::invert(&img),
+                _ => return PITH_E_INVALID,
+            };
+            match res {
+                Ok(r) => dst.copy_from_slice(r.as_slice()),
+                Err(_) => return PITH_E_REJECTED,
+            }
+        }};
+    }
+
+    match layout {
+        PITH_LAYOUT_GRAY8 => do_adjust!(Gray),
+        PITH_LAYOUT_RGB8 => do_adjust!(Rgb),
+        PITH_LAYOUT_RGBA8 => do_adjust!(Rgba),
+        _ => return PITH_E_INVALID,
+    }
+
+    PITH_OK
+}
+
+/// Converts between color spaces (e.g. RGB to Gray, RGBA to RGB, etc.).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_image_color_convert(
+    data: *const u8,
+    len: usize,
+    in_w: u32,
+    in_h: u32,
+    from_layout: u32,
+    to_layout: u32,
+    out_buf: *mut u8,
+    out_len: usize,
+) -> i32 {
+    if data.is_null() || out_buf.is_null() {
+        return PITH_E_INVALID;
+    }
+    let src = unsafe { core::slice::from_raw_parts(data, len) };
+    let total_pixels = (in_w as usize) * (in_h as usize);
+
+    if from_layout == PITH_LAYOUT_RGB8 && to_layout == PITH_LAYOUT_GRAY8 {
+        if out_len < total_pixels {
+            return PITH_E_INVALID;
+        }
+        let img = match Image::<Rgb, u8>::from_vec(in_w, in_h, src.to_vec()) {
+            Ok(im) => im,
+            Err(_) => return PITH_E_REJECTED,
+        };
+        let gray = img.to_gray();
+        let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_pixels) };
+        dst.copy_from_slice(gray.as_slice());
+        PITH_OK
+    } else if from_layout == PITH_LAYOUT_RGBA8 && to_layout == PITH_LAYOUT_GRAY8 {
+        if out_len < total_pixels {
+            return PITH_E_INVALID;
+        }
+        let img = match Image::<Rgba, u8>::from_vec(in_w, in_h, src.to_vec()) {
+            Ok(im) => im,
+            Err(_) => return PITH_E_REJECTED,
+        };
+        let gray = img.to_gray();
+        let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_pixels) };
+        dst.copy_from_slice(gray.as_slice());
+        PITH_OK
+    } else if from_layout == PITH_LAYOUT_RGBA8 && to_layout == PITH_LAYOUT_RGB8 {
+        if out_len < total_pixels * 3 {
+            return PITH_E_INVALID;
+        }
+        let img = match Image::<Rgba, u8>::from_vec(in_w, in_h, src.to_vec()) {
+            Ok(im) => im,
+            Err(_) => return PITH_E_REJECTED,
+        };
+        let rgb = img.to_rgb();
+        let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_pixels * 3) };
+        dst.copy_from_slice(rgb.as_slice());
+        PITH_OK
+    } else if from_layout == PITH_LAYOUT_RGB8 && to_layout == PITH_LAYOUT_RGBA8 {
+        if out_len < total_pixels * 4 {
+            return PITH_E_INVALID;
+        }
+        let img = match Image::<Rgb, u8>::from_vec(in_w, in_h, src.to_vec()) {
+            Ok(im) => im,
+            Err(_) => return PITH_E_REJECTED,
+        };
+        let rgba = img.to_rgba();
+        let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_pixels * 4) };
+        dst.copy_from_slice(rgba.as_slice());
+        PITH_OK
+    } else {
+        PITH_E_INVALID
+    }
+}
+
+/// Encodes raw image pixels to QOI format. Allocates buffer owned by caller.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_image_qoi_encode(
+    data: *const u8,
+    len: usize,
+    in_w: u32,
+    in_h: u32,
+    layout: u32,
+    out_ptr: *mut *mut u8,
+    out_len: *mut usize,
+) -> i32 {
+    if data.is_null() || out_ptr.is_null() || out_len.is_null() {
+        return PITH_E_INVALID;
+    }
+    let src = unsafe { core::slice::from_raw_parts(data, len) };
+    let channels = match layout {
+        PITH_LAYOUT_RGB8 => 3,
+        PITH_LAYOUT_RGBA8 => 4,
+        _ => return PITH_E_INVALID,
+    };
+
+    let encoded = match sillstone_qoi::encode(in_w, in_h, channels, 0, src) {
+        Ok(enc) => enc,
+        Err(_) => return PITH_E_REJECTED,
+    };
+
+    let mut boxed = encoded.into_boxed_slice();
+    unsafe {
+        *out_ptr = boxed.as_mut_ptr();
+        *out_len = boxed.len();
+    }
+    core::mem::forget(boxed);
+    PITH_OK
+}
+
+/// Decodes QOI bytes to raw image pixels.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_image_qoi_decode(
+    data: *const u8,
+    len: usize,
+    out_w: *mut u32,
+    out_h: *mut u32,
+    out_layout: *mut u32,
+    out_ptr: *mut *mut u8,
+    out_len: *mut usize,
+) -> i32 {
+    if data.is_null() || out_w.is_null() || out_h.is_null() || out_layout.is_null() || out_ptr.is_null() || out_len.is_null() {
+        return PITH_E_INVALID;
+    }
+    let src = unsafe { core::slice::from_raw_parts(data, len) };
+    let (header, pixels) = match sillstone_qoi::decode(src) {
+        Ok(res) => res,
+        Err(_) => return PITH_E_REJECTED,
+    };
+
+    let layout = match header.channels {
+        3 => PITH_LAYOUT_RGB8,
+        4 => PITH_LAYOUT_RGBA8,
+        _ => return PITH_E_REJECTED,
+    };
+
+    let mut boxed = pixels.into_boxed_slice();
+    unsafe {
+        *out_w = header.width;
+        *out_h = header.height;
+        *out_layout = layout;
+        *out_ptr = boxed.as_mut_ptr();
+        *out_len = boxed.len();
+    }
+    core::mem::forget(boxed);
+    PITH_OK
+}
+
+/// Encodes raw image pixels to standard BMP format.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_image_bmp_encode(
+    data: *const u8,
+    len: usize,
+    in_w: u32,
+    in_h: u32,
+    layout: u32,
+    out_ptr: *mut *mut u8,
+    out_len: *mut usize,
+) -> i32 {
+    if data.is_null() || out_ptr.is_null() || out_len.is_null() {
+        return PITH_E_INVALID;
+    }
+    let src = unsafe { core::slice::from_raw_parts(data, len) };
+    let encoded = match layout {
+        PITH_LAYOUT_RGB8 => {
+            let img = match Image::<Rgb, u8>::from_vec(in_w, in_h, src.to_vec()) {
+                Ok(im) => im,
+                Err(_) => return PITH_E_REJECTED,
+            };
+            match crate::bmp::encode_bmp_rgb(&img) {
+                Ok(b) => b,
+                Err(_) => return PITH_E_REJECTED,
+            }
+        }
+        PITH_LAYOUT_RGBA8 => {
+            let img = match Image::<Rgba, u8>::from_vec(in_w, in_h, src.to_vec()) {
+                Ok(im) => im,
+                Err(_) => return PITH_E_REJECTED,
+            };
+            match crate::bmp::encode_bmp_rgba(&img) {
+                Ok(b) => b,
+                Err(_) => return PITH_E_REJECTED,
+            }
+        }
+        _ => return PITH_E_INVALID,
+    };
+
+    let mut boxed = encoded.into_boxed_slice();
+    unsafe {
+        *out_ptr = boxed.as_mut_ptr();
+        *out_len = boxed.len();
+    }
+    core::mem::forget(boxed);
+    PITH_OK
+}
+
+/// Frees a heap buffer allocated across FFI boundaries by sillstone image operations.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_image_free_bytes(ptr: *mut u8, len: usize) {
+    if !ptr.is_null() && len > 0 {
+        let _ = unsafe { alloc::boxed::Box::from_raw(core::slice::from_raw_parts_mut(ptr, len)) };
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;

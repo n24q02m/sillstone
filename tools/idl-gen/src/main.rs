@@ -73,7 +73,11 @@ fn is_unicode_category_fn(name: &str) -> bool {
     name == "sillstone_unicode_char_category"
 }
 fn is_image_hash_fn(name: &str) -> bool {
-    name.starts_with("sillstone_image_")
+    name == "sillstone_image_phash"
+        || name == "sillstone_image_ahash"
+        || name == "sillstone_image_dhash"
+        || name == "sillstone_image_whash"
+        || name == "sillstone_image_colorhash"
 }
 
 fn digest_len(name: &str) -> usize {
@@ -279,15 +283,70 @@ fn gen_go(fns: &[Function]) -> String {
             out.push_str("func SillstoneCuratorDescribe(data []byte) []byte {\n    var outPtr *C.uint8_t\n    var outLen C.size_t\n    var ptr *C.uint8_t\n    if len(data) > 0 { ptr = (*C.uint8_t)(unsafe.Pointer(&data[0])) }\n    status := C.sillstone_curator_describe(ptr, C.size_t(len(data)), &outPtr, &outLen)\n    if status != 0 || outPtr == nil { return nil }\n    res := C.GoBytes(unsafe.Pointer(outPtr), C.int(outLen))\n    C.sillstone_curator_free(outPtr, outLen)\n    return res\n}\n\n");
         } else if f.name == "sillstone_curator_match" {
             out.push_str("func SillstoneCuratorMatch(a []byte, b []byte) (uint32, []uint64, uint32) {\n    var tag C.uint32_t\n    slots := make([]C.uint64_t, 4)\n    var matched C.uint32_t\n    var ptrA, ptrB *C.uint8_t\n    if len(a) > 0 { ptrA = (*C.uint8_t)(unsafe.Pointer(&a[0])) }\n    if len(b) > 0 { ptrB = (*C.uint8_t)(unsafe.Pointer(&b[0])) }\n    C.sillstone_curator_match(ptrA, C.size_t(len(a)), ptrB, C.size_t(len(b)), &tag, &slots[0], C.size_t(len(slots)), &matched)\n    resSlots := make([]uint64, 4)\n    for i, s := range slots { resSlots[i] = uint64(s) }\n    return uint32(tag), resSlots, uint32(matched)\n}\n\n");
+        } else if f.name == "sillstone_curator_free" {
             out.push_str("func SillstoneCuratorFree(ptr unsafe.Pointer, len uint64) {\n    C.sillstone_curator_free((*C.uint8_t)(ptr), C.size_t(len))\n}\n\n");
         } else if f.args.is_empty() {
             let go_ret = match f.ret.as_str() {
                 "u32" => "uint32",
                 "u64" => "uint64",
-                _ => "void",
+                "i32" => "int32",
+                _ => "",
             };
             out.push_str(&format!("func {go_name}() {go_ret} {{\n"));
             out.push_str(&format!("    return {go_ret}(C.{}())\n", f.name));
+            out.push_str("}\n\n");
+        } else {
+            let c_args: Vec<String> = f
+                .args
+                .iter()
+                .map(|a| {
+                    let go_ty = match a.ty.as_str() {
+                        "*const u8" | "*mut u8" => "unsafe.Pointer",
+                        "*mut *mut u8" => "*unsafe.Pointer",
+                        "*mut usize" => "*uint64",
+                        "*mut u32" => "*uint32",
+                        "*mut u64" => "*uint64",
+                        "f64" => "float64",
+                        "usize" => "uint64",
+                        "u32" => "uint32",
+                        "u64" => "uint64",
+                        "i32" => "int32",
+                        _ => "unsafe.Pointer",
+                    };
+                    format!("{} {}", a.name, go_ty)
+                })
+                .collect();
+            let c_call_args: Vec<String> = f
+                .args
+                .iter()
+                .map(|a| match a.ty.as_str() {
+                    "*const u8" | "*mut u8" => format!("(*C.uint8_t)({})", a.name),
+                    "*mut *mut u8" => format!("(**C.uint8_t)(unsafe.Pointer({}))", a.name),
+                    "*mut usize" => format!("(*C.size_t)(unsafe.Pointer({}))", a.name),
+                    "*mut u32" => format!("(*C.uint32_t)(unsafe.Pointer({}))", a.name),
+                    "*mut u64" => format!("(*C.uint64_t)(unsafe.Pointer({}))", a.name),
+                    "f64" => format!("C.double({})", a.name),
+                    "usize" => format!("C.size_t({})", a.name),
+                    "u32" => format!("C.uint32_t({})", a.name),
+                    "u64" => format!("C.uint64_t({})", a.name),
+                    "i32" => format!("C.int32_t({})", a.name),
+                    _ => a.name.clone(),
+                })
+                .collect();
+            let go_ret = match f.ret.as_str() {
+                "u32" => "uint32",
+                "u64" => "uint64",
+                "i32" => "int32",
+                "usize" => "uint64",
+                _ => "",
+            };
+            let ret_decl = if go_ret.is_empty() { String::new() } else { format!(" {go_ret}") };
+            out.push_str(&format!("func {go_name}({}){ret_decl} {{\n", c_args.join(", ")));
+            if go_ret.is_empty() {
+                out.push_str(&format!("    C.{}({})\n", f.name, c_call_args.join(", ")));
+            } else {
+                out.push_str(&format!("    return {go_ret}(C.{}({}))\n", f.name, c_call_args.join(", ")));
+            }
             out.push_str("}\n\n");
         }
     }
@@ -426,6 +485,8 @@ fn gen_node_napi(fns: &[Function]) -> String {
             out.push_str("    napi_create_uint32(env, matched, &v_matched);\n    napi_set_named_property(env, result, \"matched\", v_matched);\n");
             out.push_str("    return result;\n");
         } else if f.name == "sillstone_curator_free" {
+            out.push_str("    napi_value result;\n    napi_get_undefined(env, &result);\n    return result;\n");
+        } else if f.name == "sillstone_image_free_bytes" {
             out.push_str("    napi_value result;\n    napi_get_undefined(env, &result);\n    return result;\n");
         } else {
             out.push_str(&format!("    uint32_t val = {}();\n", f.name));

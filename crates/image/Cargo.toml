@@ -37,6 +37,14 @@ version = "0.2.1"
 path = "../math"
 version = "0.2.1"
 
+
+[dependencies.sillstone-tensor]
+path = "../tensor"
+version = "0.2.1"
+
+[dependencies.sillstone-qoi]
+path = "../qoi"
+version = "0.2.1"
 [lints.rust]
 missing_docs = "deny"
 unsafe_code = "allow"

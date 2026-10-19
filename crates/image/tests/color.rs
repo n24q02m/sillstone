@@ -3,7 +3,10 @@
 //! proof's tripwire — it fails if `(sum + 500)/1000` becomes
 //! truncation.
 
-use sillstone_image::raster::{Gray, Image, Rgb, Rgba, luma_bt601};
+use sillstone_image::raster::{
+    Cmyk, Gray, Image, La, Rgb, Rgba, cmyk_to_rgb, luma_bt601, rgb_to_cmyk, rgb_to_ycbcr,
+    rgb_to_yuv420p_pixel, ycbcr_to_rgb, yuv420p_to_rgb_pixel,
+};
 
 #[test]
 fn gray_r_equals_g_equals_b_is_identity() {
@@ -68,4 +71,62 @@ fn to_gray_u16_matches_the_scalar_function() {
     let im: Image<Rgb, u16> = Image::from_vec(1, 2, vec![0, 0, 999, 65535, 65535, 65535]).unwrap();
     let gray = im.to_gray();
     assert_eq!(gray.as_slice(), &[114, 65535]);
+}
+
+#[test]
+fn ycbcr_rgb_roundtrip() {
+    for (r, g, b) in [(0, 0, 0), (255, 255, 255), (255, 0, 0), (0, 255, 0), (0, 0, 255), (128, 64, 192)] {
+        let (y, cb, cr) = rgb_to_ycbcr(r, g, b);
+        let (r2, g2, b2) = ycbcr_to_rgb(y, cb, cr);
+        assert!((r as i32 - r2 as i32).abs() <= 2, "r mismatch: {} vs {}", r, r2);
+        assert!((g as i32 - g2 as i32).abs() <= 2, "g mismatch: {} vs {}", g, g2);
+        assert!((b as i32 - b2 as i32).abs() <= 2, "b mismatch: {} vs {}", b, b2);
+    }
+}
+
+#[test]
+fn cmyk_rgb_roundtrip() {
+    for (r, g, b) in [(0, 0, 0), (255, 255, 255), (255, 0, 0), (0, 255, 0), (0, 0, 255), (128, 128, 128)] {
+        let (c, m, y, k) = rgb_to_cmyk(r, g, b);
+        let (r2, g2, b2) = cmyk_to_rgb(c, m, y, k);
+        assert!((r as i32 - r2 as i32).abs() <= 2, "r cmyk: {} vs {}", r, r2);
+        assert!((g as i32 - g2 as i32).abs() <= 2, "g cmyk: {} vs {}", g, g2);
+        assert!((b as i32 - b2 as i32).abs() <= 2, "b cmyk: {} vs {}", b, b2);
+    }
+}
+
+#[test]
+fn yuv420p_rgb_roundtrip() {
+    for (r, g, b) in [(16, 16, 16), (235, 235, 235), (200, 50, 50), (50, 200, 50), (50, 50, 200)] {
+        let (y, u, v) = rgb_to_yuv420p_pixel(r, g, b);
+        let (r2, g2, b2) = yuv420p_to_rgb_pixel(y, u, v);
+        assert!((r as i32 - r2 as i32).abs() <= 3, "r yuv: {} vs {}", r, r2);
+        assert!((g as i32 - g2 as i32).abs() <= 3, "g yuv: {} vs {}", g, g2);
+        assert!((b as i32 - b2 as i32).abs() <= 3, "b yuv: {} vs {}", b, b2);
+    }
+}
+
+#[test]
+fn image_layout_conversions() {
+    let gray: Image<Gray> = Image::from_vec(1, 1, vec![100]).unwrap();
+    let rgb = gray.to_rgb();
+    assert_eq!(rgb.as_slice(), &[100, 100, 100]);
+    let rgba = gray.to_rgba();
+    assert_eq!(rgba.as_slice(), &[100, 100, 100, 255]);
+
+    let rgb: Image<Rgb> = Image::from_vec(1, 1, vec![10, 20, 30]).unwrap();
+    let rgba = rgb.to_rgba();
+    assert_eq!(rgba.as_slice(), &[10, 20, 30, 255]);
+    let rgb2 = rgba.to_rgb();
+    assert_eq!(rgb2.as_slice(), &[10, 20, 30]);
+
+    let la: Image<La> = Image::from_vec(1, 1, vec![120, 200]).unwrap();
+    let la_gray = la.to_gray();
+    assert_eq!(la_gray.as_slice(), &[120]);
+    let la_rgba = la.to_rgba();
+    assert_eq!(la_rgba.as_slice(), &[120, 120, 120, 200]);
+
+    let cmyk: Image<Cmyk> = Image::from_vec(1, 1, vec![0, 255, 255, 0]).unwrap(); // Red in CMYK (C=0, M=255, Y=255, K=0)
+    let cmyk_rgb = cmyk.to_rgb();
+    assert_eq!(cmyk_rgb.as_slice(), &[255, 0, 0]);
 }

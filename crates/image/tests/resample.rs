@@ -4,7 +4,7 @@
 //! test.
 
 use sillstone_digest::Error;
-use sillstone_image::raster::{Gray, Image, Rgb, box_average};
+use sillstone_image::raster::{Gray, Image, ResamplingFilter, Rgb, box_average, resize};
 
 /// 4×4 gray ramp 0..=15.
 fn ramp4() -> Image<Gray> {
@@ -112,4 +112,44 @@ fn u16_samples_round_through_the_same_rule() {
     let out = box_average(&im, 1, 1).unwrap();
     // 2001/2 = 1000.5 -> 1001 half-up.
     assert_eq!(out.as_slice(), &[1001]);
+}
+
+#[test]
+fn resize_all_filters_preserve_constant() {
+    let im: Image<Rgb> = Image::from_vec(4, 4, vec![120u8; 48]).unwrap();
+    for filter in [
+        ResamplingFilter::Nearest,
+        ResamplingFilter::Box,
+        ResamplingFilter::Bilinear,
+        ResamplingFilter::Bicubic,
+        ResamplingFilter::Lanczos,
+    ] {
+        let out = resize(&im, 2, 2, filter).unwrap();
+        assert_eq!((out.width(), out.height()), (2, 2));
+        assert!(out.as_slice().iter().all(|&s| (s as i32 - 120).abs() <= 1));
+
+        let out_up = resize(&im, 8, 8, filter).unwrap();
+        assert_eq!((out_up.width(), out_up.height()), (8, 8));
+        assert!(out_up.as_slice().iter().all(|&s| (s as i32 - 120).abs() <= 1));
+    }
+}
+
+#[test]
+fn resize_identity_dimensions_returns_clone() {
+    let im: Image<Gray> = Image::from_vec(2, 2, vec![10, 20, 30, 40]).unwrap();
+    let out = resize(&im, 2, 2, ResamplingFilter::Bicubic).unwrap();
+    assert_eq!(out.as_slice(), im.as_slice());
+}
+
+#[test]
+fn resize_bilinear_and_bicubic_smooth() {
+    let im: Image<Gray> = Image::from_vec(2, 2, vec![0, 100, 100, 200]).unwrap();
+    let out_bilinear = resize(&im, 4, 4, ResamplingFilter::Bilinear).unwrap();
+    assert_eq!((out_bilinear.width(), out_bilinear.height()), (4, 4));
+
+    let out_bicubic = resize(&im, 4, 4, ResamplingFilter::Bicubic).unwrap();
+    assert_eq!((out_bicubic.width(), out_bicubic.height()), (4, 4));
+
+    let out_lanczos = resize(&im, 4, 4, ResamplingFilter::Lanczos).unwrap();
+    assert_eq!((out_lanczos.width(), out_lanczos.height()), (4, 4));
 }

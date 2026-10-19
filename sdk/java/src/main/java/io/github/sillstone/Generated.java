@@ -60,6 +60,28 @@ public final class Generated {
 
     public static native long sillstone_image_colorhash(byte[] data, int width, int height, int layout);
 
+    public static native int sillstone_image_resize();
+
+    public static native int sillstone_image_crop();
+
+    public static native int sillstone_image_transpose();
+
+    public static native int sillstone_image_rotate();
+
+    public static native int sillstone_image_filter();
+
+    public static native int sillstone_image_adjust();
+
+    public static native int sillstone_image_color_convert();
+
+    public static native int sillstone_image_qoi_encode();
+
+    public static native int sillstone_image_qoi_decode();
+
+    public static native int sillstone_image_bmp_encode();
+
+    public static native int sillstone_image_free_bytes();
+
     public static native byte[] sillstone_text_tlsh(byte[] data);
 
     public static native int sillstone_text_tlsh_distance(byte[] a, byte[] b);

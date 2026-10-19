@@ -57,10 +57,18 @@ pub struct Rgb;
 /// order.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct Rgba;
+/// Single-channel with alpha (luma-alpha) layout: two samples per pixel, `L A` in order.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub struct La;
+/// Cyan-magenta-yellow-key layout: four samples per pixel, `C M Y K` in order.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub struct Cmyk;
 
 impl sealed::Sealed for Gray {}
 impl sealed::Sealed for Rgb {}
 impl sealed::Sealed for Rgba {}
+impl sealed::Sealed for La {}
+impl sealed::Sealed for Cmyk {}
 impl Layout for Gray {
     const CHANNELS: usize = 1;
 }
@@ -68,6 +76,12 @@ impl Layout for Rgb {
     const CHANNELS: usize = 3;
 }
 impl Layout for Rgba {
+    const CHANNELS: usize = 4;
+}
+impl Layout for La {
+    const CHANNELS: usize = 2;
+}
+impl Layout for Cmyk {
     const CHANNELS: usize = 4;
 }
 
