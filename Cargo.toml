@@ -32,8 +32,8 @@ edition = "2024"
 rust-version = "1.85.0"
 authors = ["Sillstone Contributors"]
 license = "Apache-2.0"
-repository = "https://github.com/sillstone/sillstone"
-homepage = "https://github.com/sillstone/sillstone"
+repository = "https://github.com/n24q02m/sillstone"
+homepage = "https://github.com/n24q02m/sillstone"
 readme = "README.md"
 
 [workspace.lints.rust]

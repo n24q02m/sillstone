@@ -24,7 +24,7 @@ Sillstone provides verified, zero-dependency implementations of hashing, codecs,
 
 - **Python:** `pip install sillstone` (ctypes)
 - **Node.js:** `npm install sillstone` (native N-API)
-- **Go:** `go get github.com/sillstone/sillstone/sdk/go/sillstone` (cgo)
+- **Go:** `go get github.com/n24q02m/sillstone/sdk/go/sillstone` (cgo)
 - **Java:** `io.github.sillstone:sillstone` (JNI)
 
 ## License

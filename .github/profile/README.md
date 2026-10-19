@@ -23,16 +23,16 @@ Pure-Rust, zero-dependency multimedia, hashing, and array computing suite.
 | **Rust / Cargo** | `sillstone` | `cargo add sillstone` | [crates.io/crates/sillstone](https://crates.io/crates/sillstone) |
 | **Python** | `sillstone` | `pip install sillstone` | [pypi.org/project/sillstone](https://pypi.org/project/sillstone) |
 | **JavaScript / TypeScript** | `sillstone` | `npm install sillstone` | [npmjs.com/package/sillstone](https://npmjs.com/package/sillstone) |
-| **Go** | `sillstone` | `go get github.com/sillstone/sillstone/sdk/go/sillstone` | [pkg.go.dev/github.com/sillstone/sillstone/sdk/go/sillstone](https://pkg.go.dev/github.com/sillstone/sillstone/sdk/go/sillstone) |
+| **Go** | `sillstone` | `go get github.com/n24q02m/sillstone/sdk/go/sillstone` | [pkg.go.dev/github.com/n24q02m/sillstone/sdk/go/sillstone](https://pkg.go.dev/github.com/n24q02m/sillstone/sdk/go/sillstone) |
 | **Java** | `sillstone` | `io.github.sillstone:sillstone` | [central.sonatype.com/artifact/io.github.sillstone/sillstone](https://central.sonatype.com/artifact/io.github.sillstone/sillstone) |
 
 ## Documentation
 
-- [Capabilities & Limits](https://github.com/sillstone/sillstone/blob/main/docs/limits.md)
-- [Multi-Language Parity Matrix](https://github.com/sillstone/sillstone/blob/main/docs/parity.md)
-- [Crate Scorecard](https://github.com/sillstone/sillstone/blob/main/docs/scorecard.md)
-- [Architecture & Roadmap](https://github.com/sillstone/sillstone/blob/main/ROADMAP.md)
+- [Capabilities & Limits](https://github.com/n24q02m/sillstone/blob/main/docs/limits.md)
+- [Multi-Language Parity Matrix](https://github.com/n24q02m/sillstone/blob/main/docs/parity.md)
+- [Crate Scorecard](https://github.com/n24q02m/sillstone/blob/main/docs/scorecard.md)
+- [Architecture & Roadmap](https://github.com/n24q02m/sillstone/blob/main/ROADMAP.md)
 
 ## License
 
-Licensed under the Apache License, Version 2.0. See [LICENSE](https://github.com/sillstone/sillstone/blob/main/LICENSE) and [NOTICE](https://github.com/sillstone/sillstone/blob/main/NOTICE).
+Licensed under the Apache License, Version 2.0. See [LICENSE](https://github.com/n24q02m/sillstone/blob/main/LICENSE) and [NOTICE](https://github.com/n24q02m/sillstone/blob/main/NOTICE).

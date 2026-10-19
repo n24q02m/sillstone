@@ -17,8 +17,8 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/sillstone/sillstone"
-Repository = "https://github.com/sillstone/sillstone"
+Homepage = "https://github.com/n24q02m/sillstone"
+Repository = "https://github.com/n24q02m/sillstone"
 
 [tool.setuptools.package-data]
 sillstone = ["*.dll", "*.so", "*.dylib"]

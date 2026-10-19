@@ -8,7 +8,7 @@ This document provides instructions for migrating from the 19 standalone `pith-*
 
 Prior to release 0.2.0, the codebase was distributed across 19 individual repositories under the `pith-hash` organization. Each repository maintained its own Cargo workspace, foreign function interfaces (FFI), and language SDK bindings (often relying on dynamic loaders such as `koffi` in Node.js).
 
-Beginning with version 0.2.0, the suite is consolidated into a single zero-dependency monorepo: **[github.com/sillstone/sillstone](https://github.com/sillstone/sillstone)**.
+Beginning with version 0.2.0, the suite is consolidated into a single zero-dependency monorepo: **[github.com/n24q02m/sillstone](https://github.com/n24q02m/sillstone)**.
 
 Key benefits of the migration:
 1. **Single Source of Truth**: All multimedia, hashing, array operations, and codecs compile and test together with zero cross-repo drift.
@@ -126,7 +126,7 @@ const matches = sillstone.matchSignatures(sigA, sigB);
 go get github.com/pith-hash/pith-hash
 
 # New
-go get github.com/sillstone/sillstone/sdk/go/sillstone
+go get github.com/n24q02m/sillstone/sdk/go/sillstone
 ```
 
 #### Code Updates
@@ -135,7 +135,7 @@ package main
 
 import (
     "fmt"
-    "github.com/sillstone/sillstone/sdk/go/sillstone"
+    "github.com/n24q02m/sillstone/sdk/go/sillstone"
 )
 
 func main() {

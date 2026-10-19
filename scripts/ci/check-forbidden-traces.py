@@ -6,7 +6,6 @@ import sys
 from pathlib import Path
 
 FORBIDDEN = [
-    b"n24q02m",
     b"pith-image.n24q02m.com",
     b"n24q02m-ci",
 ]

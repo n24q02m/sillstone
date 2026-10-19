@@ -9,4 +9,4 @@ environments:
 sync:
   targets:
     - type: github
-      repo: sillstone/sillstone
+      repo: n24q02m/sillstone

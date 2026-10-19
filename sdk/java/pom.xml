@@ -10,7 +10,7 @@
 
     <name>sillstone</name>
     <description>Pure-Rust zero-dependency multimedia, hashing, and array computing suite</description>
-    <url>https://github.com/sillstone/sillstone</url>
+    <url>https://github.com/n24q02m/sillstone</url>
 
     <licenses>
         <license>
@@ -28,9 +28,9 @@
     </developers>
 
     <scm>
-        <connection>scm:git:git://github.com/sillstone/sillstone.git</connection>
+        <connection>scm:git:git://github.com/n24q02m/sillstone.git</connection>
         <developerConnection>scm:git:ssh://github.com:sillstone/sillstone.git</developerConnection>
-        <url>https://github.com/sillstone/sillstone</url>
+        <url>https://github.com/n24q02m/sillstone</url>
     </scm>
 
     <properties>

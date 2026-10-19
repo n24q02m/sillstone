@@ -43,18 +43,18 @@ def generate_notice(repo_name: str) -> str:
     return f"""# {repo_name} (Deprecated)
 
 > **NOTICE**: This repository has been deprecated and merged into the unified Sillstone monorepo:
-> **[github.com/sillstone/sillstone](https://github.com/sillstone/sillstone)**
+> **[github.com/n24q02m/sillstone](https://github.com/n24q02m/sillstone)**
 
 ---
 
 ### Redirection Details
 
 - **Replacement Crate**: `{subcrate}` within the `sillstone` monorepo.
-- **Migration Guide**: See [docs/MIGRATION.md](https://github.com/sillstone/sillstone/blob/main/docs/MIGRATION.md).
+- **Migration Guide**: See [docs/MIGRATION.md](https://github.com/n24q02m/sillstone/blob/main/docs/MIGRATION.md).
 - **SDK Relocation**:
   - Python: `pip install sillstone`
   - Node.js: `npm install sillstone`
-  - Go: `go get github.com/sillstone/sillstone/sdk/go/sillstone`
+  - Go: `go get github.com/n24q02m/sillstone/sdk/go/sillstone`
   - Java: `io.github.sillstone:sillstone`
 
 This repository is archived and maintained for provenance and reference only.

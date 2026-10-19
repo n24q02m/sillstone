@@ -116,7 +116,12 @@ jobs:
           python -m build --wheel sdk/python
           if [ "${{ runner.os }}" == "Linux" ]; then
             python -m pip install auditwheel
-            auditwheel repair sdk/python/dist/*.whl -w sdk/python/dist/ || true
+            auditwheel repair sdk/python/dist/*.whl -w sdk/python/dist/repaired/ || true
+            if ls sdk/python/dist/repaired/*.whl 1> /dev/null 2>&1; then
+              rm -f sdk/python/dist/*.whl
+              mv sdk/python/dist/repaired/*.whl sdk/python/dist/
+              rm -rf sdk/python/dist/repaired
+            fi
           fi
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v4
@@ -220,6 +225,7 @@ jobs:
           find artifacts -name "*.whl" -exec cp {} sdk/python/dist/ \;
           find artifacts -name "*.tgz" -exec cp {} sdk/node/ \;
           find artifacts -name "*.jar" -exec cp {} sdk/java/target/ \;
+          find sdk/python/dist -name "*linux_*.whl" ! -name "*manylinux*" ! -name "*musllinux*" -delete
           ls -la sdk/python/dist sdk/node sdk/java/target
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
