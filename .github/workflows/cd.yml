@@ -212,7 +212,12 @@ jobs:
         run: |
           if [ -n "$NODE_AUTH_TOKEN" ]; then
             echo "Publishing to npm..."
-            cd sdk/node && npm publish --access public
+            cd sdk/node
+            if [[ "${{ inputs.expected_version }}" == *-* ]]; then
+              npm publish --access public --tag beta
+            else
+              npm publish --access public
+            fi
           else
             echo "NPM_TOKEN not configured. Running npm pack dry-run."
             cd sdk/node && npm pack --dry-run

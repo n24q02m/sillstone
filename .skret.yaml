@@ -1,0 +1,12 @@
+version: "1"
+default_env: prod
+project: sillstone
+environments:
+  prod:
+    provider: aws
+    region: ap-southeast-1
+    path: /sillstone/prod
+sync:
+  targets:
+    - type: github
+      repo: sillstone/sillstone
