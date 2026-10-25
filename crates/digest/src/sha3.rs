@@ -112,6 +112,14 @@ fn keccak_p(state: &mut [u64; 25]) {
             return;
         }
     }
+    #[cfg(all(feature = "std", target_arch = "aarch64"))]
+    {
+        if std::arch::is_aarch64_feature_detected!("sha3") {
+            // SAFETY: the `sha3` extension was just detected.
+            unsafe { arm_sha3::keccak_p(state) };
+            return;
+        }
+    }
     keccak_p_generic(state);
 }
 
@@ -129,6 +137,103 @@ fn keccak_p_generic(state: &mut [u64; 25]) {
 #[allow(unsafe_code)]
 unsafe fn keccak_p_bmi(state: &mut [u64; 25]) {
     keccak_p_generic(state);
+}
+
+/// Keccak-f[1600] on the ARMv8.2 SHA-3 instructions: `eor3` folds the
+/// theta columns, `rax1` forms the theta offsets, `xar` fuses the theta xor
+/// with the rho rotation, `bcax` is chi. One lane per vector (the second
+/// half is unused), 65 instructions per round.
+#[cfg(all(feature = "std", target_arch = "aarch64"))]
+#[allow(unsafe_code, unused_unsafe)]
+mod arm_sha3 {
+    use super::RC;
+    use core::arch::aarch64::{
+        uint64x2_t, vbcaxq_u64, vdupq_n_u64, veor3q_u64, veorq_u64, vgetq_lane_u64, vrax1q_u64,
+        vxarq_u64,
+    };
+
+    /// # Safety
+    ///
+    /// The CPU must support the `sha3` extension.
+    #[target_feature(enable = "neon,sha3")]
+    pub(super) unsafe fn keccak_p(state: &mut [u64; 25]) {
+        // `rotl(a ^ d, r)` as a single `xar` (rotate right by `64 - r`).
+        macro_rules! xr {
+            ($a:expr, $d:expr, $r:literal) => {
+                vxarq_u64::<{ 64 - $r }>($a, $d)
+            };
+        }
+        // SAFETY: the `sha3` target feature is enabled on this function.
+        unsafe {
+            let mut a: [uint64x2_t; 25] = core::array::from_fn(|i| vdupq_n_u64(state[i]));
+            for &rc in &RC {
+                let c0 = veor3q_u64(veor3q_u64(a[0], a[5], a[10]), a[15], a[20]);
+                let c1 = veor3q_u64(veor3q_u64(a[1], a[6], a[11]), a[16], a[21]);
+                let c2 = veor3q_u64(veor3q_u64(a[2], a[7], a[12]), a[17], a[22]);
+                let c3 = veor3q_u64(veor3q_u64(a[3], a[8], a[13]), a[18], a[23]);
+                let c4 = veor3q_u64(veor3q_u64(a[4], a[9], a[14]), a[19], a[24]);
+                let d0 = vrax1q_u64(c4, c1);
+                let d1 = vrax1q_u64(c0, c2);
+                let d2 = vrax1q_u64(c1, c3);
+                let d3 = vrax1q_u64(c2, c4);
+                let d4 = vrax1q_u64(c3, c0);
+                let b0 = veorq_u64(a[0], d0);
+                let b1 = xr!(a[6], d1, 44);
+                let b2 = xr!(a[12], d2, 43);
+                let b3 = xr!(a[18], d3, 21);
+                let b4 = xr!(a[24], d4, 14);
+                let b5 = xr!(a[3], d3, 28);
+                let b6 = xr!(a[9], d4, 20);
+                let b7 = xr!(a[10], d0, 3);
+                let b8 = xr!(a[16], d1, 45);
+                let b9 = xr!(a[22], d2, 61);
+                let b10 = xr!(a[1], d1, 1);
+                let b11 = xr!(a[7], d2, 6);
+                let b12 = xr!(a[13], d3, 25);
+                let b13 = xr!(a[19], d4, 8);
+                let b14 = xr!(a[20], d0, 18);
+                let b15 = xr!(a[4], d4, 27);
+                let b16 = xr!(a[5], d0, 36);
+                let b17 = xr!(a[11], d1, 10);
+                let b18 = xr!(a[17], d2, 15);
+                let b19 = xr!(a[23], d3, 56);
+                let b20 = xr!(a[2], d2, 62);
+                let b21 = xr!(a[8], d3, 55);
+                let b22 = xr!(a[14], d4, 39);
+                let b23 = xr!(a[15], d0, 41);
+                let b24 = xr!(a[21], d1, 2);
+                // chi: `b_i ^ (!b_{i+1} & b_{i+2})` per row of five.
+                a[0] = veorq_u64(vbcaxq_u64(b0, b2, b1), vdupq_n_u64(rc));
+                a[1] = vbcaxq_u64(b1, b3, b2);
+                a[2] = vbcaxq_u64(b2, b4, b3);
+                a[3] = vbcaxq_u64(b3, b0, b4);
+                a[4] = vbcaxq_u64(b4, b1, b0);
+                a[5] = vbcaxq_u64(b5, b7, b6);
+                a[6] = vbcaxq_u64(b6, b8, b7);
+                a[7] = vbcaxq_u64(b7, b9, b8);
+                a[8] = vbcaxq_u64(b8, b5, b9);
+                a[9] = vbcaxq_u64(b9, b6, b5);
+                a[10] = vbcaxq_u64(b10, b12, b11);
+                a[11] = vbcaxq_u64(b11, b13, b12);
+                a[12] = vbcaxq_u64(b12, b14, b13);
+                a[13] = vbcaxq_u64(b13, b10, b14);
+                a[14] = vbcaxq_u64(b14, b11, b10);
+                a[15] = vbcaxq_u64(b15, b17, b16);
+                a[16] = vbcaxq_u64(b16, b18, b17);
+                a[17] = vbcaxq_u64(b17, b19, b18);
+                a[18] = vbcaxq_u64(b18, b15, b19);
+                a[19] = vbcaxq_u64(b19, b16, b15);
+                a[20] = vbcaxq_u64(b20, b22, b21);
+                a[21] = vbcaxq_u64(b21, b23, b22);
+                a[22] = vbcaxq_u64(b22, b24, b23);
+                a[23] = vbcaxq_u64(b23, b20, b24);
+                a[24] = vbcaxq_u64(b24, b21, b20);
+            }
+            for (lane, v) in state.iter_mut().zip(a) {
+                *lane = vgetq_lane_u64::<0>(v);
+            }
+        }
+    }
 }
 
 /// Generic SHA-3 sponge function over arbitrary data with given rate and output length.
@@ -212,4 +317,27 @@ pub fn sha3_256(data: &[u8]) -> Result<Digest<32>> {
 /// ```
 pub fn sha3_512(data: &[u8]) -> Result<Digest<64>> {
     Ok(sha3_sponge::<64>(data, 72))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The dispatched permutation (BMI build, ARM SHA-3 kernel where the CPU
+    /// has them) must equal the portable one on arbitrary states.
+    #[test]
+    fn dispatched_permutation_matches_generic() {
+        let mut seed = 0x243f_6a88_85a3_08d3u64;
+        for _ in 0..64 {
+            let mut fast = [0u64; 25];
+            for lane in &mut fast {
+                seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                *lane = seed ^ (seed >> 29);
+            }
+            let mut slow = fast;
+            keccak_p(&mut fast);
+            keccak_p_generic(&mut slow);
+            assert_eq!(fast, slow);
+        }
+    }
 }
