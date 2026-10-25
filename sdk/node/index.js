@@ -4,55 +4,15 @@
 
 const path = require("node:path");
 const fs = require("node:fs");
-const crypto = require("node:crypto");
 
-const STATUS_OK = 0;
-const STATUS_INVALID = -1;
-const STATUS_REJECTED = -2;
+const { native, call, FfiError, STATUS_OK, STATUS_INVALID, STATUS_REJECTED } = require("./native");
+const imageModule = require("./image");
+const arrayModule = require("./array");
 
 const FORMATS = Object.freeze(["png", "jpeg", "bmp", "zip", "mp4", "mp3", "wav", "flac", "pdf", "gif", "unknown"]);
 const MODALITIES = Object.freeze(["image", "audio", "text", "binary", "video"]);
 const MATCH_TAGS = Object.freeze(["image", "audio", "text", "binary", "video"]);
 const SIGNATURE_TAGS = Object.freeze(["image", "audio", "text", "binary", "video"]);
-
-class FfiError extends Error {
-  constructor(op, status) {
-    const kind = { [STATUS_INVALID]: "invalid argument", [STATUS_REJECTED]: "input rejected" }[status] ?? "unknown failure";
-    super(`${op} failed: ${kind} (status ${status})`);
-    this.name = "FfiError";
-    this.status = status;
-  }
-}
-
-let native = null;
-const platformKey = `${process.platform}-${process.arch}`;
-const candidates = [
-  path.join(__dirname, "prebuilds", platformKey, "sillstone_napi.node"),
-  path.join(__dirname, "prebuilds", platformKey, process.platform === "win32" ? "sillstone_ffi.dll" : (process.platform === "darwin" ? "libsillstone_ffi.dylib" : "libsillstone_ffi.so")),
-  path.join(__dirname, "sillstone_napi.node"),
-  path.join(__dirname, "build", "Release", "sillstone_napi.node"),
-  path.join(__dirname, "build", "Debug", "sillstone_napi.node"),
-];
-
-const loadErrors = [];
-for (const c of candidates) {
-  if (fs.existsSync(c)) {
-    try {
-      native = require(c);
-      break;
-    } catch (e) {
-      loadErrors.push(`${c}: ${e.message}`);
-    }
-  }
-}
-if (!native) {
-  // Fail at require() instead of silently degrading: a package that cannot reach
-  // its native core must not pretend to work (several functions have no fallback).
-  throw new Error(
-    `sillstone: native addon not loadable for ${platformKey}; tried:\n` +
-      (loadErrors.length ? loadErrors : candidates.map((c) => `${c}: not found`)).join("\n"),
-  );
-}
 
 function fnv1a64(data) {
   let h = 0xcbf29ce484222325n;
@@ -187,11 +147,13 @@ function parseDescribe(raw) {
   return { format: FORMATS[fmt], modality, tier1, signature: sig, facts };
 }
 
+function requireBuffer(data, name = "data") {
+  if (!Buffer.isBuffer(data)) throw new TypeError(`${name} must be a Buffer`);
+  return data;
+}
+
 function detect(data) {
-  if (!Buffer.isBuffer(data)) throw new TypeError("data must be a Buffer");
-  if (!native || !native.sillstone_curator_detect) {
-    throw new Error("Native N-API addon not loaded");
-  }
+  requireBuffer(data);
   try {
     const res = native.sillstone_curator_detect(data);
     return {
@@ -206,10 +168,7 @@ function detect(data) {
 }
 
 function contentHash(data) {
-  if (!Buffer.isBuffer(data)) throw new TypeError("data must be a Buffer");
-  if (!native || !native.sillstone_curator_content_hash) {
-    throw new Error("Native N-API addon not loaded");
-  }
+  requireBuffer(data);
   try {
     return native.sillstone_curator_content_hash(data);
   } catch (err) {
@@ -219,13 +178,9 @@ function contentHash(data) {
 }
 
 function signature(data) {
-  if (!Buffer.isBuffer(data)) throw new TypeError("data must be a Buffer");
-  if (!native || !native.sillstone_curator_signature) {
-    throw new Error("Native N-API addon not loaded");
-  }
+  requireBuffer(data);
   try {
-    const raw = native.sillstone_curator_signature(data);
-    return parseSignature(raw);
+    return parseSignature(native.sillstone_curator_signature(data));
   } catch (err) {
     const status = err.code ? Number(err.code) : STATUS_REJECTED;
     throw new FfiError("sillstone_curator_signature", status);
@@ -252,13 +207,9 @@ function findCdylib() {
 }
 
 function describe(data) {
-  if (!Buffer.isBuffer(data)) throw new TypeError("data must be a Buffer");
-  if (!native || !native.sillstone_curator_describe) {
-    throw new Error("Native N-API addon not loaded");
-  }
+  requireBuffer(data);
   try {
-    const raw = native.sillstone_curator_describe(data);
-    return parseDescribe(raw);
+    return parseDescribe(native.sillstone_curator_describe(data));
   } catch (err) {
     const status = err.code ? Number(err.code) : STATUS_REJECTED;
     throw new FfiError("sillstone_curator_describe", status);
@@ -268,9 +219,6 @@ function describe(data) {
 function matchSignatures(a, b) {
   if (!Buffer.isBuffer(a) || !Buffer.isBuffer(b)) {
     throw new TypeError("inputs must be Buffers");
-  }
-  if (!native || !native.sillstone_curator_match) {
-    throw new Error("Native N-API addon not loaded");
   }
   try {
     const res = native.sillstone_curator_match(a, b);
@@ -283,6 +231,30 @@ function matchSignatures(a, b) {
     const status = err.code ? Number(err.code) : STATUS_REJECTED;
     throw new FfiError("sillstone_curator_match", status);
   }
+}
+
+function asBuffer(buf) {
+  return Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
+}
+
+/** Float64 values -> native DST -> plain array. */
+function dst(name, arr) {
+  const input = Float64Array.from(arr);
+  const out = native[name](Buffer.from(input.buffer, input.byteOffset, input.byteLength));
+  return Array.from(new Float64Array(out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength)));
+}
+
+/** `sillstone.hash`: digests and image hashes, the `hashlib`/`imagehash` replacements. */
+const hash = {
+  sha256: (buf) => native.sillstone_digest_sha256(asBuffer(buf)),
+  sha3_256: (buf) => native.sillstone_digest_sha3_256(asBuffer(buf)),
+  sha3_512: (buf) => native.sillstone_digest_sha3_512(asBuffer(buf)),
+  blake2b512: (buf) => native.sillstone_digest_blake2b_512(asBuffer(buf)),
+  blake3: (buf) => native.sillstone_digest_blake3(asBuffer(buf)),
+};
+
+function imageHash(name) {
+  return (data, width, height, layout = 0) => call(name, data, width, height, layout);
 }
 
 module.exports = {
@@ -303,172 +275,27 @@ module.exports = {
   signature,
   describe,
   matchSignatures,
-  version: function () {
-    if (native && native.sillstone_version_major) {
-      return `${native.sillstone_version_major()}.${native.sillstone_version_minor()}.${native.sillstone_version_patch()}`;
-    }
-    return "0.2.0";
-  },
-  bufferChecksum: function (buf) {
-    const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
-    if (native && native.sillstone_buffer_checksum) {
-      return native.sillstone_buffer_checksum(b);
-    }
-    return fnv1a64(b);
-  },
-  sha256: function (buf) {
-    const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
-    if (native && native.sillstone_digest_sha256) {
-      return native.sillstone_digest_sha256(b);
-    }
-    return crypto.createHash("sha256").update(b).digest();
-  },
-  sha3_256: function (buf) {
-    const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
-    if (native && native.sillstone_digest_sha3_256) {
-      return native.sillstone_digest_sha3_256(b);
-    }
-    return crypto.createHash("sha3-256").update(b).digest();
-  },
-  sha3_512: function (buf) {
-    const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
-    if (native && native.sillstone_digest_sha3_512) {
-      return native.sillstone_digest_sha3_512(b);
-    }
-    return crypto.createHash("sha3-512").update(b).digest();
-  },
-  blake2b512: function (buf) {
-    const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
-    if (native && native.sillstone_digest_blake2b_512) {
-      return native.sillstone_digest_blake2b_512(b);
-    }
-    return crypto.createHash("blake2b512").update(b).digest();
-  },
-  blake3: function (buf) {
-    const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
-    if (native && native.sillstone_digest_blake3) {
-      return native.sillstone_digest_blake3(b);
-    }
-    return Buffer.from("af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262", "hex");
-  },
-  dst1: function (arr) {
-    const n = arr.length;
-    const out = new Float64Array(n);
-    const factor = Math.sqrt(2.0 / (n + 1));
-    for (let k = 0; k < n; k++) {
-      let sum = 0.0;
-      for (let i = 0; i < n; i++) {
-        sum += arr[i] * Math.sin((Math.PI * (k + 1) * (i + 1)) / (n + 1));
-      }
-      out[k] = factor * sum;
-    }
-    return Array.from(out);
-  },
-  dst2: function (arr) {
-    const n = arr.length;
-    const out = new Float64Array(n);
-    const base = Math.sqrt(2.0 / n);
-    for (let k = 0; k < n; k++) {
-      let sum = 0.0;
-      for (let i = 0; i < n; i++) {
-        sum += arr[i] * Math.sin((Math.PI * (k + 1) * (i + 0.5)) / n);
-      }
-      const ck = k === n - 1 ? 1.0 / Math.SQRT2 : 1.0;
-      out[k] = base * ck * sum;
-    }
-    return Array.from(out);
-  },
-  dst3: function (arr) {
-    const n = arr.length;
-    const out = new Float64Array(n);
-    const base = Math.sqrt(2.0 / n);
-    for (let k = 0; k < n; k++) {
-      let sum = 0.0;
-      for (let i = 0; i < n; i++) {
-        const ck = i === n - 1 ? 1.0 / Math.SQRT2 : 1.0;
-        sum += ck * arr[i] * Math.sin((Math.PI * (k + 0.5) * (i + 1)) / n);
-      }
-      out[k] = base * sum;
-    }
-    return Array.from(out);
-  },
-  graphemeCount: function (str) {
-    const b = Buffer.from(str, "utf8");
-    if (native && native.sillstone_unicode_grapheme_count) {
-      return Number(native.sillstone_unicode_grapheme_count(b));
-    }
-    const segmenter = new Intl.Segmenter("und", { granularity: "grapheme" });
-    return Array.from(segmenter.segment(str)).length;
-  },
-  charCategory: function (ch) {
-    const cp = ch.codePointAt(0);
-    if (native && native.sillstone_unicode_char_category) {
-      return native.sillstone_unicode_char_category(cp);
-    }
-    return 0;
-  },
-  phash: function (data, width, height, layout = 0) {
-    if (!native || !native.sillstone_image_phash) throw new Error("Native N-API addon not loaded");
-    return native.sillstone_image_phash(data, width, height, layout);
-  },
-  ahash: function (data, width, height, layout = 0) {
-    if (!native || !native.sillstone_image_ahash) throw new Error("Native N-API addon not loaded");
-    return native.sillstone_image_ahash(data, width, height, layout);
-  },
-  dhash: function (data, width, height, layout = 0) {
-    if (!native || !native.sillstone_image_dhash) throw new Error("Native N-API addon not loaded");
-    return native.sillstone_image_dhash(data, width, height, layout);
-  },
-  whash: function (data, width, height, layout = 0) {
-    if (!native || !native.sillstone_image_whash) throw new Error("Native N-API addon not loaded");
-    return native.sillstone_image_whash(data, width, height, layout);
-  },
-  colorhash: function (data, width, height, layout = 0) {
-    if (!native || !native.sillstone_image_colorhash) throw new Error("Native N-API addon not loaded");
-    return native.sillstone_image_colorhash(data, width, height, layout);
-  },
-  tlsh: function (data) {
-    if (!native || !native.sillstone_text_tlsh) throw new Error("Native N-API addon not loaded");
-    return native.sillstone_text_tlsh(data);
-  },
-  tlshDistance: function (a, b) {
-    if (!native || !native.sillstone_text_tlsh_distance) throw new Error("Native N-API addon not loaded");
-    return native.sillstone_text_tlsh_distance(a, b);
-  },
-  tensor: function (shape, data) {
-    const size = shape.reduce((a, b) => a * b, 1);
-    const buf = (data instanceof Float64Array) ? data : (Array.isArray(data) ? Float64Array.from(data) : new Float64Array(size));
-    return {
-      shape: shape.slice(),
-      ndim: shape.length,
-      size: size,
-      data: buf,
-      reshape: function (...newShape) {
-        const target = Array.isArray(newShape[0]) ? newShape[0] : newShape;
-        const targetSize = target.reduce((a, b) => a * b, 1);
-        if (targetSize !== size) throw new Error("reshape size mismatch");
-        return module.exports.tensor(target, buf);
-      },
-      matmul: function (other) {
-        if (shape.length !== 2 || other.shape.length !== 2) throw new Error("matmul requires 2D tensors");
-        const [m, k1] = shape;
-        const [k2, n] = other.shape;
-        if (k1 !== k2) throw new Error("matmul dimension mismatch");
-        const out = new Float64Array(m * n);
-        for (let i = 0; i < m; i++) {
-          for (let j = 0; j < n; j++) {
-            let acc = 0;
-            for (let p = 0; p < k1; p++) {
-              acc += buf[i * k1 + p] * other.data[p * n + j];
-            }
-            out[i * n + j] = acc;
-          }
-        }
-        return module.exports.tensor([m, n], out);
-      },
-      sum: function () {
-        return buf.reduce((a, b) => a + b, 0);
-      },
-    };
-  },
+  hash,
+  image: imageModule,
+  array: arrayModule,
+  version: () => `${native.sillstone_version_major()}.${native.sillstone_version_minor()}.${native.sillstone_version_patch()}`,
+  bufferChecksum: (buf) => native.sillstone_buffer_checksum(asBuffer(buf)),
+  sha256: hash.sha256,
+  sha3_256: hash.sha3_256,
+  sha3_512: hash.sha3_512,
+  blake2b512: hash.blake2b512,
+  blake3: hash.blake3,
+  dst1: (arr) => dst("sillstone_math_dst1", arr),
+  dst2: (arr) => dst("sillstone_math_dst2", arr),
+  dst3: (arr) => dst("sillstone_math_dst3", arr),
+  graphemeCount: (str) => Number(native.sillstone_unicode_grapheme_count(Buffer.from(str, "utf8"))),
+  charCategory: (ch) => native.sillstone_unicode_char_category(ch.codePointAt(0)),
+  phash: imageHash("sillstone_image_phash"),
+  ahash: imageHash("sillstone_image_ahash"),
+  dhash: imageHash("sillstone_image_dhash"),
+  whash: imageHash("sillstone_image_whash"),
+  colorhash: imageHash("sillstone_image_colorhash"),
+  tlsh: (data) => native.sillstone_text_tlsh(data),
+  tlshDistance: (a, b) => native.sillstone_text_tlsh_distance(a, b),
+  tensor: (shape, data) => new arrayModule.Tensor(shape, data),
 };

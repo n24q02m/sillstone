@@ -5,6 +5,9 @@
   "main": "index.js",
   "files": [
     "index.js",
+    "native.js",
+    "image.js",
+    "array.js",
     "prebuilds/",
     "README.md",
     "LICENSE"

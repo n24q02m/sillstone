@@ -100,6 +100,45 @@ pub fn transpose<L: Layout, T: Sample>(
     Image::from_vec(out_w as u32, out_h as u32, out)
 }
 
+/// Output dimensions [`rotate`] produces for an `in_w`×`in_h` image: swapped for exact
+/// 90°/270° turns, unchanged for 0°/180° and for `expand == false`, else the bounding box
+/// of the rotated rectangle. The FFI exposes it so SDKs can size the output buffer.
+#[must_use]
+pub fn rotated_size(in_w: usize, in_h: usize, angle_degrees: f64, expand: bool) -> (usize, usize) {
+    let mut norm_angle = angle_degrees % 360.0;
+    if norm_angle < 0.0 {
+        norm_angle += 360.0;
+    }
+    if (norm_angle - 90.0).abs() < 1e-6 || (norm_angle - 270.0).abs() < 1e-6 {
+        return (in_h, in_w);
+    }
+    if !expand || norm_angle.abs() < 1e-6 || (norm_angle - 180.0).abs() < 1e-6 {
+        return (in_w, in_h);
+    }
+    let rad = norm_angle * core::f64::consts::PI / 180.0;
+    let (sin_a, cos_a) = (rad.sin(), rad.cos());
+    let w_f = in_w as f64;
+    let h_f = in_h as f64;
+    let p1_x = -w_f * 0.5 * cos_a - -h_f * 0.5 * sin_a;
+    let p1_y = -w_f * 0.5 * sin_a + -h_f * 0.5 * cos_a;
+    let p2_x = w_f * 0.5 * cos_a - -h_f * 0.5 * sin_a;
+    let p2_y = w_f * 0.5 * sin_a + -h_f * 0.5 * cos_a;
+    let p3_x = w_f * 0.5 * cos_a - h_f * 0.5 * sin_a;
+    let p3_y = w_f * 0.5 * sin_a + h_f * 0.5 * cos_a;
+    let p4_x = -w_f * 0.5 * cos_a - h_f * 0.5 * sin_a;
+    let p4_y = -w_f * 0.5 * sin_a + h_f * 0.5 * cos_a;
+
+    let min_x = p1_x.min(p2_x).min(p3_x).min(p4_x);
+    let max_x = p1_x.max(p2_x).max(p3_x).max(p4_x);
+    let min_y = p1_y.min(p2_y).min(p3_y).min(p4_y);
+    let max_y = p1_y.max(p2_y).max(p3_y).max(p4_y);
+
+    (
+        (max_x - min_x).ceil().max(1.0) as usize,
+        (max_y - min_y).ceil().max(1.0) as usize,
+    )
+}
+
 /// Rotates `img` counter-clockwise by `angle_degrees`.
 ///
 /// If `expand` is true, expands output dimensions to encompass the entire rotated image.
@@ -131,30 +170,7 @@ pub fn rotate<L: Layout, T: Sample>(
     let rad = norm_angle * core::f64::consts::PI / 180.0;
     let (sin_a, cos_a) = (rad.sin(), rad.cos());
 
-    let (out_w, out_h) = if expand {
-        let w_f = in_w as f64;
-        let h_f = in_h as f64;
-        let p1_x = -w_f * 0.5 * cos_a - -h_f * 0.5 * sin_a;
-        let p1_y = -w_f * 0.5 * sin_a + -h_f * 0.5 * cos_a;
-        let p2_x = w_f * 0.5 * cos_a - -h_f * 0.5 * sin_a;
-        let p2_y = w_f * 0.5 * sin_a + -h_f * 0.5 * cos_a;
-        let p3_x = w_f * 0.5 * cos_a - h_f * 0.5 * sin_a;
-        let p3_y = w_f * 0.5 * sin_a + h_f * 0.5 * cos_a;
-        let p4_x = -w_f * 0.5 * cos_a - h_f * 0.5 * sin_a;
-        let p4_y = -w_f * 0.5 * sin_a + h_f * 0.5 * cos_a;
-
-        let min_x = p1_x.min(p2_x).min(p3_x).min(p4_x);
-        let max_x = p1_x.max(p2_x).max(p3_x).max(p4_x);
-        let min_y = p1_y.min(p2_y).min(p3_y).min(p4_y);
-        let max_y = p1_y.max(p2_y).max(p3_y).max(p4_y);
-
-        (
-            (max_x - min_x).ceil().max(1.0) as usize,
-            (max_y - min_y).ceil().max(1.0) as usize,
-        )
-    } else {
-        (in_w, in_h)
-    };
+    let (out_w, out_h) = rotated_size(in_w, in_h, angle_degrees, expand);
 
     let c = L::CHANNELS;
     let src = img.as_slice();

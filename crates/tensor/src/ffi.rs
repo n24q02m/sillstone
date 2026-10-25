@@ -3,8 +3,8 @@
 use crate::tensor::Tensor;
 
 const PITH_OK: i32 = 0;
-const PITH_E_INVALID: i32 = 1;
-const PITH_E_REJECTED: i32 = 2;
+const PITH_E_INVALID: i32 = -1;
+const PITH_E_REJECTED: i32 = -2;
 
 /// Performs 2D GEMM matrix multiplication for float64 arrays: C = A @ B.
 /// A is [m, k1], B is [k2, n].
@@ -30,9 +30,12 @@ pub unsafe extern "C" fn sillstone_tensor_matmul_f64(
         return PITH_E_REJECTED;
     }
 
-    let a_slice = unsafe { core::slice::from_raw_parts(a, m * k1) };
-    let b_slice = unsafe { core::slice::from_raw_parts(b, k2 * n) };
-    let out_slice = unsafe { core::slice::from_raw_parts_mut(out, m * n) };
+    let (Some(a_len), Some(b_len), Some(out_len)) = (m.checked_mul(k1), k2.checked_mul(n), m.checked_mul(n)) else {
+        return PITH_E_INVALID;
+    };
+    let a_slice = unsafe { core::slice::from_raw_parts(a, a_len) };
+    let b_slice = unsafe { core::slice::from_raw_parts(b, b_len) };
+    let out_slice = unsafe { core::slice::from_raw_parts_mut(out, out_len) };
 
     let tensor_a: Tensor<f64> = match Tensor::from_vec(alloc::vec![m, k1], a_slice.to_vec()) {
         Ok(t) => t,

@@ -530,6 +530,31 @@ pub unsafe extern "C" fn sillstone_image_rotate(
     PITH_OK
 }
 
+/// Reports the output dimensions [`sillstone_image_rotate`] produces for the same
+/// `angle`/`expand`, so a caller can size `out_buf` exactly.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_image_rotate_size(
+    in_w: u32,
+    in_h: u32,
+    angle: f64,
+    expand: u32,
+    out_w: *mut u32,
+    out_h: *mut u32,
+) -> i32 {
+    if out_w.is_null() || out_h.is_null() || !angle.is_finite() {
+        return PITH_E_INVALID;
+    }
+    let (w, h) = crate::transform::rotated_size(in_w as usize, in_h as usize, angle, expand != 0);
+    let (Ok(w), Ok(h)) = (u32::try_from(w), u32::try_from(h)) else {
+        return PITH_E_REJECTED;
+    };
+    unsafe {
+        *out_w = w;
+        *out_h = h;
+    }
+    PITH_OK
+}
+
 /// Applies built-in 2D convolution filters.
 /// Filter ID: 0=Blur, 1=Sharpen, 2=Contour, 3=Detail, 4=EdgeEnhance, 5=FindEdges, 6=Emboss.
 #[unsafe(no_mangle)]

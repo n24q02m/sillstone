@@ -11,6 +11,22 @@ static void throw_status(napi_env env, int32_t status) {
     napi_throw_error(env, buf, "FFI error");
 }
 
+static int get_size(napi_env env, napi_value v, size_t* out) {
+    int64_t x = 0;
+    if (napi_get_value_int64(env, v, &x) != napi_ok || x < 0) { napi_throw_type_error(env, NULL, "expected a non-negative integer"); return 0; }
+    *out = (size_t)x;
+    return 1;
+}
+
+static int get_f64_buf(napi_env env, napi_value v, const double** p, size_t* count) {
+    void* d = NULL; size_t len = 0;
+    if (napi_get_buffer_info(env, v, &d, &len) != napi_ok) { napi_throw_type_error(env, NULL, "expected a Buffer over a Float64Array"); return 0; }
+    if (len % sizeof(double) != 0 || ((uintptr_t)d % sizeof(double)) != 0) { napi_throw_type_error(env, NULL, "buffer must be 8-byte aligned and a whole number of doubles"); return 0; }
+    *p = (const double*)d;
+    *count = len / sizeof(double);
+    return 1;
+}
+
 static napi_value n_sillstone_version_major(napi_env env, napi_callback_info info) {
     uint32_t val = sillstone_version_major();
     napi_value result;
@@ -505,6 +521,25 @@ static napi_value n_sillstone_image_rotate(napi_env env, napi_callback_info info
     return result;
 }
 
+static napi_value n_sillstone_image_rotate_size(napi_env env, napi_callback_info info) {
+    size_t argc = 4;
+    napi_value args[4];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    if (argc < 4) { napi_throw_type_error(env, NULL, "expected 4 arguments"); return NULL; }
+    uint32_t in_w = 0, in_h = 0, expand = 0; double angle = 0;
+    if (napi_get_value_uint32(env, args[0], &in_w) != napi_ok || napi_get_value_uint32(env, args[1], &in_h) != napi_ok || napi_get_value_double(env, args[2], &angle) != napi_ok || napi_get_value_uint32(env, args[3], &expand) != napi_ok) { napi_throw_type_error(env, NULL, "expected (uint32, uint32, number, uint32)"); return NULL; }
+    uint32_t w = 0, h = 0;
+    int32_t status = sillstone_image_rotate_size(in_w, in_h, angle, expand, &w, &h);
+    if (status != 0) { throw_status(env, status); return NULL; }
+    napi_value result, v_w, v_h;
+    napi_create_object(env, &result);
+    napi_create_uint32(env, w, &v_w);
+    napi_set_named_property(env, result, "width", v_w);
+    napi_create_uint32(env, h, &v_h);
+    napi_set_named_property(env, result, "height", v_h);
+    return result;
+}
+
 static napi_value n_sillstone_image_filter(napi_env env, napi_callback_info info) {
     size_t argc = 6;
     napi_value args[6];
@@ -682,6 +717,55 @@ static napi_value n_sillstone_text_tlsh_distance(napi_env env, napi_callback_inf
     return result;
 }
 
+static napi_value n_sillstone_tensor_matmul_f64(napi_env env, napi_callback_info info) {
+    size_t argc = 6;
+    napi_value args[6];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    if (argc < 6) { napi_throw_type_error(env, NULL, "expected 6 arguments"); return NULL; }
+    const double* a = NULL; size_t a_count = 0; const double* b = NULL; size_t b_count = 0;
+    size_t m = 0, k1 = 0, k2 = 0, n = 0;
+    if (!get_f64_buf(env, args[0], &a, &a_count) || !get_size(env, args[1], &m) || !get_size(env, args[2], &k1)) return NULL;
+    if (!get_f64_buf(env, args[3], &b, &b_count) || !get_size(env, args[4], &k2) || !get_size(env, args[5], &n)) return NULL;
+    if (k1 != k2) { napi_throw_range_error(env, NULL, "matmul: inner dimensions disagree"); return NULL; }
+    if (m == 0 || n == 0 || k1 == 0 || m > SIZE_MAX / k1 || n > SIZE_MAX / k1 || m > SIZE_MAX / n / sizeof(double) || a_count != m * k1 || b_count != k1 * n) { napi_throw_range_error(env, NULL, "matmul: buffer length disagrees with the declared shape"); return NULL; }
+    double* out_data = NULL; napi_value result;
+    if (napi_create_buffer(env, m * n * sizeof(double), (void**)&out_data, &result) != napi_ok) { napi_throw_error(env, NULL, "output allocation failed"); return NULL; }
+    int32_t status = sillstone_tensor_matmul_f64(a, m, k1, b, k2, n, out_data);
+    if (status != 0) { throw_status(env, status); return NULL; }
+    return result;
+}
+
+static napi_value n_sillstone_tensor_add_f64(napi_env env, napi_callback_info info) {
+    size_t argc = 2;
+    napi_value args[2];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    if (argc < 2) { napi_throw_type_error(env, NULL, "expected 2 arguments"); return NULL; }
+    const double* a = NULL; size_t a_count = 0; const double* b = NULL; size_t b_count = 0;
+    if (!get_f64_buf(env, args[0], &a, &a_count) || !get_f64_buf(env, args[1], &b, &b_count)) return NULL;
+    if (a_count != b_count || a_count == 0) { napi_throw_range_error(env, NULL, "add: operands must be non-empty and equally long"); return NULL; }
+    double* out_data = NULL; napi_value result;
+    if (napi_create_buffer(env, a_count * sizeof(double), (void**)&out_data, &result) != napi_ok) { napi_throw_error(env, NULL, "output allocation failed"); return NULL; }
+    int32_t status = sillstone_tensor_add_f64(a, b, a_count, out_data);
+    if (status != 0) { throw_status(env, status); return NULL; }
+    return result;
+}
+
+static napi_value n_sillstone_tensor_sum_f64(napi_env env, napi_callback_info info) {
+    size_t argc = 1;
+    napi_value args[1];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    if (argc < 1) { napi_throw_type_error(env, NULL, "expected 1 argument"); return NULL; }
+    const double* a = NULL; size_t a_count = 0;
+    if (!get_f64_buf(env, args[0], &a, &a_count)) return NULL;
+    if (a_count == 0) { napi_throw_range_error(env, NULL, "sum: operand must be non-empty"); return NULL; }
+    double total = 0.0;
+    int32_t status = sillstone_tensor_sum_f64(a, a_count, &total);
+    if (status != 0) { throw_status(env, status); return NULL; }
+    napi_value result;
+    napi_create_double(env, total, &result);
+    return result;
+}
+
 NAPI_MODULE_INIT() {
     napi_value fn_sillstone_version_major;
     napi_create_function(env, NULL, 0, n_sillstone_version_major, NULL, &fn_sillstone_version_major);
@@ -770,6 +854,9 @@ NAPI_MODULE_INIT() {
     napi_value fn_sillstone_image_rotate;
     napi_create_function(env, NULL, 0, n_sillstone_image_rotate, NULL, &fn_sillstone_image_rotate);
     napi_set_named_property(env, exports, "sillstone_image_rotate", fn_sillstone_image_rotate);
+    napi_value fn_sillstone_image_rotate_size;
+    napi_create_function(env, NULL, 0, n_sillstone_image_rotate_size, NULL, &fn_sillstone_image_rotate_size);
+    napi_set_named_property(env, exports, "sillstone_image_rotate_size", fn_sillstone_image_rotate_size);
     napi_value fn_sillstone_image_filter;
     napi_create_function(env, NULL, 0, n_sillstone_image_filter, NULL, &fn_sillstone_image_filter);
     napi_set_named_property(env, exports, "sillstone_image_filter", fn_sillstone_image_filter);
@@ -797,5 +884,14 @@ NAPI_MODULE_INIT() {
     napi_value fn_sillstone_text_tlsh_distance;
     napi_create_function(env, NULL, 0, n_sillstone_text_tlsh_distance, NULL, &fn_sillstone_text_tlsh_distance);
     napi_set_named_property(env, exports, "sillstone_text_tlsh_distance", fn_sillstone_text_tlsh_distance);
+    napi_value fn_sillstone_tensor_matmul_f64;
+    napi_create_function(env, NULL, 0, n_sillstone_tensor_matmul_f64, NULL, &fn_sillstone_tensor_matmul_f64);
+    napi_set_named_property(env, exports, "sillstone_tensor_matmul_f64", fn_sillstone_tensor_matmul_f64);
+    napi_value fn_sillstone_tensor_add_f64;
+    napi_create_function(env, NULL, 0, n_sillstone_tensor_add_f64, NULL, &fn_sillstone_tensor_add_f64);
+    napi_set_named_property(env, exports, "sillstone_tensor_add_f64", fn_sillstone_tensor_add_f64);
+    napi_value fn_sillstone_tensor_sum_f64;
+    napi_create_function(env, NULL, 0, n_sillstone_tensor_sum_f64, NULL, &fn_sillstone_tensor_sum_f64);
+    napi_set_named_property(env, exports, "sillstone_tensor_sum_f64", fn_sillstone_tensor_sum_f64);
     return exports;
 }

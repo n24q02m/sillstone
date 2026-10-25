@@ -22,6 +22,7 @@ from ._generated import (
     sillstone_image_qoi_encode_raw,
     sillstone_image_resize_raw,
     sillstone_image_rotate_raw,
+    sillstone_image_rotate_size_raw,
     sillstone_image_transpose_raw,
     sillstone_image_whash_raw,
 )
@@ -266,8 +267,15 @@ class Image:
     def rotate(self, angle: float, resample: int = Resampling.BILINEAR, expand: bool = False) -> Image:
         """Rotates the image counter-clockwise."""
         layout = MODE_TO_LAYOUT[self._mode]
-        # In expand=False, output size matches input size
-        out_size = (self._width, self._height)
+        out_w = ctypes.c_uint32()
+        out_h = ctypes.c_uint32()
+        status = sillstone_image_rotate_size_raw(
+            self._width, self._height, float(angle), 1 if expand else 0,
+            ctypes.byref(out_w), ctypes.byref(out_h),
+        )
+        if status != 0:
+            raise RuntimeError(f"Rotate failed with status {status}")
+        out_size = (out_w.value, out_h.value)
         ch = CHANNELS[self._mode]
         out_len = out_size[0] * out_size[1] * ch
         out_buf = ctypes.create_string_buffer(out_len)

@@ -313,7 +313,7 @@ fn gen_go(fns: &[Function]) -> String {
                 .iter()
                 .map(|a| {
                     let go_ty = match a.ty.as_str() {
-                        "*const u8" | "*mut u8" => "unsafe.Pointer",
+                        "*const u8" | "*mut u8" | "*const f64" | "*mut f64" => "unsafe.Pointer",
                         "*mut *mut u8" => "*unsafe.Pointer",
                         "*mut usize" => "*uint64",
                         "*mut u32" => "*uint32",
@@ -333,6 +333,7 @@ fn gen_go(fns: &[Function]) -> String {
                 .iter()
                 .map(|a| match a.ty.as_str() {
                     "*const u8" | "*mut u8" => format!("(*C.uint8_t)({})", a.name),
+                    "*const f64" | "*mut f64" => format!("(*C.double)({})", a.name),
                     "*mut *mut u8" => format!("(**C.uint8_t)(unsafe.Pointer({}))", a.name),
                     "*mut usize" => format!("(*C.size_t)(unsafe.Pointer({}))", a.name),
                     "*mut u32" => format!("(*C.uint32_t)(unsafe.Pointer({}))", a.name),
@@ -447,11 +448,60 @@ fn gen_napi_qoi_decode() -> String {
     out
 }
 
+/// Float64 tensor kernels: every `*const f64` argument is a `Buffer` view of a
+/// `Float64Array`, validated for 8-byte alignment and whole-element length; sizes are
+/// checked against the buffers before the call so the C ABI never reads out of bounds.
+fn gen_napi_tensor_fn(f: &Function) -> String {
+    let mut out = String::new();
+    match f.name.as_str() {
+        "sillstone_tensor_matmul_f64" => {
+            out.push_str("    size_t argc = 6;\n    napi_value args[6];\n    napi_get_cb_info(env, info, &argc, args, NULL, NULL);\n");
+            out.push_str("    if (argc < 6) { napi_throw_type_error(env, NULL, \"expected 6 arguments\"); return NULL; }\n");
+            out.push_str("    const double* a = NULL; size_t a_count = 0; const double* b = NULL; size_t b_count = 0;\n");
+            out.push_str("    size_t m = 0, k1 = 0, k2 = 0, n = 0;\n");
+            out.push_str("    if (!get_f64_buf(env, args[0], &a, &a_count) || !get_size(env, args[1], &m) || !get_size(env, args[2], &k1)) return NULL;\n");
+            out.push_str("    if (!get_f64_buf(env, args[3], &b, &b_count) || !get_size(env, args[4], &k2) || !get_size(env, args[5], &n)) return NULL;\n");
+            out.push_str("    if (k1 != k2) { napi_throw_range_error(env, NULL, \"matmul: inner dimensions disagree\"); return NULL; }\n");
+            out.push_str("    if (m == 0 || n == 0 || k1 == 0 || m > SIZE_MAX / k1 || n > SIZE_MAX / k1 || m > SIZE_MAX / n / sizeof(double) || a_count != m * k1 || b_count != k1 * n) { napi_throw_range_error(env, NULL, \"matmul: buffer length disagrees with the declared shape\"); return NULL; }\n");
+            out.push_str("    double* out_data = NULL; napi_value result;\n");
+            out.push_str("    if (napi_create_buffer(env, m * n * sizeof(double), (void**)&out_data, &result) != napi_ok) { napi_throw_error(env, NULL, \"output allocation failed\"); return NULL; }\n");
+            out.push_str("    int32_t status = sillstone_tensor_matmul_f64(a, m, k1, b, k2, n, out_data);\n");
+            out.push_str("    if (status != 0) { throw_status(env, status); return NULL; }\n    return result;\n");
+        }
+        "sillstone_tensor_add_f64" => {
+            out.push_str("    size_t argc = 2;\n    napi_value args[2];\n    napi_get_cb_info(env, info, &argc, args, NULL, NULL);\n");
+            out.push_str("    if (argc < 2) { napi_throw_type_error(env, NULL, \"expected 2 arguments\"); return NULL; }\n");
+            out.push_str("    const double* a = NULL; size_t a_count = 0; const double* b = NULL; size_t b_count = 0;\n");
+            out.push_str("    if (!get_f64_buf(env, args[0], &a, &a_count) || !get_f64_buf(env, args[1], &b, &b_count)) return NULL;\n");
+            out.push_str("    if (a_count != b_count || a_count == 0) { napi_throw_range_error(env, NULL, \"add: operands must be non-empty and equally long\"); return NULL; }\n");
+            out.push_str("    double* out_data = NULL; napi_value result;\n");
+            out.push_str("    if (napi_create_buffer(env, a_count * sizeof(double), (void**)&out_data, &result) != napi_ok) { napi_throw_error(env, NULL, \"output allocation failed\"); return NULL; }\n");
+            out.push_str("    int32_t status = sillstone_tensor_add_f64(a, b, a_count, out_data);\n");
+            out.push_str("    if (status != 0) { throw_status(env, status); return NULL; }\n    return result;\n");
+        }
+        "sillstone_tensor_sum_f64" => {
+            out.push_str("    size_t argc = 1;\n    napi_value args[1];\n    napi_get_cb_info(env, info, &argc, args, NULL, NULL);\n");
+            out.push_str("    if (argc < 1) { napi_throw_type_error(env, NULL, \"expected 1 argument\"); return NULL; }\n");
+            out.push_str("    const double* a = NULL; size_t a_count = 0;\n");
+            out.push_str("    if (!get_f64_buf(env, args[0], &a, &a_count)) return NULL;\n");
+            out.push_str("    if (a_count == 0) { napi_throw_range_error(env, NULL, \"sum: operand must be non-empty\"); return NULL; }\n");
+            out.push_str("    double total = 0.0;\n");
+            out.push_str("    int32_t status = sillstone_tensor_sum_f64(a, a_count, &total);\n");
+            out.push_str("    if (status != 0) { throw_status(env, status); return NULL; }\n");
+            out.push_str("    napi_value result;\n    napi_create_double(env, total, &result);\n    return result;\n");
+        }
+        other => panic!("N-API: no tensor emitter for {other}"),
+    }
+    out
+}
+
 fn gen_node_napi(fns: &[Function]) -> String {
     let mut out = String::new();
     out.push_str("/* Generated by sillstone-idl-gen. DO NOT EDIT. */\n");
     out.push_str("#include <node_api.h>\n#include <stdint.h>\n#include <stddef.h>\n#include <stdio.h>\n#include \"sillstone.h\"\n\n");
     out.push_str("static void throw_status(napi_env env, int32_t status) {\n    char buf[16];\n    snprintf(buf, sizeof(buf), \"%d\", status);\n    napi_throw_error(env, buf, \"FFI error\");\n}\n\n");
+    out.push_str("static int get_size(napi_env env, napi_value v, size_t* out) {\n    int64_t x = 0;\n    if (napi_get_value_int64(env, v, &x) != napi_ok || x < 0) { napi_throw_type_error(env, NULL, \"expected a non-negative integer\"); return 0; }\n    *out = (size_t)x;\n    return 1;\n}\n\n");
+    out.push_str("static int get_f64_buf(napi_env env, napi_value v, const double** p, size_t* count) {\n    void* d = NULL; size_t len = 0;\n    if (napi_get_buffer_info(env, v, &d, &len) != napi_ok) { napi_throw_type_error(env, NULL, \"expected a Buffer over a Float64Array\"); return 0; }\n    if (len % sizeof(double) != 0 || ((uintptr_t)d % sizeof(double)) != 0) { napi_throw_type_error(env, NULL, \"buffer must be 8-byte aligned and a whole number of doubles\"); return 0; }\n    *p = (const double*)d;\n    *count = len / sizeof(double);\n    return 1;\n}\n\n");
 
     for f in fns {
         out.push_str(&format!("static napi_value n_{}(napi_env env, napi_callback_info info) {{\n", f.name));
@@ -578,6 +628,19 @@ fn gen_node_napi(fns: &[Function]) -> String {
             out.push_str("    napi_set_named_property(env, result, \"slots\", v_slots);\n");
             out.push_str("    napi_create_uint32(env, matched, &v_matched);\n    napi_set_named_property(env, result, \"matched\", v_matched);\n");
             out.push_str("    return result;\n");
+        } else if f.name.starts_with("sillstone_tensor_") {
+            out.push_str(&gen_napi_tensor_fn(f));
+        } else if f.name == "sillstone_image_rotate_size" {
+            out.push_str("    size_t argc = 4;\n    napi_value args[4];\n    napi_get_cb_info(env, info, &argc, args, NULL, NULL);\n");
+            out.push_str("    if (argc < 4) { napi_throw_type_error(env, NULL, \"expected 4 arguments\"); return NULL; }\n");
+            out.push_str("    uint32_t in_w = 0, in_h = 0, expand = 0; double angle = 0;\n");
+            out.push_str("    if (napi_get_value_uint32(env, args[0], &in_w) != napi_ok || napi_get_value_uint32(env, args[1], &in_h) != napi_ok || napi_get_value_double(env, args[2], &angle) != napi_ok || napi_get_value_uint32(env, args[3], &expand) != napi_ok) { napi_throw_type_error(env, NULL, \"expected (uint32, uint32, number, uint32)\"); return NULL; }\n");
+            out.push_str("    uint32_t w = 0, h = 0;\n");
+            out.push_str("    int32_t status = sillstone_image_rotate_size(in_w, in_h, angle, expand, &w, &h);\n");
+            out.push_str("    if (status != 0) { throw_status(env, status); return NULL; }\n");
+            out.push_str("    napi_value result, v_w, v_h;\n    napi_create_object(env, &result);\n");
+            out.push_str("    napi_create_uint32(env, w, &v_w);\n    napi_set_named_property(env, result, \"width\", v_w);\n");
+            out.push_str("    napi_create_uint32(env, h, &v_h);\n    napi_set_named_property(env, result, \"height\", v_h);\n    return result;\n");
         } else if is_image_buffer_op(f) || is_image_encode_fn(f) {
             out.push_str(&gen_napi_image_buffer_fn(f));
         } else if f.name == "sillstone_image_qoi_decode" {
@@ -641,9 +704,37 @@ fn gen_java(fns: &[Function]) -> String {
             out.push_str("    public static native void sillstone_curator_free(long ptr, long len);\n\n");
         } else if f.args.is_empty() && f.ret == "u32" {
             out.push_str(&format!("    public static native int {}();\n\n", f.name));
-        } else if f.name.starts_with("sillstone_image_") {
-            // Image buffer operations have no JNI implementation yet; declaring a
-            // native method without one only defers the failure to call time.
+        } else if f.name == "sillstone_tensor_matmul_f64" {
+            out.push_str("    public static native double[] sillstone_tensor_matmul_f64(double[] a, int m, int k1, double[] b, int k2, int n);\n\n");
+        } else if f.name == "sillstone_tensor_add_f64" {
+            out.push_str("    public static native double[] sillstone_tensor_add_f64(double[] a, double[] b);\n\n");
+        } else if f.name == "sillstone_tensor_sum_f64" {
+            out.push_str("    public static native double sillstone_tensor_sum_f64(double[] a);\n\n");
+        } else if f.name == "sillstone_image_free_bytes" {
+            // The JNI layer copies encoder output into a Java array and frees it itself.
+        } else if f.name == "sillstone_image_rotate_size" {
+            out.push_str("    /** Returns {@code null} on failure, else {@code {width, height}} of the rotated image. */\n");
+            out.push_str("    public static native int[] sillstone_image_rotate_size(int in_w, int in_h, double angle, int expand);\n\n");
+        } else if f.name == "sillstone_image_qoi_decode" {
+            out.push_str("    /** Returns {@code null} on failure, else 12 little-endian header bytes (width, height, layout as u32) followed by the pixels. */\n");
+            out.push_str("    public static native byte[] sillstone_image_qoi_decode(byte[] data);\n\n");
+        } else if is_image_buffer_op(f) || is_image_encode_fn(f) {
+            let encode = is_image_encode_fn(f);
+            let stop = if encode { "out_ptr" } else { "out_buf" };
+            let scalars: Vec<String> = f
+                .args
+                .iter()
+                .skip(2)
+                .take_while(|a| a.name != stop)
+                .map(|a| match a.ty.as_str() {
+                    "u32" => format!("int {}", a.name),
+                    "f64" => format!("double {}", a.name),
+                    other => panic!("JNI: unsupported scalar type {other} for argument {}", a.name),
+                })
+                .collect();
+            let tail = if encode { String::new() } else { ", int outLen".to_string() };
+            out.push_str("    /** Returns {@code null} when the operation is refused. */\n");
+            out.push_str(&format!("    public static native byte[] {}(byte[] data, {}{tail});\n\n", f.name, scalars.join(", ")));
         } else {
             panic!("JNI: no emitter for {}; add one instead of emitting a wrong stub", f.name);
         }

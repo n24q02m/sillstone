@@ -497,3 +497,389 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1text
         dist as jint
     }
 }
+
+// ---------------------------------------------------------------------------
+// Image buffer operations and float64 tensor kernels.
+//
+// Failure is reported as a `null` array (or NaN for `sum`); the Java facade turns
+// that into a `SillstoneFfiException`. Sizes handed to the C ABI are validated
+// against the real array lengths here, so a wrong `outLen` or shape can never make
+// the cdylib read or write out of bounds.
+// ---------------------------------------------------------------------------
+
+/// Runs a fixed-output image operation: `f(data, len, out_buf, out_len)`.
+unsafe fn run_buffer_op(
+    env: *mut JNIEnv,
+    data: JArray,
+    out_len: jint,
+    f: impl FnOnce(*const u8, usize, *mut u8, usize) -> i32,
+) -> JArray {
+    if out_len < 0 {
+        return core::ptr::null_mut();
+    }
+    let bytes = unsafe { get_input_bytes(env, data) };
+    let mut out = vec![0u8; out_len as usize];
+    let status = f(bytes.as_ptr(), bytes.len(), out.as_mut_ptr(), out.len());
+    if status != 0 {
+        return core::ptr::null_mut();
+    }
+    unsafe { create_output_byte_array(env, &out) }
+}
+
+/// Runs an encoder that hands back a library-allocated buffer, copies it into a
+/// Java array and frees it: `f(data, len, out_ptr, out_len)`.
+unsafe fn run_encode_op(
+    env: *mut JNIEnv,
+    data: JArray,
+    f: impl FnOnce(*const u8, usize, *mut *mut u8, *mut usize) -> i32,
+) -> JArray {
+    let bytes = unsafe { get_input_bytes(env, data) };
+    let mut ptr: *mut u8 = core::ptr::null_mut();
+    let mut len = 0usize;
+    let status = f(bytes.as_ptr(), bytes.len(), &mut ptr, &mut len);
+    if status != 0 || ptr.is_null() {
+        return core::ptr::null_mut();
+    }
+    let result = unsafe { create_output_byte_array(env, core::slice::from_raw_parts(ptr, len)) };
+    unsafe { sillstone_image::ffi::sillstone_image_free_bytes(ptr, len) };
+    result
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1resize(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    data: JArray,
+    in_w: jint,
+    in_h: jint,
+    layout: jint,
+    out_w: jint,
+    out_h: jint,
+    filter: jint,
+    out_len: jint,
+) -> JArray {
+    unsafe {
+        run_buffer_op(env, data, out_len, |p, n, o, on| {
+            sillstone_image::ffi::sillstone_image_resize(
+                p, n, in_w as u32, in_h as u32, layout as u32, out_w as u32, out_h as u32,
+                filter as u32, o, on,
+            )
+        })
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1crop(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    data: JArray,
+    in_w: jint,
+    in_h: jint,
+    layout: jint,
+    x0: jint,
+    y0: jint,
+    x1: jint,
+    y1: jint,
+    out_len: jint,
+) -> JArray {
+    unsafe {
+        run_buffer_op(env, data, out_len, |p, n, o, on| {
+            sillstone_image::ffi::sillstone_image_crop(
+                p, n, in_w as u32, in_h as u32, layout as u32, x0 as u32, y0 as u32, x1 as u32,
+                y1 as u32, o, on,
+            )
+        })
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1transpose(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    data: JArray,
+    in_w: jint,
+    in_h: jint,
+    layout: jint,
+    method: jint,
+    out_len: jint,
+) -> JArray {
+    unsafe {
+        run_buffer_op(env, data, out_len, |p, n, o, on| {
+            sillstone_image::ffi::sillstone_image_transpose(
+                p, n, in_w as u32, in_h as u32, layout as u32, method as u32, o, on,
+            )
+        })
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1rotate(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    data: JArray,
+    in_w: jint,
+    in_h: jint,
+    layout: jint,
+    angle: f64,
+    expand: jint,
+    filter: jint,
+    out_len: jint,
+) -> JArray {
+    unsafe {
+        run_buffer_op(env, data, out_len, |p, n, o, on| {
+            sillstone_image::ffi::sillstone_image_rotate(
+                p, n, in_w as u32, in_h as u32, layout as u32, angle, expand as u32,
+                filter as u32, o, on,
+            )
+        })
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1filter(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    data: JArray,
+    in_w: jint,
+    in_h: jint,
+    layout: jint,
+    filter_id: jint,
+    out_len: jint,
+) -> JArray {
+    unsafe {
+        run_buffer_op(env, data, out_len, |p, n, o, on| {
+            sillstone_image::ffi::sillstone_image_filter(
+                p, n, in_w as u32, in_h as u32, layout as u32, filter_id as u32, o, on,
+            )
+        })
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1adjust(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    data: JArray,
+    in_w: jint,
+    in_h: jint,
+    layout: jint,
+    op_id: jint,
+    factor: f64,
+    out_len: jint,
+) -> JArray {
+    unsafe {
+        run_buffer_op(env, data, out_len, |p, n, o, on| {
+            sillstone_image::ffi::sillstone_image_adjust(
+                p, n, in_w as u32, in_h as u32, layout as u32, op_id as u32, factor, o, on,
+            )
+        })
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1color_1convert(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    data: JArray,
+    in_w: jint,
+    in_h: jint,
+    from_layout: jint,
+    to_layout: jint,
+    out_len: jint,
+) -> JArray {
+    unsafe {
+        run_buffer_op(env, data, out_len, |p, n, o, on| {
+            sillstone_image::ffi::sillstone_image_color_convert(
+                p, n, in_w as u32, in_h as u32, from_layout as u32, to_layout as u32, o, on,
+            )
+        })
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1qoi_1encode(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    data: JArray,
+    in_w: jint,
+    in_h: jint,
+    layout: jint,
+) -> JArray {
+    unsafe {
+        run_encode_op(env, data, |p, n, op, ol| {
+            sillstone_image::ffi::sillstone_image_qoi_encode(
+                p, n, in_w as u32, in_h as u32, layout as u32, op, ol,
+            )
+        })
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1bmp_1encode(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    data: JArray,
+    in_w: jint,
+    in_h: jint,
+    layout: jint,
+) -> JArray {
+    unsafe {
+        run_encode_op(env, data, |p, n, op, ol| {
+            sillstone_image::ffi::sillstone_image_bmp_encode(
+                p, n, in_w as u32, in_h as u32, layout as u32, op, ol,
+            )
+        })
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1qoi_1decode(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    data: JArray,
+) -> JArray {
+    let bytes = unsafe { get_input_bytes(env, data) };
+    let (mut w, mut h, mut layout) = (0u32, 0u32, 0u32);
+    let mut ptr: *mut u8 = core::ptr::null_mut();
+    let mut len = 0usize;
+    let status = unsafe {
+        sillstone_image::ffi::sillstone_image_qoi_decode(
+            bytes.as_ptr(),
+            bytes.len(),
+            &mut w,
+            &mut h,
+            &mut layout,
+            &mut ptr,
+            &mut len,
+        )
+    };
+    if status != 0 || ptr.is_null() {
+        return core::ptr::null_mut();
+    }
+    let mut packed = Vec::with_capacity(12 + len);
+    packed.extend_from_slice(&w.to_le_bytes());
+    packed.extend_from_slice(&h.to_le_bytes());
+    packed.extend_from_slice(&layout.to_le_bytes());
+    packed.extend_from_slice(unsafe { core::slice::from_raw_parts(ptr, len) });
+    unsafe { sillstone_image::ffi::sillstone_image_free_bytes(ptr, len) };
+    unsafe { create_output_byte_array(env, &packed) }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1tensor_1matmul_1f64(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    a: JArray,
+    m: jint,
+    k1: jint,
+    b: JArray,
+    k2: jint,
+    n: jint,
+) -> JArray {
+    if m <= 0 || k1 <= 0 || k2 <= 0 || n <= 0 {
+        return core::ptr::null_mut();
+    }
+    let (m, k1, k2, n) = (m as usize, k1 as usize, k2 as usize, n as usize);
+    let a = unsafe { get_input_doubles(env, a) };
+    let b = unsafe { get_input_doubles(env, b) };
+    if a.len() != m.saturating_mul(k1) || b.len() != k2.saturating_mul(n) {
+        return core::ptr::null_mut();
+    }
+    let mut out = vec![0.0f64; m * n];
+    let status = unsafe {
+        sillstone_tensor::ffi::sillstone_tensor_matmul_f64(
+            a.as_ptr(),
+            m,
+            k1,
+            b.as_ptr(),
+            k2,
+            n,
+            out.as_mut_ptr(),
+        )
+    };
+    if status != 0 {
+        return core::ptr::null_mut();
+    }
+    unsafe { create_output_double_array(env, &out) }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1tensor_1add_1f64(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    a: JArray,
+    b: JArray,
+) -> JArray {
+    let a = unsafe { get_input_doubles(env, a) };
+    let b = unsafe { get_input_doubles(env, b) };
+    if a.is_empty() || a.len() != b.len() {
+        return core::ptr::null_mut();
+    }
+    let mut out = vec![0.0f64; a.len()];
+    let status = unsafe {
+        sillstone_tensor::ffi::sillstone_tensor_add_f64(
+            a.as_ptr(),
+            b.as_ptr(),
+            a.len(),
+            out.as_mut_ptr(),
+        )
+    };
+    if status != 0 {
+        return core::ptr::null_mut();
+    }
+    unsafe { create_output_double_array(env, &out) }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1tensor_1sum_1f64(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    a: JArray,
+) -> f64 {
+    let a = unsafe { get_input_doubles(env, a) };
+    if a.is_empty() {
+        return f64::NAN;
+    }
+    let mut total = 0.0f64;
+    let status = unsafe {
+        sillstone_tensor::ffi::sillstone_tensor_sum_f64(a.as_ptr(), a.len(), &mut total)
+    };
+    if status != 0 { f64::NAN } else { total }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1rotate_1size(
+    env: *mut JNIEnv,
+    _class: *mut c_void,
+    in_w: jint,
+    in_h: jint,
+    angle: f64,
+    expand: jint,
+) -> JArray {
+    let (mut w, mut h) = (0u32, 0u32);
+    let status = unsafe {
+        sillstone_image::ffi::sillstone_image_rotate_size(
+            in_w as u32, in_h as u32, angle, expand as u32, &mut w, &mut h,
+        )
+    };
+    if status != 0 || w > i32::MAX as u32 || h > i32::MAX as u32 {
+        return core::ptr::null_mut();
+    }
+    unsafe { create_output_int_array(env, &[w as jint, h as jint]) }
+}
+
+unsafe fn create_output_int_array(env: *mut JNIEnv, data: &[jint]) -> JArray {
+    // JNI function table: NewIntArray = 179, SetIntArrayRegion = 211.
+    let table: &[usize; 256] = unsafe { &*(*env as *const [usize; 256]) };
+    unsafe {
+        let new: extern "system" fn(*mut JNIEnv, jint) -> JArray = core::mem::transmute(table[179]);
+        let arr = new(env, data.len() as jint);
+        if arr.is_null() {
+            return core::ptr::null_mut();
+        }
+        let set: extern "system" fn(*mut JNIEnv, JArray, jint, jint, *const jint) =
+            core::mem::transmute(table[211]);
+        set(env, arr, 0, data.len() as jint, data.as_ptr());
+        arr
+    }
+}

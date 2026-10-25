@@ -82,6 +82,7 @@ napi_status napi_get_value_uint32(napi_env env, napi_value value, uint32_t* resu
 napi_status napi_get_value_int64(napi_env env, napi_value value, int64_t* result);
 napi_status napi_get_value_double(napi_env env, napi_value value, double* result);
 napi_status napi_create_int64(napi_env env, int64_t value, napi_value* result);
+napi_status napi_create_double(napi_env env, double value, napi_value* result);
 napi_status napi_create_bigint_uint64(napi_env env, uint64_t value, napi_value* result);
 napi_status napi_create_object(napi_env env, napi_value* result);
 napi_status napi_set_named_property(napi_env env,
@@ -93,6 +94,7 @@ napi_status napi_set_element(napi_env env, napi_value object, uint32_t index, na
 napi_status napi_get_undefined(napi_env env, napi_value* result);
 napi_status napi_throw_error(napi_env env, const char* code, const char* msg);
 napi_status napi_throw_type_error(napi_env env, const char* code, const char* msg);
+napi_status napi_throw_range_error(napi_env env, const char* code, const char* msg);
 napi_status napi_create_function(napi_env env,
                                  const char* utf8name,
                                  size_t length,

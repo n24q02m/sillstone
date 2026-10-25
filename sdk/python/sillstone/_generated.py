@@ -88,6 +88,8 @@ sillstone_image_transpose_raw = _bind('sillstone_image_transpose', ctypes.c_int3
 
 sillstone_image_rotate_raw = _bind('sillstone_image_rotate', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_double, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_size_t])
 
+sillstone_image_rotate_size_raw = _bind('sillstone_image_rotate_size', ctypes.c_int32, [ctypes.c_uint32, ctypes.c_uint32, ctypes.c_double, ctypes.c_uint32, ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_uint32)])
+
 sillstone_image_filter_raw = _bind('sillstone_image_filter', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_size_t])
 
 sillstone_image_adjust_raw = _bind('sillstone_image_adjust', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_double, ctypes.c_void_p, ctypes.c_size_t])
@@ -105,4 +107,10 @@ sillstone_image_free_bytes_raw = _bind('sillstone_image_free_bytes', None, [ctyp
 sillstone_text_tlsh_raw = _bind('sillstone_text_tlsh', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p])
 
 sillstone_text_tlsh_distance_raw = _bind('sillstone_text_tlsh_distance', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint32)])
+
+sillstone_tensor_matmul_f64_raw = _bind('sillstone_tensor_matmul_f64', ctypes.c_int32, [ctypes.POINTER(ctypes.c_double), ctypes.c_size_t, ctypes.c_size_t, ctypes.POINTER(ctypes.c_double), ctypes.c_size_t, ctypes.c_size_t, ctypes.POINTER(ctypes.c_double)])
+
+sillstone_tensor_add_f64_raw = _bind('sillstone_tensor_add_f64', ctypes.c_int32, [ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.c_size_t, ctypes.POINTER(ctypes.c_double)])
+
+sillstone_tensor_sum_f64_raw = _bind('sillstone_tensor_sum_f64', ctypes.c_int32, [ctypes.POINTER(ctypes.c_double), ctypes.c_size_t, ctypes.POINTER(ctypes.c_double)])
 

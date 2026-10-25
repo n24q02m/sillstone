@@ -60,8 +60,47 @@ public final class Generated {
 
     public static native long sillstone_image_colorhash(byte[] data, int width, int height, int layout);
 
+    /** Returns {@code null} when the operation is refused. */
+    public static native byte[] sillstone_image_resize(byte[] data, int in_w, int in_h, int layout, int out_w, int out_h, int filter, int outLen);
+
+    /** Returns {@code null} when the operation is refused. */
+    public static native byte[] sillstone_image_crop(byte[] data, int in_w, int in_h, int layout, int x0, int y0, int x1, int y1, int outLen);
+
+    /** Returns {@code null} when the operation is refused. */
+    public static native byte[] sillstone_image_transpose(byte[] data, int in_w, int in_h, int layout, int method, int outLen);
+
+    /** Returns {@code null} when the operation is refused. */
+    public static native byte[] sillstone_image_rotate(byte[] data, int in_w, int in_h, int layout, double angle, int expand, int filter, int outLen);
+
+    /** Returns {@code null} on failure, else {@code {width, height}} of the rotated image. */
+    public static native int[] sillstone_image_rotate_size(int in_w, int in_h, double angle, int expand);
+
+    /** Returns {@code null} when the operation is refused. */
+    public static native byte[] sillstone_image_filter(byte[] data, int in_w, int in_h, int layout, int filter_id, int outLen);
+
+    /** Returns {@code null} when the operation is refused. */
+    public static native byte[] sillstone_image_adjust(byte[] data, int in_w, int in_h, int layout, int op_id, double factor, int outLen);
+
+    /** Returns {@code null} when the operation is refused. */
+    public static native byte[] sillstone_image_color_convert(byte[] data, int in_w, int in_h, int from_layout, int to_layout, int outLen);
+
+    /** Returns {@code null} when the operation is refused. */
+    public static native byte[] sillstone_image_qoi_encode(byte[] data, int in_w, int in_h, int layout);
+
+    /** Returns {@code null} on failure, else 12 little-endian header bytes (width, height, layout as u32) followed by the pixels. */
+    public static native byte[] sillstone_image_qoi_decode(byte[] data);
+
+    /** Returns {@code null} when the operation is refused. */
+    public static native byte[] sillstone_image_bmp_encode(byte[] data, int in_w, int in_h, int layout);
+
     public static native byte[] sillstone_text_tlsh(byte[] data);
 
     public static native int sillstone_text_tlsh_distance(byte[] a, byte[] b);
+
+    public static native double[] sillstone_tensor_matmul_f64(double[] a, int m, int k1, double[] b, int k2, int n);
+
+    public static native double[] sillstone_tensor_add_f64(double[] a, double[] b);
+
+    public static native double sillstone_tensor_sum_f64(double[] a);
 
 }

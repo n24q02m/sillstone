@@ -67,6 +67,8 @@ int32_t sillstone_image_transpose(const uint8_t *data, size_t len, uint32_t in_w
 
 int32_t sillstone_image_rotate(const uint8_t *data, size_t len, uint32_t in_w, uint32_t in_h, uint32_t layout, double angle, uint32_t expand, uint32_t filter, uint8_t *out_buf, size_t out_len);
 
+int32_t sillstone_image_rotate_size(uint32_t in_w, uint32_t in_h, double angle, uint32_t expand, uint32_t *out_w, uint32_t *out_h);
+
 int32_t sillstone_image_filter(const uint8_t *data, size_t len, uint32_t in_w, uint32_t in_h, uint32_t layout, uint32_t filter_id, uint8_t *out_buf, size_t out_len);
 
 int32_t sillstone_image_adjust(const uint8_t *data, size_t len, uint32_t in_w, uint32_t in_h, uint32_t layout, uint32_t op_id, double factor, uint8_t *out_buf, size_t out_len);
@@ -84,6 +86,12 @@ void sillstone_image_free_bytes(uint8_t *ptr, size_t len);
 int32_t sillstone_text_tlsh(const uint8_t *data, size_t len, uint8_t *out);
 
 int32_t sillstone_text_tlsh_distance(const uint8_t *hash_a, const uint8_t *hash_b, uint32_t *out);
+
+int32_t sillstone_tensor_matmul_f64(const double *a, size_t m, size_t k1, const double *b, size_t k2, size_t n, double *out);
+
+int32_t sillstone_tensor_add_f64(const double *a, const double *b, size_t len, double *out);
+
+int32_t sillstone_tensor_sum_f64(const double *a, size_t len, double *out);
 
 #ifdef __cplusplus
 }

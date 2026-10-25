@@ -239,6 +239,10 @@ func SillstoneImageRotate(data unsafe.Pointer, len uint64, in_w uint32, in_h uin
     return int32(C.sillstone_image_rotate((*C.uint8_t)(data), C.size_t(len), C.uint32_t(in_w), C.uint32_t(in_h), C.uint32_t(layout), C.double(angle), C.uint32_t(expand), C.uint32_t(filter), (*C.uint8_t)(out_buf), C.size_t(out_len)))
 }
 
+func SillstoneImageRotateSize(in_w uint32, in_h uint32, angle float64, expand uint32, out_w *uint32, out_h *uint32) int32 {
+    return int32(C.sillstone_image_rotate_size(C.uint32_t(in_w), C.uint32_t(in_h), C.double(angle), C.uint32_t(expand), (*C.uint32_t)(unsafe.Pointer(out_w)), (*C.uint32_t)(unsafe.Pointer(out_h))))
+}
+
 func SillstoneImageFilter(data unsafe.Pointer, len uint64, in_w uint32, in_h uint32, layout uint32, filter_id uint32, out_buf unsafe.Pointer, out_len uint64) int32 {
     return int32(C.sillstone_image_filter((*C.uint8_t)(data), C.size_t(len), C.uint32_t(in_w), C.uint32_t(in_h), C.uint32_t(layout), C.uint32_t(filter_id), (*C.uint8_t)(out_buf), C.size_t(out_len)))
 }
@@ -282,5 +286,17 @@ func SillstoneTextTlshDistance(a []byte, b []byte) uint32 {
     if len(b) > 0 { ptrB = (*C.uint8_t)(unsafe.Pointer(&b[0])) }
     C.sillstone_text_tlsh_distance(ptrA, ptrB, &out)
     return uint32(out)
+}
+
+func SillstoneTensorMatmulF64(a unsafe.Pointer, m uint64, k1 uint64, b unsafe.Pointer, k2 uint64, n uint64, out unsafe.Pointer) int32 {
+    return int32(C.sillstone_tensor_matmul_f64((*C.double)(a), C.size_t(m), C.size_t(k1), (*C.double)(b), C.size_t(k2), C.size_t(n), (*C.double)(out)))
+}
+
+func SillstoneTensorAddF64(a unsafe.Pointer, b unsafe.Pointer, len uint64, out unsafe.Pointer) int32 {
+    return int32(C.sillstone_tensor_add_f64((*C.double)(a), (*C.double)(b), C.size_t(len), (*C.double)(out)))
+}
+
+func SillstoneTensorSumF64(a unsafe.Pointer, len uint64, out unsafe.Pointer) int32 {
+    return int32(C.sillstone_tensor_sum_f64((*C.double)(a), C.size_t(len), (*C.double)(out)))
 }
 
