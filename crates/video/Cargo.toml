@@ -32,23 +32,23 @@ workspace = true
 workspace = true
 
 [dependencies.sillstone-digest]
-version = "0.2.1"
+version = "0.3.0-beta.1"
 path = "../digest"
 
 [dependencies.sillstone-image]
-version = "0.2.1"
+version = "0.3.0-beta.1"
 path = "../image"
 
 [dependencies.sillstone-text]
-version = "0.2.1"
+version = "0.3.0-beta.1"
 path = "../text"
 
 [dependencies.sillstone-mp4]
-version = "0.2.1"
+version = "0.3.0-beta.1"
 path = "../mp4"
 
 [dependencies.sillstone-h264]
-version = "0.2.1"
+version = "0.3.0-beta.1"
 path = "../h264"
 
 [lints.rust]

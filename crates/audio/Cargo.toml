@@ -36,15 +36,15 @@ workspace = true
 workspace = true
 
 [dependencies.sillstone-digest]
-version = "0.2.1"
+version = "0.3.0-beta.1"
 path = "../digest"
 
 [dependencies.sillstone-flac]
-version = "0.2.1"
+version = "0.3.0-beta.1"
 path = "../flac"
 
 [dependencies.sillstone-math]
-version = "0.2.1"
+version = "0.3.0-beta.1"
 path = "../math"
 
 [lints.rust]

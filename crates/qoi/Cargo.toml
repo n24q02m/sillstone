@@ -32,7 +32,7 @@ workspace = true
 workspace = true
 
 [dependencies.sillstone-digest]
-version = "0.2.1"
+version = "0.3.0-beta.1"
 path = "../digest"
 
 [lints.rust]

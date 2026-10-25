@@ -39,7 +39,7 @@ from ._generated import (
 )
 from .image import Image, ImageFilter, Resampling, Transpose
 from .array import Array, array, asarray, zeros, ones, arange, linspace, matmul, dot
-__version__ = "0.2.1"
+__version__ = "0.3.0b1"
 
 __all__ = [
     "Image",
