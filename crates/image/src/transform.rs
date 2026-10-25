@@ -93,9 +93,7 @@ pub fn transpose<L: Layout, T: Sample>(
             let src_idx = (y * in_w + x) * c;
             let dst_idx = (dst_y * out_w + dst_x) * c;
 
-            for k in 0..c {
-                out[dst_idx + k] = src[src_idx + k];
-            }
+            out[dst_idx..dst_idx + c].copy_from_slice(&src[src_idx..src_idx + c]);
         }
     }
 
@@ -182,9 +180,7 @@ pub fn rotate<L: Layout, T: Sample>(
                 let ry = src_y.round() as isize;
                 if rx >= 0 && rx < in_w as isize && ry >= 0 && ry < in_h as isize {
                     let in_idx = (ry as usize * in_w + rx as usize) * c;
-                    for k in 0..c {
-                        out[out_idx + k] = src[in_idx + k];
-                    }
+                    out[out_idx..out_idx + c].copy_from_slice(&src[in_idx..in_idx + c]);
                 }
             } else {
                 // Bilinear sampling

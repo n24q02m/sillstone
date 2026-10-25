@@ -14,7 +14,7 @@ impl<L: Layout, T: Sample> Image<L, T> {
     {
         let h = self.height() as usize;
         let w = self.width() as usize;
-        let c = L::CHANNELS as usize;
+        let c = L::CHANNELS;
         let shape = vec![h, w, c];
         Tensor::from_vec(shape, self.as_slice().to_vec()).expect("image size must match product")
     }
@@ -33,7 +33,7 @@ impl<L: Layout, T: Sample> Image<L, T> {
         let w = shape[1] as u32;
         let c = if shape.len() == 3 { shape[2] } else { 1 };
 
-        if c != L::CHANNELS as usize {
+        if c != L::CHANNELS {
             return Err(Error::BadValue("tensor channel count does not match layout"));
         }
 

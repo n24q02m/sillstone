@@ -48,7 +48,7 @@ pub fn decode(bytes: &[u8]) -> Result<(QoiHeader, Vec<u8>)> {
         return Err(Error::BadValue("QOI data too short for header and footer"));
     }
 
-    if &bytes[0..4] != &QOI_MAGIC {
+    if bytes[0..4] != QOI_MAGIC {
         return Err(Error::BadValue("invalid QOI magic bytes"));
     }
 
@@ -250,14 +250,16 @@ pub fn encode(
                     let vg_r = vr.wrapping_sub(vg);
                     let vg_b = vb.wrapping_sub(vg);
 
-                    if vr >= -2 && vr <= 1 && vg >= -2 && vg <= 1 && vb >= -2 && vb <= 1 {
+                    if (-2..=1).contains(&vr) && (-2..=1).contains(&vg) && (-2..=1).contains(&vb) {
                         out.push(
                             QOI_OP_DIFF
                                 | (((vr + 2) as u8) << 4)
                                 | (((vg + 2) as u8) << 2)
                                 | ((vb + 2) as u8),
                         );
-                    } else if vg >= -32 && vg <= 31 && vg_r >= -8 && vg_r <= 7 && vg_b >= -8 && vg_b <= 7
+                    } else if (-32..=31).contains(&vg)
+                        && (-8..=7).contains(&vg_r)
+                        && (-8..=7).contains(&vg_b)
                     {
                         out.push(QOI_OP_LUMA | ((vg + 32) as u8));
                         out.push((((vg_r + 8) as u8) << 4) | ((vg_b + 8) as u8));

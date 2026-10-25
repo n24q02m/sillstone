@@ -484,9 +484,7 @@ fn gen_node_napi(fns: &[Function]) -> String {
             out.push_str("    napi_set_named_property(env, result, \"slots\", v_slots);\n");
             out.push_str("    napi_create_uint32(env, matched, &v_matched);\n    napi_set_named_property(env, result, \"matched\", v_matched);\n");
             out.push_str("    return result;\n");
-        } else if f.name == "sillstone_curator_free" {
-            out.push_str("    napi_value result;\n    napi_get_undefined(env, &result);\n    return result;\n");
-        } else if f.name == "sillstone_image_free_bytes" {
+        } else if f.name == "sillstone_curator_free" || f.name == "sillstone_image_free_bytes" {
             out.push_str("    napi_value result;\n    napi_get_undefined(env, &result);\n    return result;\n");
         } else {
             out.push_str(&format!("    uint32_t val = {}();\n", f.name));

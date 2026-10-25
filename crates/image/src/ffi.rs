@@ -831,7 +831,7 @@ pub unsafe extern "C" fn sillstone_image_bmp_encode(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sillstone_image_free_bytes(ptr: *mut u8, len: usize) {
     if !ptr.is_null() && len > 0 {
-        let _ = unsafe { alloc::boxed::Box::from_raw(core::slice::from_raw_parts_mut(ptr, len)) };
+        let _ = unsafe { alloc::boxed::Box::from_raw(core::ptr::slice_from_raw_parts_mut(ptr, len)) };
     }
 }
 #[cfg(test)]

@@ -8,6 +8,11 @@ const PITH_E_REJECTED: i32 = 2;
 
 /// Performs 2D GEMM matrix multiplication for float64 arrays: C = A @ B.
 /// A is [m, k1], B is [k2, n].
+///
+/// # Safety
+///
+/// `a` must be valid for reads of `m * k1` `f64`s, `b` for `k2 * n` `f64`s, and `out`
+/// must be valid for writes of `m * n` `f64`s. The buffers must not overlap `out`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sillstone_tensor_matmul_f64(
     a: *const f64,
@@ -52,6 +57,11 @@ pub unsafe extern "C" fn sillstone_tensor_matmul_f64(
 }
 
 /// Performs vectorized elementwise addition for float64 arrays: C = A + B.
+///
+/// # Safety
+///
+/// `a` and `b` must be valid for reads of `len` `f64`s and `out` must be valid for
+/// writes of `len` `f64`s.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sillstone_tensor_add_f64(
     a: *const f64,
@@ -73,6 +83,11 @@ pub unsafe extern "C" fn sillstone_tensor_add_f64(
 }
 
 /// Performs fast sum reduction for float64 arrays.
+///
+/// # Safety
+///
+/// `a` must be valid for reads of `len` `f64`s and `out` must be valid for a write of
+/// one `f64`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sillstone_tensor_sum_f64(
     a: *const f64,
