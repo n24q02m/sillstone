@@ -282,7 +282,7 @@ def char_category(char: str) -> int:
 
 
 def phash(data: bytes, width: int, height: int, layout: int = 0) -> int:
-    """Computes 64-bit perceptual hash (pHash) of an image."""
+    """64-bit pHash, bit-exact with `imagehash.phash` (hash_size=8)."""
     out = ctypes.c_uint64()
     rc = sillstone_image_phash_raw(data, len(data), width, height, layout, ctypes.byref(out))
     if rc != 0:
@@ -291,7 +291,7 @@ def phash(data: bytes, width: int, height: int, layout: int = 0) -> int:
 
 
 def ahash(data: bytes, width: int, height: int, layout: int = 0) -> int:
-    """Computes 64-bit average hash (aHash) of an image."""
+    """64-bit aHash, bit-exact with `imagehash.average_hash`."""
     out = ctypes.c_uint64()
     rc = sillstone_image_ahash_raw(data, len(data), width, height, layout, ctypes.byref(out))
     if rc != 0:
@@ -300,7 +300,7 @@ def ahash(data: bytes, width: int, height: int, layout: int = 0) -> int:
 
 
 def dhash(data: bytes, width: int, height: int, layout: int = 0) -> int:
-    """Computes 64-bit difference hash (dHash) of an image."""
+    """64-bit dHash, bit-exact with `imagehash.dhash`."""
     out = ctypes.c_uint64()
     rc = sillstone_image_dhash_raw(data, len(data), width, height, layout, ctypes.byref(out))
     if rc != 0:
@@ -308,8 +308,12 @@ def dhash(data: bytes, width: int, height: int, layout: int = 0) -> int:
     return out.value
 
 
-def whash(data: bytes, width: int, height: int, layout: int = 0, level: int = 3) -> int:
-    """Computes 64-bit wavelet hash (wHash) of an image."""
+def whash(data: bytes, width: int, height: int, layout: int = 0, level: int = 0) -> int:
+    """64-bit wHash, bit-exact with `imagehash.whash`.
+
+    `level` is log2(image_scale); 0 (default) is imagehash's default
+    2**floor(log2(min(width, height))), otherwise 3..=15.
+    """
     out = ctypes.c_uint64()
     rc = sillstone_image_whash_raw(data, len(data), width, height, layout, level, ctypes.byref(out))
     if rc != 0:
@@ -317,8 +321,12 @@ def whash(data: bytes, width: int, height: int, layout: int = 0, level: int = 3)
     return out.value
 
 
-def colorhash(data: bytes, width: int, height: int, layout: int = 0, bins: int = 4) -> int:
-    """Computes 64-bit color distribution hash of an image."""
+def colorhash(data: bytes, width: int, height: int, layout: int = 0, bins: int = 3) -> int:
+    """64-bit colorhash, bit-exact with `imagehash.colorhash(binbits=bins)`.
+
+    `bins` is binbits: 0 or 3 (default) gives imagehash's 42-bit hash, 1..=4
+    selects 14*bins bits.
+    """
     out = ctypes.c_uint64()
     rc = sillstone_image_colorhash_raw(data, len(data), width, height, layout, bins, ctypes.byref(out))
     if rc != 0:

@@ -81,11 +81,8 @@ This document specifies the algorithmic guarantees, operational limits, input bo
 ## 6. Multi-Modal Perceptual Fingerprints (`sillstone-curator`)
 
 - **Image Hashes:**
-  - `pHash`: 64-bit DCT-based perceptual hash (resistant to scaling and gamma shifts).
-  - `aHash`: 64-bit Average hash (8x8 box average).
-  - `dHash`: 64-bit Difference hash (horizontal gradient comparison).
-  - `wHash`: 64-bit Discrete Wavelet Transform hash (Haar LL sub-band).
-  - `colorhash`: 64-bit Color histogram distribution hash.
+  - `pHash`, `aHash`, `dHash`, `wHash`, `colorhash`: bit-exact with the Python `imagehash` library (default parameters, `hash_size = 8`, `binbits = 3`) on 8-bit Gray / RGB / RGBA input; see `docs/parity.md` §4 for the measured parity and its one documented limit. 16-bit samples are reduced with `>> 8` first.
+  - Tier-2 curator signatures keep their own pinned pHash lineage (`image_phash`, box-average, DC excluded); it is not the `imagehash` one.
 - **Text Hashes:**
   - `TLSH`: TrendMicro Locality Sensitive Hash (72-hex character representation, distance 0..1000+).
   - `n-gram Jaccard`: Character-level k-shingle MinHash.

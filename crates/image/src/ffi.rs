@@ -22,12 +22,8 @@
 
 #![allow(unsafe_code)]
 
-use crate::ahash::image_ahash;
-use crate::colorhash::image_colorhash;
-use crate::dhash::image_dhash;
-use crate::phash::image_phash;
+use crate::imagehash::{image_ahash, image_colorhash, image_dhash, image_phash_imagehash, image_whash};
 use crate::raster::{Gray, Image, Layout, Rgb, Rgba};
-use crate::whash::image_whash;
 use sillstone_digest::Error;
 
 /// Status: success.
@@ -263,11 +259,11 @@ where
 /// the declared geometry and runs the pHash pipeline.
 fn phash_of_dump(dump: &[u8], width: u32, height: u32, layout: u32) -> Result<u64, i32> {
     match layout {
-        PITH_LAYOUT_GRAY8 => hash_8::<Gray, _>(dump, width, height, 1, image_phash),
-        PITH_LAYOUT_GRAY16 => hash_16::<Gray, _>(dump, width, height, 1, image_phash),
-        PITH_LAYOUT_RGB8 => hash_8::<Rgb, _>(dump, width, height, 3, image_phash),
-        PITH_LAYOUT_RGB16 => hash_16::<Rgb, _>(dump, width, height, 3, image_phash),
-        PITH_LAYOUT_RGBA8 => hash_8::<Rgba, _>(dump, width, height, 4, image_phash),
+        PITH_LAYOUT_GRAY8 => hash_8::<Gray, _>(dump, width, height, 1, image_phash_imagehash),
+        PITH_LAYOUT_GRAY16 => hash_16::<Gray, _>(dump, width, height, 1, image_phash_imagehash),
+        PITH_LAYOUT_RGB8 => hash_8::<Rgb, _>(dump, width, height, 3, image_phash_imagehash),
+        PITH_LAYOUT_RGB16 => hash_16::<Rgb, _>(dump, width, height, 3, image_phash_imagehash),
+        PITH_LAYOUT_RGBA8 => hash_8::<Rgba, _>(dump, width, height, 4, image_phash_imagehash),
         _ => Err(PITH_E_INVALID),
     }
 }
@@ -840,25 +836,25 @@ mod tests {
     use crate::reference::RawLayout;
 
     /// The committed fixtures: (name, layout, width, height, expected).
-    /// These are the nine oracle vectors of `reference.json`; the SDK
-    /// conformance suites replay them through the FFI against the
-    /// fixture files, this test pins three of them (one per sample
-    /// width and channel count class) byte-exactly in-tree.
+    /// Three of the nine `reference.json` fixture dumps (one per sample
+    /// width and channel count class), hashed by `imagehash.phash` 4.3.2
+    /// (Pillow 13.0.0); the 16-bit fixture is first reduced with `>> 8`,
+    /// the documented 16-bit rule of the facade.
     const PINNED: &[(&str, RawLayout, u32, u32, u64)] = &[
-        ("base_444", RawLayout::Rgb8, 32, 24, 0x8d0a_3f41_1ee5_0f7a),
+        ("base_444", RawLayout::Rgb8, 32, 24, 0x858a_3f41_1ef5_0f78),
         (
             "phash_gray16_36x28",
             RawLayout::Gray16,
             36,
             28,
-            0xd386_0405_6df8_c37f,
+            0xd386_0541_67f9_c277,
         ),
         (
             "phash_rgba8_48x40",
             RawLayout::Rgba8,
             48,
             40,
-            0x8433_4f9d_2c5a_f4a9,
+            0x8433_679d_2c5a_76a9,
         ),
     ];
 
@@ -977,6 +973,6 @@ mod tests {
         let dump = vec![7u8; 4 * 4];
         let via_core = phash_of_dump(&dump, 4, 4, PITH_LAYOUT_GRAY8).expect("hash");
         let img = Image::<Gray, u8>::from_vec(4, 4, dump).expect("image");
-        assert_eq!(via_core, image_phash(&img).expect("pipeline"));
+        assert_eq!(via_core, image_phash_imagehash(&img).expect("pipeline"));
     }
 }

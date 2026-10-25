@@ -61,3 +61,18 @@ All 45 reference vectors defined in `reference.json` are executed across all fou
 | **Locality Sensitive Hash**| TrendMicro TLSH (2013) | Full bit-exact | Official TrendMicro TLSH test suite vectors |
 | **Container Standards** | POSIX.1-1988 (USTAR), POSIX.1-2001 (PAX) | Full compliance | Path traversal protection, long names |
 | **Archive Standards** | ZIP Format Specification / ZIP64 | Full compliance | Zip64 extra field 0x0001, EOCD64 |
+
+---
+
+## 4. Image Hash Parity With `imagehash` / Pillow
+
+`sillstone_image_{a,d,p,w,color}hash` (and every SDK facade over them) reproduce `imagehash` 4.3.2 on Pillow 13.0.0 bit for bit:
+
+- `Image.convert("L")` is the fixed-point luma `(19595 R + 38470 G + 7471 B + 0x8000) >> 16`; `convert("HSV")` mirrors `rgb2hsv_row`.
+- `Image.resize(.., LANCZOS)` is Pillow's separable convolution: `f64` coefficients per output pixel, `PRECISION_BITS = 22` fixed point, an 8-bit intermediate between the two passes, and the pass order of `ImagingResampleInner` (vertical first when the height shrinks by more than twice the width). Bilinear, bicubic and nearest (affine, accumulated centre) are exact too; box stays an integer box average.
+- `whash` replays `pywt`'s Haar `wavedec2`/`waverec2` operation for operation in `f64` (verified bitwise against `pywt`), so ties at the median resolve as in the reference.
+- Parameters: `whash` `level` is `log2(image_scale)` (`0` = imagehash default, else `3..=15`); `colorhash` `bins` is `binbits` (`0` = default `3`, else `1..=4`). Bit order is row-major, MSB first.
+
+Measured against a live `imagehash` (`sdk/python/tests/test_imagehash_parity.py`, plus a 500-image / 2500-hash sweep over noise, gradient, block, flat and smooth content in Gray/RGB/RGBA, sizes from 1 px to 700 px): `ahash`, `dhash`, `whash`, `colorhash` Hamming 0 in all cases; resize identical to Pillow in 1600/1600 random cases.
+
+**Limit — `phash` on exactly rank-deficient content.** `imagehash.phash` thresholds the 8x8 low-frequency DCT block at its median. When the true coefficients are exactly zero (flat image, rows or columns that repeat after the 32x32 resize, perfectly symmetric block patterns) the bits come from `scipy.fftpack.dct` rounding noise. Our DCT sums in a fixed order and cannot reproduce another FFT's noise. In the sweep, 167 of 500 `phash` values differed, all from such content (images narrower or shorter than 32 px, which are upscaled from a single repeated row/column, and synthetic 16-px block images); every `phash` of noise, smooth or gradient content of at least 32x32 px matched. RGBA is filtered per channel without premultiplying alpha, as `convert("L")` drops it first.

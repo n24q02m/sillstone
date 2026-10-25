@@ -53,13 +53,25 @@ fn filter_weight(f: ResamplingFilter, x: f64) -> f64 {
     let x = x.abs();
     match f {
         ResamplingFilter::Nearest => {
-            if x < 0.5 { 1.0 } else { 0.0 }
+            if x < 0.5 {
+                1.0
+            } else {
+                0.0
+            }
         }
         ResamplingFilter::Box => {
-            if x < 0.5 { 1.0 } else { 0.0 }
+            if x < 0.5 {
+                1.0
+            } else {
+                0.0
+            }
         }
         ResamplingFilter::Bilinear => {
-            if x < 1.0 { 1.0 - x } else { 0.0 }
+            if x < 1.0 {
+                1.0 - x
+            } else {
+                0.0
+            }
         }
         ResamplingFilter::Bicubic => {
             // Catmull-Rom spline (a = -0.5)
@@ -101,7 +113,11 @@ struct FilterWeights {
     entries: Vec<Contribution>,
 }
 
-fn compute_weights(in_size: usize, out_size: usize, filter: ResamplingFilter) -> Vec<FilterWeights> {
+fn compute_weights(
+    in_size: usize,
+    out_size: usize,
+    filter: ResamplingFilter,
+) -> Vec<FilterWeights> {
     let scale = out_size as f64 / in_size as f64;
     let (filter_scale, radius) = if scale < 1.0 {
         // Downsampling: stretch filter
@@ -124,7 +140,10 @@ fn compute_weights(in_size: usize, out_size: usize, filter: ResamplingFilter) ->
             let w = filter_weight(filter, dist);
             if w != 0.0 {
                 sum += w;
-                entries.push(Contribution { pixel: in_idx, weight: w });
+                entries.push(Contribution {
+                    pixel: in_idx,
+                    weight: w,
+                });
             }
         }
 
@@ -139,9 +158,7 @@ fn compute_weights(in_size: usize, out_size: usize, filter: ResamplingFilter) ->
             }
         }
 
-        weights.push(FilterWeights {
-            entries,
-        });
+        weights.push(FilterWeights { entries });
     }
     weights
 }
@@ -203,6 +220,12 @@ pub fn box_average<L: Layout, T: Sample>(
 
 /// General-purpose multi-algorithm 2-pass separable image resizer.
 ///
+/// 8-bit rasters (`Gray`/`Rgb`/`Rgba` over `u8`) reproduce Pillow's
+/// `Image.resize` bit for bit for `Nearest`, `Bilinear`, `Bicubic` and
+/// `Lanczos` (RGBA is filtered per channel, without premultiplying
+/// alpha); `Box` is the integer area average of [`box_average`]. Wider
+/// samples use a floating-point convolution.
+///
 /// Supports [`ResamplingFilter::Nearest`], [`ResamplingFilter::Box`],
 /// [`ResamplingFilter::Bilinear`], [`ResamplingFilter::Bicubic`], and
 /// [`ResamplingFilter::Lanczos`].
@@ -232,6 +255,18 @@ pub fn resize<L: Layout, T: Sample>(
 
     let src = img.as_slice();
 
+    // 8-bit rasters take the Pillow-exact fixed-point path.
+    if T::MAX_U64 == 255 {
+        let bytes: Vec<u8> = src.iter().map(|v| v.to_u64() as u8).collect();
+        let out = super::pillow::resize_u8(&bytes, in_w, in_h, c, out_w_usize, out_h_usize, filter);
+        return Image::from_vec(
+            out_w,
+            out_h,
+            out.into_iter().map(|v| T::from_u64(u64::from(v))).collect(),
+        );
+    }
+
+    // Wider samples: floating-point separable convolution.
     // Pass 1: Horizontal resize (in_w, in_h) -> (out_w, in_h)
     let h_weights = compute_weights(in_w, out_w_usize, filter);
     let mut intermediate = vec![0.0f64; out_w_usize * in_h * c];

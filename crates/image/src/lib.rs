@@ -34,12 +34,10 @@
 // their `alloc`-only buffer code unchanged.
 extern crate alloc;
 
-pub mod ahash;
-pub mod colorhash;
-pub mod dhash;
 pub mod bmp;
 pub mod ffi;
 pub mod filter;
+pub mod imagehash;
 pub mod qoi_codec;
 // The Java SDK's native-method surface: `Java_hash_sillstone_image_*`
 // exports that forward to the C ABI above. Compiled out of the unit
@@ -54,16 +52,16 @@ pub mod phash;
 pub mod raster;
 pub mod reference;
 pub mod tier3;
-pub mod whash;
 pub mod transform;
 
-pub use ahash::image_ahash;
-pub use colorhash::image_colorhash;
-pub use dhash::image_dhash;
-pub use phash::image_phash;
-pub use whash::image_whash;
-pub use raster::{ResamplingFilter, resize};
-pub use filter::{BuiltinFilter, adjust_brightness, apply_filter, convolve_3x3, gaussian_blur, invert};
-pub use transform::{TransposeMethod, crop, rotate, transpose};
 pub use bmp::{decode as decode_bmp, encode_bmp_rgb, encode_bmp_rgba};
+pub use filter::{
+    BuiltinFilter, adjust_brightness, apply_filter, convolve_3x3, gaussian_blur, invert,
+};
+pub use imagehash::{
+    image_ahash, image_colorhash, image_dhash, image_phash_imagehash, image_whash,
+};
+pub use phash::image_phash;
 pub use qoi_codec::{qoi_decode_rgb, qoi_decode_rgba, qoi_encode_rgb, qoi_encode_rgba};
+pub use raster::{ResamplingFilter, resize};
+pub use transform::{TransposeMethod, crop, rotate, transpose};

@@ -18,6 +18,7 @@
 
 mod color;
 mod exif;
+mod pillow;
 // `raster::raster` keeps the upstream file naming (`modhash-raster`'s
 // buffer module of the same name); the nesting is intentional.
 #[allow(clippy::module_inception)]
@@ -29,5 +30,6 @@ pub use self::color::{
     yuv420p_to_rgb_pixel,
 };
 pub use self::exif::apply_orientation;
+pub use self::pillow::{resize_u8, rgb_to_hsv, rgb_to_l};
 pub use self::raster::{Cmyk, Gray, Image, La, Layout, MAX_BUFFER_BYTES, Rgb, Rgba, Sample};
 pub use self::resample::{ResamplingFilter, box_average, resize};

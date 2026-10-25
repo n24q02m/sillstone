@@ -206,7 +206,7 @@ fn jni_phash_matches_the_pinned_oracle() {
         (hash, read_status(slot))
     });
     assert_eq!(status, 0, "status");
-    assert_eq!(hash as u64, 0x8d0a_3f41_1ee5_0f7a, "hash");
+    assert_eq!(hash as u64, 0x858a_3f41_1ef5_0f78, "hash");
 }
 
 #[test]

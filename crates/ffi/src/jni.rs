@@ -412,7 +412,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1imag
             width as u32,
             height as u32,
             layout as u32,
-            3,
+            0,
             &mut out,
         )
     };
@@ -441,7 +441,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1imag
             width as u32,
             height as u32,
             layout as u32,
-            4,
+            3,
             &mut out,
         )
     };

@@ -370,7 +370,7 @@ static napi_value n_sillstone_image_whash(napi_env env, napi_callback_info info)
     if (argc > 2) napi_get_value_uint32(env, args[2], &height);
     if (argc > 3) napi_get_value_uint32(env, args[3], &layout);
     uint64_t hash_val = 0;
-    int32_t status = sillstone_image_whash((const uint8_t*)data, length, width, height, layout, 3, &hash_val);
+    int32_t status = sillstone_image_whash((const uint8_t*)data, length, width, height, layout, 0, &hash_val);
     if (status != 0) { napi_throw_error(env, NULL, "image hash failed"); return NULL; }
     napi_value result;
     napi_create_bigint_uint64(env, hash_val, &result);
@@ -388,7 +388,7 @@ static napi_value n_sillstone_image_colorhash(napi_env env, napi_callback_info i
     if (argc > 2) napi_get_value_uint32(env, args[2], &height);
     if (argc > 3) napi_get_value_uint32(env, args[3], &layout);
     uint64_t hash_val = 0;
-    int32_t status = sillstone_image_colorhash((const uint8_t*)data, length, width, height, layout, 4, &hash_val);
+    int32_t status = sillstone_image_colorhash((const uint8_t*)data, length, width, height, layout, 3, &hash_val);
     if (status != 0) { napi_throw_error(env, NULL, "image hash failed"); return NULL; }
     napi_value result;
     napi_create_bigint_uint64(env, hash_val, &result);

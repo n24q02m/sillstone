@@ -161,10 +161,19 @@ fn gen_python(fns: &[Function]) -> String {
     out.push_str("    return None\n\n");
     out.push_str("LIB = _load_lib()\n\n");
 
+    // Bind every symbol once at import: per-call `getattr` plus
+    // `restype`/`argtypes` assignment dominated small-input latency.
+    out.push_str("def _bind(name, restype, argtypes):\n");
+    out.push_str("    if LIB is None:\n");
+    out.push_str("        def _missing(*args):\n");
+    out.push_str("            raise RuntimeError('sillstone_ffi library not loaded')\n");
+    out.push_str("        return _missing\n");
+    out.push_str("    fn = getattr(LIB, name)\n");
+    out.push_str("    fn.restype = restype\n");
+    out.push_str("    fn.argtypes = argtypes\n");
+    out.push_str("    return fn\n\n");
+
     for f in fns {
-        out.push_str(&format!("def {}_raw(*args):\n", f.name));
-        out.push_str("    if LIB is None:\n        raise RuntimeError('sillstone_ffi library not loaded')\n");
-        out.push_str(&format!("    fn = getattr(LIB, '{}')\n", f.name));
         let py_ret = match f.ret.as_str() {
             "u32" => "ctypes.c_uint32",
             "u64" => "ctypes.c_uint64",
@@ -172,7 +181,6 @@ fn gen_python(fns: &[Function]) -> String {
             "usize" => "ctypes.c_size_t",
             _ => "None",
         };
-        out.push_str(&format!("    fn.restype = {py_ret}\n"));
         let py_args: Vec<&str> = f
             .args
             .iter()
@@ -193,8 +201,12 @@ fn gen_python(fns: &[Function]) -> String {
                 _ => "ctypes.c_void_p",
             })
             .collect();
-        out.push_str(&format!("    fn.argtypes = [{}]\n", py_args.join(", ")));
-        out.push_str("    return fn(*args)\n\n");
+        out.push_str(&format!(
+            "{}_raw = _bind('{}', {py_ret}, [{}])\n\n",
+            f.name,
+            f.name,
+            py_args.join(", ")
+        ));
     }
 
     out
@@ -256,12 +268,12 @@ fn gen_go(fns: &[Function]) -> String {
             if f.name == "sillstone_image_whash" {
                 out.push_str(&format!("func {go_name}(data []byte, width uint32, height uint32, layout uint32) uint64 {{\n"));
                 out.push_str("    var out C.uint64_t\n    var ptr *C.uint8_t\n    if len(data) > 0 { ptr = (*C.uint8_t)(unsafe.Pointer(&data[0])) }\n");
-                out.push_str("    C.sillstone_image_whash(ptr, C.size_t(len(data)), C.uint32_t(width), C.uint32_t(height), C.uint32_t(layout), 3, &out)\n");
+                out.push_str("    C.sillstone_image_whash(ptr, C.size_t(len(data)), C.uint32_t(width), C.uint32_t(height), C.uint32_t(layout), 0, &out)\n");
                 out.push_str("    return uint64(out)\n}\n\n");
             } else if f.name == "sillstone_image_colorhash" {
                 out.push_str(&format!("func {go_name}(data []byte, width uint32, height uint32, layout uint32) uint64 {{\n"));
                 out.push_str("    var out C.uint64_t\n    var ptr *C.uint8_t\n    if len(data) > 0 { ptr = (*C.uint8_t)(unsafe.Pointer(&data[0])) }\n");
-                out.push_str("    C.sillstone_image_colorhash(ptr, C.size_t(len(data)), C.uint32_t(width), C.uint32_t(height), C.uint32_t(layout), 4, &out)\n");
+                out.push_str("    C.sillstone_image_colorhash(ptr, C.size_t(len(data)), C.uint32_t(width), C.uint32_t(height), C.uint32_t(layout), 3, &out)\n");
                 out.push_str("    return uint64(out)\n}\n\n");
             } else {
                 out.push_str(&format!("func {go_name}(data []byte, width uint32, height uint32, layout uint32) uint64 {{\n"));
@@ -491,9 +503,9 @@ fn gen_node_napi(fns: &[Function]) -> String {
             out.push_str("    if (argc > 3) napi_get_value_uint32(env, args[3], &layout);\n");
             out.push_str("    uint64_t hash_val = 0;\n");
             if f.name == "sillstone_image_whash" {
-                out.push_str("    int32_t status = sillstone_image_whash((const uint8_t*)data, length, width, height, layout, 3, &hash_val);\n");
+                out.push_str("    int32_t status = sillstone_image_whash((const uint8_t*)data, length, width, height, layout, 0, &hash_val);\n");
             } else if f.name == "sillstone_image_colorhash" {
-                out.push_str("    int32_t status = sillstone_image_colorhash((const uint8_t*)data, length, width, height, layout, 4, &hash_val);\n");
+                out.push_str("    int32_t status = sillstone_image_colorhash((const uint8_t*)data, length, width, height, layout, 3, &hash_val);\n");
             } else {
                 out.push_str(&format!("    int32_t status = {}((const uint8_t*)data, length, width, height, layout, &hash_val);\n", f.name));
             }

@@ -360,7 +360,7 @@ class Image:
 
     # Perceptual hash convenience methods on the Image instance
     def phash(self) -> int:
-        """Computes 64-bit perceptual hash (pHash)."""
+        """64-bit pHash, bit-exact with `imagehash.phash`."""
         layout = MODE_TO_LAYOUT[self._mode]
         out = ctypes.c_uint64()
         status = sillstone_image_phash_raw(self._data, len(self._data), self._width, self._height, layout, ctypes.byref(out))
@@ -386,8 +386,8 @@ class Image:
             raise RuntimeError(f"dHash failed with status {status}")
         return out.value
 
-    def whash(self, level: int = 3) -> int:
-        """Computes 64-bit wavelet hash (wHash)."""
+    def whash(self, level: int = 0) -> int:
+        """64-bit wHash, bit-exact with `imagehash.whash`; `level` = log2(image_scale), 0 = default."""
         layout = MODE_TO_LAYOUT[self._mode]
         out = ctypes.c_uint64()
         status = sillstone_image_whash_raw(self._data, len(self._data), self._width, self._height, layout, level, ctypes.byref(out))
@@ -395,8 +395,8 @@ class Image:
             raise RuntimeError(f"wHash failed with status {status}")
         return out.value
 
-    def colorhash(self, bins: int = 4) -> int:
-        """Computes 64-bit color distribution hash."""
+    def colorhash(self, bins: int = 3) -> int:
+        """64-bit colorhash, bit-exact with `imagehash.colorhash(binbits=bins)`."""
         layout = MODE_TO_LAYOUT[self._mode]
         out = ctypes.c_uint64()
         status = sillstone_image_colorhash_raw(self._data, len(self._data), self._width, self._height, layout, bins, ctypes.byref(out))

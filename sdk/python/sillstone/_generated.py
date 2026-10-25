@@ -20,307 +20,89 @@ def _load_lib():
 
 LIB = _load_lib()
 
-def sillstone_version_major_raw(*args):
+def _bind(name, restype, argtypes):
     if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_version_major')
-    fn.restype = ctypes.c_uint32
-    fn.argtypes = []
-    return fn(*args)
+        def _missing(*args):
+            raise RuntimeError('sillstone_ffi library not loaded')
+        return _missing
+    fn = getattr(LIB, name)
+    fn.restype = restype
+    fn.argtypes = argtypes
+    return fn
 
-def sillstone_version_minor_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_version_minor')
-    fn.restype = ctypes.c_uint32
-    fn.argtypes = []
-    return fn(*args)
+sillstone_version_major_raw = _bind('sillstone_version_major', ctypes.c_uint32, [])
 
-def sillstone_version_patch_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_version_patch')
-    fn.restype = ctypes.c_uint32
-    fn.argtypes = []
-    return fn(*args)
+sillstone_version_minor_raw = _bind('sillstone_version_minor', ctypes.c_uint32, [])
 
-def sillstone_buffer_checksum_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_buffer_checksum')
-    fn.restype = ctypes.c_uint64
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
-    return fn(*args)
+sillstone_version_patch_raw = _bind('sillstone_version_patch', ctypes.c_uint32, [])
 
-def sillstone_digest_sha256_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_digest_sha256')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p]
-    return fn(*args)
+sillstone_buffer_checksum_raw = _bind('sillstone_buffer_checksum', ctypes.c_uint64, [ctypes.c_void_p, ctypes.c_size_t])
 
-def sillstone_digest_sha3_256_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_digest_sha3_256')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p]
-    return fn(*args)
+sillstone_digest_sha256_raw = _bind('sillstone_digest_sha256', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p])
 
-def sillstone_digest_sha3_512_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_digest_sha3_512')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p]
-    return fn(*args)
+sillstone_digest_sha3_256_raw = _bind('sillstone_digest_sha3_256', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p])
 
-def sillstone_digest_blake2b_512_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_digest_blake2b_512')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p]
-    return fn(*args)
+sillstone_digest_sha3_512_raw = _bind('sillstone_digest_sha3_512', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p])
 
-def sillstone_digest_blake3_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_digest_blake3')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p]
-    return fn(*args)
+sillstone_digest_blake2b_512_raw = _bind('sillstone_digest_blake2b_512', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p])
 
-def sillstone_math_dst1_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_math_dst1')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.POINTER(ctypes.c_double), ctypes.c_size_t, ctypes.POINTER(ctypes.c_double)]
-    return fn(*args)
+sillstone_digest_blake3_raw = _bind('sillstone_digest_blake3', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p])
 
-def sillstone_math_dst2_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_math_dst2')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.POINTER(ctypes.c_double), ctypes.c_size_t, ctypes.POINTER(ctypes.c_double)]
-    return fn(*args)
+sillstone_math_dst1_raw = _bind('sillstone_math_dst1', ctypes.c_int32, [ctypes.POINTER(ctypes.c_double), ctypes.c_size_t, ctypes.POINTER(ctypes.c_double)])
 
-def sillstone_math_dst3_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_math_dst3')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.POINTER(ctypes.c_double), ctypes.c_size_t, ctypes.POINTER(ctypes.c_double)]
-    return fn(*args)
+sillstone_math_dst2_raw = _bind('sillstone_math_dst2', ctypes.c_int32, [ctypes.POINTER(ctypes.c_double), ctypes.c_size_t, ctypes.POINTER(ctypes.c_double)])
 
-def sillstone_unicode_grapheme_count_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_unicode_grapheme_count')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t)]
-    return fn(*args)
+sillstone_math_dst3_raw = _bind('sillstone_math_dst3', ctypes.c_int32, [ctypes.POINTER(ctypes.c_double), ctypes.c_size_t, ctypes.POINTER(ctypes.c_double)])
 
-def sillstone_unicode_char_category_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_unicode_char_category')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_uint32, ctypes.c_void_p]
-    return fn(*args)
+sillstone_unicode_grapheme_count_raw = _bind('sillstone_unicode_grapheme_count', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t)])
 
-def sillstone_curator_detect_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_curator_detect')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_uint32)]
-    return fn(*args)
+sillstone_unicode_char_category_raw = _bind('sillstone_unicode_char_category', ctypes.c_int32, [ctypes.c_uint32, ctypes.c_void_p])
 
-def sillstone_curator_content_hash_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_curator_content_hash')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t)]
-    return fn(*args)
+sillstone_curator_detect_raw = _bind('sillstone_curator_detect', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_uint32)])
 
-def sillstone_curator_signature_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_curator_signature')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_size_t)]
-    return fn(*args)
+sillstone_curator_content_hash_raw = _bind('sillstone_curator_content_hash', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t)])
 
-def sillstone_curator_describe_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_curator_describe')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_size_t)]
-    return fn(*args)
+sillstone_curator_signature_raw = _bind('sillstone_curator_signature', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_size_t)])
 
-def sillstone_curator_match_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_curator_match')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_uint64), ctypes.c_size_t, ctypes.POINTER(ctypes.c_uint32)]
-    return fn(*args)
+sillstone_curator_describe_raw = _bind('sillstone_curator_describe', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_size_t)])
 
-def sillstone_curator_free_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_curator_free')
-    fn.restype = None
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
-    return fn(*args)
+sillstone_curator_match_raw = _bind('sillstone_curator_match', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_uint64), ctypes.c_size_t, ctypes.POINTER(ctypes.c_uint32)])
 
-def sillstone_image_phash_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_image_phash')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.POINTER(ctypes.c_uint64)]
-    return fn(*args)
+sillstone_curator_free_raw = _bind('sillstone_curator_free', None, [ctypes.c_void_p, ctypes.c_size_t])
 
-def sillstone_image_ahash_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_image_ahash')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.POINTER(ctypes.c_uint64)]
-    return fn(*args)
+sillstone_image_phash_raw = _bind('sillstone_image_phash', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.POINTER(ctypes.c_uint64)])
 
-def sillstone_image_dhash_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_image_dhash')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.POINTER(ctypes.c_uint64)]
-    return fn(*args)
+sillstone_image_ahash_raw = _bind('sillstone_image_ahash', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.POINTER(ctypes.c_uint64)])
 
-def sillstone_image_whash_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_image_whash')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.POINTER(ctypes.c_uint64)]
-    return fn(*args)
+sillstone_image_dhash_raw = _bind('sillstone_image_dhash', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.POINTER(ctypes.c_uint64)])
 
-def sillstone_image_colorhash_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_image_colorhash')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.POINTER(ctypes.c_uint64)]
-    return fn(*args)
+sillstone_image_whash_raw = _bind('sillstone_image_whash', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.POINTER(ctypes.c_uint64)])
 
-def sillstone_image_resize_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_image_resize')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_size_t]
-    return fn(*args)
+sillstone_image_colorhash_raw = _bind('sillstone_image_colorhash', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.POINTER(ctypes.c_uint64)])
 
-def sillstone_image_crop_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_image_crop')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_size_t]
-    return fn(*args)
+sillstone_image_resize_raw = _bind('sillstone_image_resize', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_size_t])
 
-def sillstone_image_transpose_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_image_transpose')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_size_t]
-    return fn(*args)
+sillstone_image_crop_raw = _bind('sillstone_image_crop', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_size_t])
 
-def sillstone_image_rotate_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_image_rotate')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_double, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_size_t]
-    return fn(*args)
+sillstone_image_transpose_raw = _bind('sillstone_image_transpose', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_size_t])
 
-def sillstone_image_filter_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_image_filter')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_size_t]
-    return fn(*args)
+sillstone_image_rotate_raw = _bind('sillstone_image_rotate', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_double, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_size_t])
 
-def sillstone_image_adjust_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_image_adjust')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_double, ctypes.c_void_p, ctypes.c_size_t]
-    return fn(*args)
+sillstone_image_filter_raw = _bind('sillstone_image_filter', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_size_t])
 
-def sillstone_image_color_convert_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_image_color_convert')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_size_t]
-    return fn(*args)
+sillstone_image_adjust_raw = _bind('sillstone_image_adjust', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_double, ctypes.c_void_p, ctypes.c_size_t])
 
-def sillstone_image_qoi_encode_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_image_qoi_encode')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_size_t)]
-    return fn(*args)
+sillstone_image_color_convert_raw = _bind('sillstone_image_color_convert', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_size_t])
 
-def sillstone_image_qoi_decode_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_image_qoi_decode')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_size_t)]
-    return fn(*args)
+sillstone_image_qoi_encode_raw = _bind('sillstone_image_qoi_encode', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_size_t)])
 
-def sillstone_image_bmp_encode_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_image_bmp_encode')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_size_t)]
-    return fn(*args)
+sillstone_image_qoi_decode_raw = _bind('sillstone_image_qoi_decode', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_uint32), ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_size_t)])
 
-def sillstone_image_free_bytes_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_image_free_bytes')
-    fn.restype = None
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
-    return fn(*args)
+sillstone_image_bmp_encode_raw = _bind('sillstone_image_bmp_encode', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32, ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_size_t)])
 
-def sillstone_text_tlsh_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_text_tlsh')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p]
-    return fn(*args)
+sillstone_image_free_bytes_raw = _bind('sillstone_image_free_bytes', None, [ctypes.c_void_p, ctypes.c_size_t])
 
-def sillstone_text_tlsh_distance_raw(*args):
-    if LIB is None:
-        raise RuntimeError('sillstone_ffi library not loaded')
-    fn = getattr(LIB, 'sillstone_text_tlsh_distance')
-    fn.restype = ctypes.c_int32
-    fn.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint32)]
-    return fn(*args)
+sillstone_text_tlsh_raw = _bind('sillstone_text_tlsh', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p])
+
+sillstone_text_tlsh_distance_raw = _bind('sillstone_text_tlsh_distance', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint32)])
 

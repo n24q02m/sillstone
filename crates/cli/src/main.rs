@@ -425,11 +425,11 @@ fn cmd_image(args: &[String]) -> u8 {
 
     let alg = o.alg.as_deref().unwrap_or("phash");
     let hash_val: Result<u64, sillstone_digest::Error> = match alg {
-        "phash" => sillstone_image::image_phash(&img),
+        "phash" => sillstone_image::image_phash_imagehash(&img),
         "ahash" => sillstone_image::image_ahash(&img),
         "dhash" => sillstone_image::image_dhash(&img),
-        "whash" => sillstone_image::image_whash(&img, 1),
-        "colorhash" | "color-hash" => sillstone_image::image_colorhash(&img, 4),
+        "whash" => sillstone_image::image_whash(&img, 0),
+        "colorhash" | "color-hash" => sillstone_image::image_colorhash(&img, 3),
         other => {
             eprintln!("pith image: unknown algorithm `{other}`");
             return USAGE;

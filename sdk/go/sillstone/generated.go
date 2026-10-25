@@ -211,7 +211,7 @@ func SillstoneImageWhash(data []byte, width uint32, height uint32, layout uint32
     var out C.uint64_t
     var ptr *C.uint8_t
     if len(data) > 0 { ptr = (*C.uint8_t)(unsafe.Pointer(&data[0])) }
-    C.sillstone_image_whash(ptr, C.size_t(len(data)), C.uint32_t(width), C.uint32_t(height), C.uint32_t(layout), 3, &out)
+    C.sillstone_image_whash(ptr, C.size_t(len(data)), C.uint32_t(width), C.uint32_t(height), C.uint32_t(layout), 0, &out)
     return uint64(out)
 }
 
@@ -219,7 +219,7 @@ func SillstoneImageColorhash(data []byte, width uint32, height uint32, layout ui
     var out C.uint64_t
     var ptr *C.uint8_t
     if len(data) > 0 { ptr = (*C.uint8_t)(unsafe.Pointer(&data[0])) }
-    C.sillstone_image_colorhash(ptr, C.size_t(len(data)), C.uint32_t(width), C.uint32_t(height), C.uint32_t(layout), 4, &out)
+    C.sillstone_image_colorhash(ptr, C.size_t(len(data)), C.uint32_t(width), C.uint32_t(height), C.uint32_t(layout), 3, &out)
     return uint64(out)
 }
 
