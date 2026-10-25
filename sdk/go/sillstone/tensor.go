@@ -2,6 +2,8 @@ package sillstone
 
 import (
 	"errors"
+	"fmt"
+	"unsafe"
 )
 
 // Tensor represents an N-dimensional strided array of float64 elements.
@@ -48,16 +50,36 @@ func (t *Tensor) Reshape(newShape []int) (*Tensor, error) {
 	return NewTensor(newShape, t.Data)
 }
 
-// Sum returns total sum of all elements.
+// Sum returns the total of all elements, computed by the native core.
 func (t *Tensor) Sum() float64 {
-	acc := 0.0
-	for _, v := range t.Data {
-		acc += v
+	var out float64
+	if len(t.Data) == 0 {
+		return 0
 	}
-	return acc
+	SillstoneTensorSumF64(unsafe.Pointer(&t.Data[0]), uint64(len(t.Data)), unsafe.Pointer(&out))
+	return out
 }
 
-// Matmul performs 2D matrix multiplication.
+// Add returns the element-wise sum of two tensors of the same shape.
+func (t *Tensor) Add(other *Tensor) (*Tensor, error) {
+	if len(t.Shape) != len(other.Shape) {
+		return nil, errors.New("add requires identical shapes")
+	}
+	for i, d := range t.Shape {
+		if d != other.Shape[i] {
+			return nil, errors.New("add requires identical shapes")
+		}
+	}
+	out := make([]float64, len(t.Data))
+	if len(out) > 0 {
+		if status := SillstoneTensorAddF64(unsafe.Pointer(&t.Data[0]), unsafe.Pointer(&other.Data[0]), uint64(len(out)), unsafe.Pointer(&out[0])); status != 0 {
+			return nil, fmt.Errorf("sillstone: tensor add failed (status %d)", status)
+		}
+	}
+	return NewTensor(t.Shape, out)
+}
+
+// Matmul performs 2D matrix multiplication in the native core.
 func (t *Tensor) Matmul(other *Tensor) (*Tensor, error) {
 	if t.Ndim() != 2 || other.Ndim() != 2 {
 		return nil, errors.New("matmul requires 2D tensors")
@@ -67,15 +89,11 @@ func (t *Tensor) Matmul(other *Tensor) (*Tensor, error) {
 	if k1 != k2 {
 		return nil, errors.New("inner dimensions must match for matmul")
 	}
-
 	out := make([]float64, m*n)
-	for i := 0; i < m; i++ {
-		for j := 0; j < n; j++ {
-			acc := 0.0
-			for p := 0; p < k1; p++ {
-				acc += t.Data[i*k1+p] * other.Data[p*n+j]
-			}
-			out[i*n+j] = acc
+	if len(out) > 0 && k1 > 0 {
+		status := SillstoneTensorMatmulF64(unsafe.Pointer(&t.Data[0]), uint64(m), uint64(k1), unsafe.Pointer(&other.Data[0]), uint64(k2), uint64(n), unsafe.Pointer(&out[0]))
+		if status != 0 {
+			return nil, fmt.Errorf("sillstone: tensor matmul failed (status %d)", status)
 		}
 	}
 	return NewTensor([]int{m, n}, out)
