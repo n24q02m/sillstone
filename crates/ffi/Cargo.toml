@@ -19,11 +19,11 @@ missing_docs = "deny"
 rust_2018_idioms = { level = "deny", priority = -1 }
 
 [dependencies]
-sillstone-buffer = { version = "0.3.0-beta.1", path = "../buffer" }
-sillstone-digest = { version = "0.3.0-beta.1", path = "../digest" }
-sillstone-math = { version = "0.3.0-beta.1", path = "../math" }
-sillstone-unicode = { version = "0.3.0-beta.1", path = "../unicode" }
-sillstone-curator = { version = "0.3.0-beta.1", path = "../curator" }
-sillstone-image = { version = "0.3.0-beta.1", path = "../image" }
-sillstone-text = { version = "0.3.0-beta.1", path = "../text" }
-sillstone-tensor = { version = "0.3.0-beta.1", path = "../tensor" }
+sillstone-buffer = { version = "0.3.0-beta.2", path = "../buffer" }
+sillstone-digest = { version = "0.3.0-beta.2", path = "../digest" }
+sillstone-math = { version = "0.3.0-beta.2", path = "../math" }
+sillstone-unicode = { version = "0.3.0-beta.2", path = "../unicode" }
+sillstone-curator = { version = "0.3.0-beta.2", path = "../curator" }
+sillstone-image = { version = "0.3.0-beta.2", path = "../image" }
+sillstone-text = { version = "0.3.0-beta.2", path = "../text" }
+sillstone-tensor = { version = "0.3.0-beta.2", path = "../tensor" }

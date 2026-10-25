@@ -14,7 +14,7 @@ on:
         description: "Expected version to publish (e.g. 0.2.1)"
         required: false
         type: string
-        default: "0.3.0-beta.1"
+        default: "0.3.0-beta.2"
 
 env:
   RELEASE_TYPE: ${{ inputs.release_type }}

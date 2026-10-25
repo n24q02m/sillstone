@@ -35,63 +35,63 @@ workspace = true
 workspace = true
 
 [dependencies.sillstone-digest]
-version = "0.3.0-beta.1"
+version = "0.3.0-beta.2"
 path = "../digest"
 
 [dependencies.sillstone-math]
-version = "0.3.0-beta.1"
+version = "0.3.0-beta.2"
 path = "../math"
 
 [dependencies.sillstone-image]
-version = "0.3.0-beta.1"
+version = "0.3.0-beta.2"
 path = "../image"
 
 [dependencies.sillstone-png]
-version = "0.3.0-beta.1"
+version = "0.3.0-beta.2"
 path = "../png"
 
 [dependencies.sillstone-jpeg]
-version = "0.3.0-beta.1"
+version = "0.3.0-beta.2"
 path = "../jpeg"
 
 [dependencies.sillstone-qoi]
-version = "0.3.0-beta.1"
+version = "0.3.0-beta.2"
 path = "../qoi"
 
 [dependencies.sillstone-text]
-version = "0.3.0-beta.1"
+version = "0.3.0-beta.2"
 path = "../text"
 
 [dependencies.sillstone-audio]
-version = "0.3.0-beta.1"
+version = "0.3.0-beta.2"
 path = "../audio"
 
 [dependencies.sillstone-flac]
-version = "0.3.0-beta.1"
+version = "0.3.0-beta.2"
 path = "../flac"
 
 [dependencies.sillstone-mp3]
-version = "0.3.0-beta.1"
+version = "0.3.0-beta.2"
 path = "../mp3"
 
 [dependencies.sillstone-mp4]
-version = "0.3.0-beta.1"
+version = "0.3.0-beta.2"
 path = "../mp4"
 
 [dependencies.sillstone-h264]
-version = "0.3.0-beta.1"
+version = "0.3.0-beta.2"
 path = "../h264"
 
 [dependencies.sillstone-video]
-version = "0.3.0-beta.1"
+version = "0.3.0-beta.2"
 path = "../video"
 
 [dependencies.sillstone-file]
-version = "0.3.0-beta.1"
+version = "0.3.0-beta.2"
 path = "../file"
 
 [dependencies.sillstone-pdf]
-version = "0.3.0-beta.1"
+version = "0.3.0-beta.2"
 path = "../pdf"
 
 [dev-dependencies.sillstone-unicode]
