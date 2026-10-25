@@ -37,6 +37,11 @@ from ._generated import (
     sillstone_curator_match_raw,
     sillstone_curator_free_raw,
 )
+# Fixed-size output buffers: instantiating a ctypes array type is ~3x
+# cheaper than `create_string_buffer`, which matters for small digests.
+_Buf32 = ctypes.c_char * 32
+_Buf64 = ctypes.c_char * 64
+
 from .image import Image, ImageFilter, Resampling, Transpose
 from .array import Array, array, asarray, zeros, ones, arange, linspace, matmul, dot
 __version__ = "0.3.0b1"
@@ -188,7 +193,7 @@ def buffer_checksum(data: bytes) -> int:
 
 def sha256(data: bytes) -> bytes:
     """Computes 32-byte SHA-256 digest."""
-    out = ctypes.create_string_buffer(32)
+    out = _Buf32()
     rc = sillstone_digest_sha256_raw(data, len(data), out)
     if rc != 0:
         raise FfiError("sha256", rc)
@@ -197,7 +202,7 @@ def sha256(data: bytes) -> bytes:
 
 def sha3_256(data: bytes) -> bytes:
     """Computes 32-byte SHA-3-256 digest."""
-    out = ctypes.create_string_buffer(32)
+    out = _Buf32()
     rc = sillstone_digest_sha3_256_raw(data, len(data), out)
     if rc != 0:
         raise FfiError("sha3_256", rc)
@@ -206,7 +211,7 @@ def sha3_256(data: bytes) -> bytes:
 
 def sha3_512(data: bytes) -> bytes:
     """Computes 64-byte SHA-3-512 digest."""
-    out = ctypes.create_string_buffer(64)
+    out = _Buf64()
     rc = sillstone_digest_sha3_512_raw(data, len(data), out)
     if rc != 0:
         raise FfiError("sha3_512", rc)
@@ -215,7 +220,7 @@ def sha3_512(data: bytes) -> bytes:
 
 def blake2b_512(data: bytes) -> bytes:
     """Computes 64-byte unkeyed BLAKE2b digest."""
-    out = ctypes.create_string_buffer(64)
+    out = _Buf64()
     rc = sillstone_digest_blake2b_512_raw(data, len(data), out)
     if rc != 0:
         raise FfiError("blake2b_512", rc)
@@ -224,7 +229,7 @@ def blake2b_512(data: bytes) -> bytes:
 
 def blake3(data: bytes) -> bytes:
     """Computes 32-byte BLAKE3 digest."""
-    out = ctypes.create_string_buffer(32)
+    out = _Buf32()
     rc = sillstone_digest_blake3_raw(data, len(data), out)
     if rc != 0:
         raise FfiError("blake3", rc)

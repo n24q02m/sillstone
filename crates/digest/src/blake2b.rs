@@ -52,7 +52,21 @@ fn g(v: &mut [u64; 16], a: usize, b: usize, c: usize, d: usize, x: u64, y: u64) 
     v[b] = (v[b] ^ v[c]).rotate_right(63);
 }
 
+/// One compression step; dispatches to the AVX2 kernel when the CPU has it.
+#[allow(unsafe_code)]
 fn compress(h: &mut [u64; 8], block: &[u8; 128], t: u128, is_last: bool) {
+    #[cfg(all(feature = "std", target_arch = "x86_64"))]
+    {
+        if std::is_x86_feature_detected!("avx2") {
+            // SAFETY: AVX2 support was just detected.
+            unsafe { avx2::compress(h, block, t, is_last) };
+            return;
+        }
+    }
+    compress_scalar(h, block, t, is_last);
+}
+
+fn compress_scalar(h: &mut [u64; 8], block: &[u8; 128], t: u128, is_last: bool) {
     let mut v = [0u64; 16];
     v[..8].copy_from_slice(h);
     v[8..].copy_from_slice(&IV);
@@ -84,6 +98,81 @@ fn compress(h: &mut [u64; 8], block: &[u8; 128], t: u128, is_last: bool) {
 
     for i in 0..8 {
         h[i] ^= v[i] ^ v[i + 8];
+    }
+}
+
+/// AVX2 compression: the four columns, then the four diagonals, of the
+/// 4x4 state matrix are each one `G` over 256-bit rows.
+#[cfg(all(feature = "std", target_arch = "x86_64"))]
+#[allow(unsafe_code, unused_unsafe)]
+mod avx2 {
+    use super::{IV, SIGMA};
+    use core::arch::x86_64::*;
+
+    /// `G` over the four rows `v = [a, b, c, d]`; `r` is the (24, 16) rotate masks.
+    #[inline(always)]
+    unsafe fn g(v: &mut [__m256i; 4], mx: __m256i, my: __m256i, r: &[__m256i; 2]) {
+        unsafe {
+            let [a, b, c, d] = v;
+            *a = _mm256_add_epi64(_mm256_add_epi64(*a, *b), mx);
+            *d = _mm256_shuffle_epi32(_mm256_xor_si256(*d, *a), 0xB1);
+            *c = _mm256_add_epi64(*c, *d);
+            *b = _mm256_shuffle_epi8(_mm256_xor_si256(*b, *c), r[0]);
+            *a = _mm256_add_epi64(_mm256_add_epi64(*a, *b), my);
+            *d = _mm256_shuffle_epi8(_mm256_xor_si256(*d, *a), r[1]);
+            *c = _mm256_add_epi64(*c, *d);
+            let x = _mm256_xor_si256(*b, *c);
+            *b = _mm256_or_si256(_mm256_srli_epi64(x, 63), _mm256_add_epi64(x, x));
+        }
+    }
+
+    /// # Safety
+    ///
+    /// The CPU must support AVX2.
+    #[target_feature(enable = "avx2")]
+    pub(super) unsafe fn compress(h: &mut [u64; 8], block: &[u8; 128], t: u128, is_last: bool) {
+        unsafe {
+            let mut m = [0u64; 16];
+            for (word, chunk) in m.iter_mut().zip(block.chunks_exact(8)) {
+                *word = u64::from_le_bytes(chunk.try_into().expect("chunks_exact yields 8"));
+            }
+            let r24 = _mm256_setr_epi8(
+                3, 4, 5, 6, 7, 0, 1, 2, 11, 12, 13, 14, 15, 8, 9, 10, 3, 4, 5, 6, 7, 0, 1, 2, 11,
+                12, 13, 14, 15, 8, 9, 10,
+            );
+            let r16 = _mm256_setr_epi8(
+                2, 3, 4, 5, 6, 7, 0, 1, 10, 11, 12, 13, 14, 15, 8, 9, 2, 3, 4, 5, 6, 7, 0, 1, 10,
+                11, 12, 13, 14, 15, 8, 9,
+            );
+            let h0 = _mm256_loadu_si256(h.as_ptr().cast());
+            let h1 = _mm256_loadu_si256(h.as_ptr().add(4).cast());
+            let c = _mm256_loadu_si256(IV.as_ptr().cast());
+            let f0 = if is_last { u64::MAX as i64 } else { 0 };
+            let d = _mm256_xor_si256(
+                _mm256_loadu_si256(IV.as_ptr().add(4).cast()),
+                _mm256_set_epi64x(0, f0, (t >> 64) as u64 as i64, t as u64 as i64),
+            );
+            let r = [r24, r16];
+            let mut v = [h0, h1, c, d];
+            for s in &SIGMA {
+                let mx = _mm256_set_epi64x(m[s[6]] as i64, m[s[4]] as i64, m[s[2]] as i64, m[s[0]] as i64);
+                let my = _mm256_set_epi64x(m[s[7]] as i64, m[s[5]] as i64, m[s[3]] as i64, m[s[1]] as i64);
+                g(&mut v, mx, my, &r);
+                v[1] = _mm256_permute4x64_epi64(v[1], 0x39);
+                v[2] = _mm256_permute4x64_epi64(v[2], 0x4E);
+                v[3] = _mm256_permute4x64_epi64(v[3], 0x93);
+                let mx = _mm256_set_epi64x(m[s[14]] as i64, m[s[12]] as i64, m[s[10]] as i64, m[s[8]] as i64);
+                let my = _mm256_set_epi64x(m[s[15]] as i64, m[s[13]] as i64, m[s[11]] as i64, m[s[9]] as i64);
+                g(&mut v, mx, my, &r);
+                v[1] = _mm256_permute4x64_epi64(v[1], 0x93);
+                v[2] = _mm256_permute4x64_epi64(v[2], 0x4E);
+                v[3] = _mm256_permute4x64_epi64(v[3], 0x39);
+            }
+            let o0 = _mm256_xor_si256(h0, _mm256_xor_si256(v[0], v[2]));
+            let o1 = _mm256_xor_si256(h1, _mm256_xor_si256(v[1], v[3]));
+            _mm256_storeu_si256(h.as_mut_ptr().cast(), o0);
+            _mm256_storeu_si256(h.as_mut_ptr().add(4).cast(), o1);
+        }
     }
 }
 

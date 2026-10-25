@@ -6,9 +6,10 @@ against imagehash and compared bit-for-bit (Hamming distance over the 64-bit val
 MSB-first row-major, the order imagehash's ``__int__``-style flattening uses).
 
 Usage:
-    python scripts/bench/bench_hash_parity.py [--json out.json] [--quick]
+    python scripts/bench/bench_hash_parity.py [--json out.json] [--quick] [--repeats N]
 
-Exit status is non-zero when any digest differs from hashlib.
+Exit status is non-zero when any digest differs from hashlib or any image hash
+differs from imagehash.
 """
 
 import argparse
@@ -150,39 +151,66 @@ def bench_image_hashes(sizes):
     return rows
 
 
+def summarize(runs, section, keys):
+    """Per-row median/min/max of `speed_ratio` over the repeated runs."""
+    table = {}
+    for run in runs:
+        for r in run[section]:
+            table.setdefault(tuple(r[k] for k in keys), []).append(r["speed_ratio"])
+    out = []
+    for key, ratios in table.items():
+        ratios.sort()
+        row = dict(zip(keys, key))
+        row.update(
+            {
+                "runs": len(ratios),
+                "ratio_median": ratios[len(ratios) // 2],
+                "ratio_min": ratios[0],
+                "ratio_max": ratios[-1],
+            }
+        )
+        out.append(row)
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--json")
     ap.add_argument("--quick", action="store_true")
+    ap.add_argument("--repeats", type=int, default=1, help="full-suite repetitions (CI uses >= 5)")
     args = ap.parse_args()
     sizes = [64, 4096, 1 << 20] if args.quick else [64, 4096, 1 << 20, 16 << 20]
     img_sizes = [(256, 256)] if args.quick else [(256, 256), (1024, 1024)]
 
+    runs = [
+        {"digests": bench_digests(sizes), "image_hashes": bench_image_hashes(img_sizes)}
+        for _ in range(args.repeats)
+    ]
     result = {
         "sillstone_version": sillstone.version(),
         "python": platform.python_version(),
         "platform": platform.platform(),
-        "digests": bench_digests(sizes),
-        "image_hashes": bench_image_hashes(img_sizes),
+        "machine": platform.machine(),
+        "repeats": args.repeats,
+        "runs": runs,
+        "digest_summary": summarize(runs, "digests", ("algo", "bytes")),
+        "image_summary": summarize(runs, "image_hashes", ("algo", "size")),
     }
 
-    print(f"sillstone {result['sillstone_version']} on {result['platform']}")
-    print(f"{'digest':<12}{'bytes':>10}{'parity':>8}{'hashlib MB/s':>14}{'sillstone MB/s':>16}{'ratio':>8}")
-    for r in result["digests"]:
-        print(
-            f"{r['algo']:<12}{r['bytes']:>10}{str(r['parity']):>8}"
-            f"{r['hashlib_MBps']:>14.1f}{r['sillstone_MBps']:>16.1f}{r['speed_ratio']:>8.2f}"
-        )
-    print(f"\n{'imagehash':<12}{'size':>12}{'hamming':>9}{'imagehash ms':>14}{'sillstone ms':>14}{'ratio':>8}")
-    for r in result["image_hashes"]:
-        print(
-            f"{r['algo']:<12}{r['size']:>12}{r['hamming_vs_imagehash']:>9}"
-            f"{r['imagehash_s'] * 1e3:>14.3f}{r['sillstone_s'] * 1e3:>14.3f}{r['speed_ratio']:>8.2f}"
-        )
+    print(f"sillstone {result['sillstone_version']} on {result['platform']} ({result['machine']}), {args.repeats} run(s)")
+    print(f"{'digest':<12}{'bytes':>10}{'ratio med':>11}{'min':>8}{'max':>8}")
+    for r in result["digest_summary"]:
+        print(f"{r['algo']:<12}{r['bytes']:>10}{r['ratio_median']:>11.2f}{r['ratio_min']:>8.2f}{r['ratio_max']:>8.2f}")
+    print(f"\n{'imagehash':<12}{'size':>12}{'ratio med':>11}{'min':>8}{'max':>8}")
+    for r in result["image_summary"]:
+        print(f"{r['algo']:<12}{r['size']:>12}{r['ratio_median']:>11.2f}{r['ratio_min']:>8.2f}{r['ratio_max']:>8.2f}")
     if args.json:
         with open(args.json, "w", encoding="utf-8") as fh:
             json.dump(result, fh, indent=2)
-    return 0 if all(r["parity"] for r in result["digests"]) else 1
+    digest_ok = all(r["parity"] for run in runs for r in run["digests"])
+    # Every perceptual hash of this smooth synthetic image must match imagehash bit for bit.
+    image_ok = all(r["hamming_vs_imagehash"] == 0 for run in runs for r in run["image_hashes"])
+    return 0 if digest_ok and image_ok else 1
 
 
 if __name__ == "__main__":

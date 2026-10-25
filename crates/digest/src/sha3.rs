@@ -35,64 +35,100 @@ const RC: [u64; 24] = [
     0x8000_0000_8000_8008,
 ];
 
-/// Keccak rotation offsets `RHO[x][y]`.
-const RHO: [[u32; 5]; 5] = [
-    [0, 36, 3, 41, 18],
-    [1, 44, 10, 45, 2],
-    [62, 6, 43, 15, 61],
-    [28, 55, 25, 21, 56],
-    [27, 20, 39, 8, 14],
-];
+/// One Keccak-f[1600] round, fully unrolled over named lanes (`a[x + 5 * y]`).
+#[inline(always)]
+fn round(a: &mut [u64; 25], rc: u64) {
+    let c0 = a[0] ^ a[5] ^ a[10] ^ a[15] ^ a[20];
+    let c1 = a[1] ^ a[6] ^ a[11] ^ a[16] ^ a[21];
+    let c2 = a[2] ^ a[7] ^ a[12] ^ a[17] ^ a[22];
+    let c3 = a[3] ^ a[8] ^ a[13] ^ a[18] ^ a[23];
+    let c4 = a[4] ^ a[9] ^ a[14] ^ a[19] ^ a[24];
+    let d0 = c4 ^ c1.rotate_left(1);
+    let d1 = c0 ^ c2.rotate_left(1);
+    let d2 = c1 ^ c3.rotate_left(1);
+    let d3 = c2 ^ c4.rotate_left(1);
+    let d4 = c3 ^ c0.rotate_left(1);
+    let b0 = a[0] ^ d0;
+    let b1 = (a[6] ^ d1).rotate_left(44);
+    let b2 = (a[12] ^ d2).rotate_left(43);
+    let b3 = (a[18] ^ d3).rotate_left(21);
+    let b4 = (a[24] ^ d4).rotate_left(14);
+    let b5 = (a[3] ^ d3).rotate_left(28);
+    let b6 = (a[9] ^ d4).rotate_left(20);
+    let b7 = (a[10] ^ d0).rotate_left(3);
+    let b8 = (a[16] ^ d1).rotate_left(45);
+    let b9 = (a[22] ^ d2).rotate_left(61);
+    let b10 = (a[1] ^ d1).rotate_left(1);
+    let b11 = (a[7] ^ d2).rotate_left(6);
+    let b12 = (a[13] ^ d3).rotate_left(25);
+    let b13 = (a[19] ^ d4).rotate_left(8);
+    let b14 = (a[20] ^ d0).rotate_left(18);
+    let b15 = (a[4] ^ d4).rotate_left(27);
+    let b16 = (a[5] ^ d0).rotate_left(36);
+    let b17 = (a[11] ^ d1).rotate_left(10);
+    let b18 = (a[17] ^ d2).rotate_left(15);
+    let b19 = (a[23] ^ d3).rotate_left(56);
+    let b20 = (a[2] ^ d2).rotate_left(62);
+    let b21 = (a[8] ^ d3).rotate_left(55);
+    let b22 = (a[14] ^ d4).rotate_left(39);
+    let b23 = (a[15] ^ d0).rotate_left(41);
+    let b24 = (a[21] ^ d1).rotate_left(2);
+    a[0] = b0 ^ (!b1 & b2) ^ rc;
+    a[1] = b1 ^ (!b2 & b3);
+    a[2] = b2 ^ (!b3 & b4);
+    a[3] = b3 ^ (!b4 & b0);
+    a[4] = b4 ^ (!b0 & b1);
+    a[5] = b5 ^ (!b6 & b7);
+    a[6] = b6 ^ (!b7 & b8);
+    a[7] = b7 ^ (!b8 & b9);
+    a[8] = b8 ^ (!b9 & b5);
+    a[9] = b9 ^ (!b5 & b6);
+    a[10] = b10 ^ (!b11 & b12);
+    a[11] = b11 ^ (!b12 & b13);
+    a[12] = b12 ^ (!b13 & b14);
+    a[13] = b13 ^ (!b14 & b10);
+    a[14] = b14 ^ (!b10 & b11);
+    a[15] = b15 ^ (!b16 & b17);
+    a[16] = b16 ^ (!b17 & b18);
+    a[17] = b17 ^ (!b18 & b19);
+    a[18] = b18 ^ (!b19 & b15);
+    a[19] = b19 ^ (!b15 & b16);
+    a[20] = b20 ^ (!b21 & b22);
+    a[21] = b21 ^ (!b22 & b23);
+    a[22] = b22 ^ (!b23 & b24);
+    a[23] = b23 ^ (!b24 & b20);
+    a[24] = b24 ^ (!b20 & b21);
+}
 
-/// Runs the 24-round Keccak-f[1600] permutation over the 5x5 state of 64-bit lanes.
+/// Runs the 24-round Keccak-f[1600] permutation over the 5x5 state of
+/// 64-bit lanes (`state[x + 5 * y]`).
+#[allow(unsafe_code)]
 fn keccak_p(state: &mut [u64; 25]) {
-    let mut a = [[0u64; 5]; 5];
-    for x in 0..5 {
-        for y in 0..5 {
-            a[x][y] = state[x + 5 * y];
+    #[cfg(all(feature = "std", target_arch = "x86_64"))]
+    {
+        if std::is_x86_feature_detected!("bmi1") && std::is_x86_feature_detected!("bmi2") {
+            // SAFETY: the CPU features the callee enables were just detected.
+            unsafe { keccak_p_bmi(state) };
+            return;
         }
     }
+    keccak_p_generic(state);
+}
 
+#[inline(always)]
+fn keccak_p_generic(state: &mut [u64; 25]) {
     for &rc in &RC {
-        // Theta step
-        let mut c = [0u64; 5];
-        for x in 0..5 {
-            c[x] = a[x][0] ^ a[x][1] ^ a[x][2] ^ a[x][3] ^ a[x][4];
-        }
-        let mut d = [0u64; 5];
-        for x in 0..5 {
-            d[x] = c[(x + 4) % 5] ^ c[(x + 1) % 5].rotate_left(1);
-        }
-        for x in 0..5 {
-            for item in &mut a[x] {
-                *item ^= d[x];
-            }
-        }
-
-        // Rho and Pi steps
-        let mut b = [[0u64; 5]; 5];
-        for x in 0..5 {
-            for y in 0..5 {
-                b[y][(2 * x + 3 * y) % 5] = a[x][y].rotate_left(RHO[x][y]);
-            }
-        }
-
-        // Chi step
-        for x in 0..5 {
-            for y in 0..5 {
-                a[x][y] = b[x][y] ^ ((!b[(x + 1) % 5][y]) & b[(x + 2) % 5][y]);
-            }
-        }
-
-        // Iota step
-        a[0][0] ^= rc;
+        round(state, rc);
     }
+}
 
-    for x in 0..5 {
-        for y in 0..5 {
-            state[x + 5 * y] = a[x][y];
-        }
-    }
+/// The same permutation compiled with `andn` (BMI1) and flag-free `rorx`
+/// rotates (BMI2); bit-identical to the generic build.
+#[cfg(all(feature = "std", target_arch = "x86_64"))]
+#[target_feature(enable = "bmi1,bmi2")]
+#[allow(unsafe_code)]
+unsafe fn keccak_p_bmi(state: &mut [u64; 25]) {
+    keccak_p_generic(state);
 }
 
 /// Generic SHA-3 sponge function over arbitrary data with given rate and output length.

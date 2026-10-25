@@ -57,11 +57,39 @@ pub fn sha256(data: &[u8]) -> Result<crate::Digest<32>> {
 /// slice boundary between calls must fall on a block edge, which the
 /// callers guarantee by always absorbing from a block-aligned state.
 pub(crate) fn absorb<'a>(h: &mut [u32; 8], data: &'a [u8]) -> &'a [u8] {
-    let mut chunks = data.chunks_exact(64);
-    for block in chunks.by_ref() {
+    let (blocks, rem) = data.split_at(data.len() & !63);
+    compress_blocks(h, blocks);
+    rem
+}
+
+/// Compresses every 64-byte block of `blocks` (whose length is a
+/// multiple of 64) into `h`, on the CPU's SHA extensions when present.
+#[allow(unsafe_code)]
+pub(crate) fn compress_blocks(h: &mut [u32; 8], blocks: &[u8]) {
+    debug_assert!(blocks.len() % 64 == 0);
+    #[cfg(all(feature = "std", target_arch = "x86_64"))]
+    {
+        if std::is_x86_feature_detected!("sha")
+            && std::is_x86_feature_detected!("sse2")
+            && std::is_x86_feature_detected!("ssse3")
+            && std::is_x86_feature_detected!("sse4.1")
+        {
+            // SAFETY: the CPU features the callee enables were just detected.
+            unsafe { sha_ni::compress(h, blocks) };
+            return;
+        }
+    }
+    #[cfg(all(feature = "std", target_arch = "aarch64"))]
+    {
+        if std::arch::is_aarch64_feature_detected!("sha2") {
+            // SAFETY: the CPU feature the callee enables was just detected.
+            unsafe { arm_sha2::compress(h, blocks) };
+            return;
+        }
+    }
+    for block in blocks.chunks_exact(64) {
         compress(h, block.try_into().expect("chunks_exact yields 64"));
     }
-    chunks.remainder()
 }
 
 /// Pads the `rem` tail (0x80, zeros, the 64-bit big-endian bit length
@@ -79,49 +107,187 @@ pub(crate) fn finish(h: &[u32; 8], rem: &[u8], total_len: u64) -> [u32; 8] {
     tail[rem.len()] = 0x80;
     let pad_len = if rem.len() + 9 <= 64 { 64 } else { 128 };
     tail[pad_len - 8..pad_len].copy_from_slice(&bit_len.to_be_bytes());
-    for block in tail[..pad_len].chunks_exact(64) {
-        compress(&mut h, block.try_into().expect("chunks_exact yields 64"));
-    }
+    compress_blocks(&mut h, &tail[..pad_len]);
     h
 }
 
-/// One compression step: 64 rounds over the message schedule for `block`.
+/// One round with the working variables passed by name, so eight
+/// consecutive rounds rotate the roles instead of moving the values.
+macro_rules! round {
+    ($a:ident, $b:ident, $c:ident, $d:ident, $e:ident, $f:ident, $g:ident, $h:ident, $k:expr, $w:expr) => {
+        let t1 = $h
+            .wrapping_add($e.rotate_right(6) ^ $e.rotate_right(11) ^ $e.rotate_right(25))
+            .wrapping_add($g ^ ($e & ($f ^ $g)))
+            .wrapping_add($k)
+            .wrapping_add($w);
+        let t2 = ($a.rotate_right(2) ^ $a.rotate_right(13) ^ $a.rotate_right(22))
+            .wrapping_add(($a & $b) | ($c & ($a | $b)));
+        $d = $d.wrapping_add(t1);
+        $h = t1.wrapping_add(t2);
+    };
+}
+
+/// One compression step: 64 rounds over a rolling 16-word schedule.
 pub(crate) fn compress(h: &mut [u32; 8], block: &[u8; 64]) {
-    let mut w = [0u32; 64];
+    let mut w = [0u32; 16];
     for (word, chunk) in w.iter_mut().zip(block.chunks_exact(4)) {
         *word = u32::from_be_bytes(chunk.try_into().expect("chunks_exact yields 4"));
     }
-    for i in 16..64 {
-        let s0 = w[i - 15].rotate_right(7) ^ w[i - 15].rotate_right(18) ^ (w[i - 15] >> 3);
-        let s1 = w[i - 2].rotate_right(17) ^ w[i - 2].rotate_right(19) ^ (w[i - 2] >> 10);
-        w[i] = w[i - 16]
-            .wrapping_add(s0)
-            .wrapping_add(w[i - 7])
-            .wrapping_add(s1);
-    }
 
     let [mut a, mut b, mut c, mut d, mut e, mut f, mut g, mut hh] = *h;
-    for i in 0..64 {
-        let s1 = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25);
-        let ch = (e & f) ^ (!e & g);
-        let t1 = hh
-            .wrapping_add(s1)
-            .wrapping_add(ch)
-            .wrapping_add(K[i])
-            .wrapping_add(w[i]);
-        let s0 = a.rotate_right(2) ^ a.rotate_right(13) ^ a.rotate_right(22);
-        let maj = (a & b) ^ (a & c) ^ (b & c);
-        let t2 = s0.wrapping_add(maj);
-        hh = g;
-        g = f;
-        f = e;
-        e = d.wrapping_add(t1);
-        d = c;
-        c = b;
-        b = a;
-        a = t1.wrapping_add(t2);
+    for base in (0..64).step_by(16) {
+        if base > 0 {
+            for i in 0..16 {
+                let w15 = w[(i + 1) & 15];
+                let w2 = w[(i + 14) & 15];
+                let s0 = w15.rotate_right(7) ^ w15.rotate_right(18) ^ (w15 >> 3);
+                let s1 = w2.rotate_right(17) ^ w2.rotate_right(19) ^ (w2 >> 10);
+                w[i] = w[i]
+                    .wrapping_add(s0)
+                    .wrapping_add(w[(i + 9) & 15])
+                    .wrapping_add(s1);
+            }
+        }
+        for i in (0..16).step_by(8) {
+            let k = &K[base + i..base + i + 8];
+            round!(a, b, c, d, e, f, g, hh, k[0], w[i]);
+            round!(hh, a, b, c, d, e, f, g, k[1], w[i + 1]);
+            round!(g, hh, a, b, c, d, e, f, k[2], w[i + 2]);
+            round!(f, g, hh, a, b, c, d, e, k[3], w[i + 3]);
+            round!(e, f, g, hh, a, b, c, d, k[4], w[i + 4]);
+            round!(d, e, f, g, hh, a, b, c, k[5], w[i + 5]);
+            round!(c, d, e, f, g, hh, a, b, k[6], w[i + 6]);
+            round!(b, c, d, e, f, g, hh, a, k[7], w[i + 7]);
+        }
     }
     for (slot, value) in h.iter_mut().zip([a, b, c, d, e, f, g, hh]) {
         *slot = slot.wrapping_add(value);
+    }
+}
+
+/// The x86-64 SHA extensions kernel (`sha256rnds2`, `sha256msg1/2`).
+#[cfg(all(feature = "std", target_arch = "x86_64"))]
+#[allow(unsafe_code, unused_unsafe)]
+mod sha_ni {
+    use super::K;
+    use core::arch::x86_64::*;
+
+    /// # Safety
+    ///
+    /// The CPU must support SHA, SSE2, SSSE3 and SSE4.1; `blocks.len()`
+    /// must be a multiple of 64.
+    #[target_feature(enable = "sha,sse2,ssse3,sse4.1")]
+    pub(super) unsafe fn compress(state: &mut [u32; 8], blocks: &[u8]) {
+        unsafe {
+            let mask = _mm_set_epi64x(0x0c0d_0e0f_0809_0a0b, 0x0405_0607_0001_0203);
+            let dcba = _mm_loadu_si128(state.as_ptr().cast());
+            let hgfe = _mm_loadu_si128(state.as_ptr().add(4).cast());
+            let cdab = _mm_shuffle_epi32(dcba, 0xB1);
+            let efgh = _mm_shuffle_epi32(hgfe, 0x1B);
+            let mut s0 = _mm_alignr_epi8(cdab, efgh, 8); // ABEF
+            let mut s1 = _mm_blend_epi16(efgh, cdab, 0xF0); // CDGH
+
+            for block in blocks.chunks_exact(64) {
+                let (save0, save1) = (s0, s1);
+                let p = block.as_ptr();
+                let mut m = [
+                    _mm_shuffle_epi8(_mm_loadu_si128(p.cast()), mask),
+                    _mm_shuffle_epi8(_mm_loadu_si128(p.add(16).cast()), mask),
+                    _mm_shuffle_epi8(_mm_loadu_si128(p.add(32).cast()), mask),
+                    _mm_shuffle_epi8(_mm_loadu_si128(p.add(48).cast()), mask),
+                ];
+                for i in 0..16 {
+                    if i >= 4 {
+                        let w4 = m[i % 4];
+                        let w3 = m[(i + 1) % 4];
+                        let w2 = m[(i + 2) % 4];
+                        let w1 = m[(i + 3) % 4];
+                        let t = _mm_add_epi32(_mm_sha256msg1_epu32(w4, w3), _mm_alignr_epi8(w1, w2, 4));
+                        m[i % 4] = _mm_sha256msg2_epu32(t, w1);
+                    }
+                    let wk = _mm_add_epi32(m[i % 4], _mm_loadu_si128(K.as_ptr().add(4 * i).cast()));
+                    s1 = _mm_sha256rnds2_epu32(s1, s0, wk);
+                    s0 = _mm_sha256rnds2_epu32(s0, s1, _mm_shuffle_epi32(wk, 0x0E));
+                }
+                s0 = _mm_add_epi32(s0, save0);
+                s1 = _mm_add_epi32(s1, save1);
+            }
+
+            let feba = _mm_shuffle_epi32(s0, 0x1B);
+            let dchg = _mm_shuffle_epi32(s1, 0xB1);
+            let dcba = _mm_blend_epi16(feba, dchg, 0xF0);
+            let hgfe = _mm_alignr_epi8(dchg, feba, 8);
+            _mm_storeu_si128(state.as_mut_ptr().cast(), dcba);
+            _mm_storeu_si128(state.as_mut_ptr().add(4).cast(), hgfe);
+        }
+    }
+}
+
+/// The ARMv8 cryptographic-extension kernel (`sha256h`, `sha256su0/1`).
+#[cfg(all(feature = "std", target_arch = "aarch64"))]
+#[allow(unsafe_code, unused_unsafe)]
+mod arm_sha2 {
+    use super::K;
+    use core::arch::aarch64::*;
+
+    /// # Safety
+    ///
+    /// The CPU must support the `sha2` extension; `blocks.len()` must be a
+    /// multiple of 64.
+    #[target_feature(enable = "sha2")]
+    pub(super) unsafe fn compress(state: &mut [u32; 8], blocks: &[u8]) {
+        unsafe {
+            let mut s0 = vld1q_u32(state.as_ptr());
+            let mut s1 = vld1q_u32(state.as_ptr().add(4));
+            for block in blocks.chunks_exact(64) {
+                let (save0, save1) = (s0, s1);
+                let p = block.as_ptr();
+                let mut m = [
+                    vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(p))),
+                    vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(p.add(16)))),
+                    vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(p.add(32)))),
+                    vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(p.add(48)))),
+                ];
+                for i in 0..16 {
+                    if i >= 4 {
+                        m[i % 4] = vsha256su1q_u32(
+                            vsha256su0q_u32(m[i % 4], m[(i + 1) % 4]),
+                            m[(i + 2) % 4],
+                            m[(i + 3) % 4],
+                        );
+                    }
+                    let wk = vaddq_u32(m[i % 4], vld1q_u32(K.as_ptr().add(4 * i)));
+                    let prev = s0;
+                    s0 = vsha256hq_u32(s0, s1, wk);
+                    s1 = vsha256h2q_u32(s1, prev, wk);
+                }
+                s0 = vaddq_u32(s0, save0);
+                s1 = vaddq_u32(s1, save1);
+            }
+            vst1q_u32(state.as_mut_ptr(), s0);
+            vst1q_u32(state.as_mut_ptr().add(4), s1);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The dispatched kernel (SHA extensions where the CPU has them) must
+    /// agree with the portable scalar compression on every block count.
+    #[test]
+    fn dispatched_kernel_matches_scalar() {
+        let data: Vec<u8> = (0..64 * 9u32).map(|i| (i.wrapping_mul(2_654_435_761) >> 13) as u8).collect();
+        for n in 0..=9 {
+            let blocks = &data[..64 * n];
+            let mut fast = H0;
+            compress_blocks(&mut fast, blocks);
+            let mut slow = H0;
+            for block in blocks.chunks_exact(64) {
+                compress(&mut slow, block.try_into().unwrap());
+            }
+            assert_eq!(fast, slow, "{n} blocks");
+        }
     }
 }

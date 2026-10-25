@@ -21,8 +21,10 @@
 //! With the horizontal pass first, only the rows the vertical pass reads
 //! are filtered.
 
+use alloc::rc::Rc;
 use alloc::vec;
 use alloc::vec::Vec;
+use core::cell::RefCell;
 
 use crate::raster::ResamplingFilter;
 
@@ -120,7 +122,7 @@ struct Coeffs {
     kk: Vec<i32>,
 }
 
-fn precompute(in_size: usize, out_size: usize, filter: ResamplingFilter) -> Coeffs {
+fn compute_coeffs(in_size: usize, out_size: usize, filter: ResamplingFilter) -> Coeffs {
     let (fsupport, f) = kernel(filter);
     let scale = in_size as f64 / out_size as f64;
     let filterscale = scale.max(1.0);
@@ -158,6 +160,39 @@ fn precompute(in_size: usize, out_size: usize, filter: ResamplingFilter) -> Coef
         bounds.push((xmin, taps));
     }
     Coeffs { ksize, bounds, kk }
+}
+
+/// Coefficient tables cached per thread: the kernel evaluates one `sin`
+/// per tap, which dominates a small-output resize (the perceptual hashes
+/// resize to the same few shapes every call).
+const CACHE_ENTRIES: usize = 8;
+/// Tables above this many taps are recomputed rather than retained.
+const CACHE_MAX_TAPS: usize = 1 << 16;
+
+type CacheKey = (usize, usize, ResamplingFilter);
+
+thread_local! {
+    static COEFF_CACHE: RefCell<Vec<(CacheKey, Rc<Coeffs>)>> = const { RefCell::new(Vec::new()) };
+}
+
+fn precompute(in_size: usize, out_size: usize, filter: ResamplingFilter) -> Rc<Coeffs> {
+    let key = (in_size, out_size, filter);
+    if let Some(hit) = COEFF_CACHE.with(|c| {
+        c.borrow().iter().find(|(k, _)| *k == key).map(|(_, v)| Rc::clone(v))
+    }) {
+        return hit;
+    }
+    let coeffs = Rc::new(compute_coeffs(in_size, out_size, filter));
+    if coeffs.kk.len() <= CACHE_MAX_TAPS {
+        COEFF_CACHE.with(|c| {
+            let mut c = c.borrow_mut();
+            if c.len() == CACHE_ENTRIES {
+                c.remove(0);
+            }
+            c.push((key, Rc::clone(&coeffs)));
+        });
+    }
+    coeffs
 }
 
 #[inline]
@@ -236,7 +271,29 @@ pub fn resize_u8(
 
 /// Horizontal pass over every row of `src` (`in_w` pixels of `c` channels
 /// per row) → 8-bit rows of `hc.bounds.len()` pixels.
+#[allow(unsafe_code)]
 fn horizontal(src: &[u8], in_w: usize, c: usize, hc: &Coeffs) -> Vec<u8> {
+    #[cfg(target_arch = "x86_64")]
+    {
+        if std::is_x86_feature_detected!("avx2") {
+            // SAFETY: AVX2 support was just detected.
+            return unsafe { horizontal_avx2(src, in_w, c, hc) };
+        }
+    }
+    horizontal_impl(src, in_w, c, hc)
+}
+
+/// The same loops compiled with AVX2 enabled, so the tap reductions
+/// vectorise 8-wide; integer arithmetic, so bit-identical to the baseline.
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+#[allow(unsafe_code)]
+unsafe fn horizontal_avx2(src: &[u8], in_w: usize, c: usize, hc: &Coeffs) -> Vec<u8> {
+    horizontal_impl(src, in_w, c, hc)
+}
+
+#[inline(always)]
+fn horizontal_impl(src: &[u8], in_w: usize, c: usize, hc: &Coeffs) -> Vec<u8> {
     let out_w = hc.bounds.len();
     let rows = src.len() / (in_w * c);
     let mut buf = vec![0u8; rows * out_w * c];
@@ -270,7 +327,28 @@ fn horizontal(src: &[u8], in_w: usize, c: usize, hc: &Coeffs) -> Vec<u8> {
 
 /// Vertical pass: `src` holds rows of `width` samples starting at source
 /// row `first`; `vc.bounds` index absolute source rows.
+#[allow(unsafe_code)]
 fn vertical(src: &[u8], width: usize, first: usize, vc: &Coeffs) -> Vec<u8> {
+    #[cfg(target_arch = "x86_64")]
+    {
+        if std::is_x86_feature_detected!("avx2") {
+            // SAFETY: AVX2 support was just detected.
+            return unsafe { vertical_avx2(src, width, first, vc) };
+        }
+    }
+    vertical_impl(src, width, first, vc)
+}
+
+/// AVX2 build of [`vertical_impl`]; bit-identical to the baseline.
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+#[allow(unsafe_code)]
+unsafe fn vertical_avx2(src: &[u8], width: usize, first: usize, vc: &Coeffs) -> Vec<u8> {
+    vertical_impl(src, width, first, vc)
+}
+
+#[inline(always)]
+fn vertical_impl(src: &[u8], width: usize, first: usize, vc: &Coeffs) -> Vec<u8> {
     let out_h = vc.bounds.len();
     let mut out = vec![0u8; out_h * width];
     let mut acc = vec![0i32; width];
