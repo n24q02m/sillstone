@@ -24,7 +24,7 @@
 use alloc::rc::Rc;
 use alloc::vec;
 use alloc::vec::Vec;
-use core::cell::RefCell;
+use core::cell::{OnceCell, RefCell};
 
 use crate::raster::ResamplingFilter;
 
@@ -37,6 +37,179 @@ const PRECISION_BITS: u32 = 22;
 #[inline]
 pub fn rgb_to_l(r: u8, g: u8, b: u8) -> u8 {
     ((u32::from(r) * 19595 + u32::from(g) * 38470 + u32::from(b) * 7471 + 0x8000) >> 16) as u8
+}
+
+/// `convert("L")` of `n` pixels of `c` interleaved 8-bit channels (`c` is 3
+/// for RGB or 4 for RGBA; the first three channels are R, G, B): the
+/// Pillow luma of every pixel. Runtime-dispatched SIMD where available,
+/// all routes integer arithmetic and so bit-identical to [`rgb_to_l`].
+#[allow(unsafe_code)]
+pub fn rgb_plane_to_l(src: &[u8], c: usize, n: usize) -> Vec<u8> {
+    debug_assert!(c == 3 || c == 4);
+    debug_assert!(src.len() >= n * c);
+    let mut out = vec![0u8; n];
+    #[cfg(target_arch = "x86_64")]
+    {
+        if std::is_x86_feature_detected!("avx2") {
+            // SAFETY: AVX2 support was just detected.
+            let done = unsafe { luma_avx2(src, c, &mut out) };
+            return finish_luma(src, c, out, done);
+        }
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        // SAFETY: NEON is part of the aarch64 baseline.
+        let done = unsafe { luma_neon(src, c, &mut out) };
+        return finish_luma(src, c, out, done);
+    }
+    #[allow(unreachable_code)]
+    finish_luma(src, c, out, 0)
+}
+
+/// Scalar tail: converts pixels `from..` of `src` into `out`.
+fn finish_luma(src: &[u8], c: usize, mut out: Vec<u8>, from: usize) -> Vec<u8> {
+    for (o, p) in out[from..].iter_mut().zip(src[from * c..].chunks_exact(c)) {
+        *o = rgb_to_l(p[0], p[1], p[2]);
+    }
+    out
+}
+
+/// Eight pixels per step: gather R/G/B into 32-bit lanes with `pshufb`,
+/// multiply-accumulate, keep the byte at bit 16. Returns the pixels done.
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+#[allow(unsafe_code, unused_unsafe)]
+unsafe fn luma_avx2(src: &[u8], c: usize, out: &mut [u8]) -> usize {
+    use core::arch::x86_64::{
+        __m256i, _mm256_add_epi32, _mm256_castsi128_si256, _mm256_castsi256_si128,
+        _mm256_extracti128_si256, _mm256_inserti128_si256, _mm256_loadu_si256, _mm256_mullo_epi32,
+        _mm256_set1_epi32, _mm256_setr_epi8, _mm256_shuffle_epi8, _mm256_srli_epi32,
+        _mm_cvtsi128_si32, _mm_loadu_si128,
+    };
+
+    let n = out.len();
+    // Byte index of channel `ch` of pixel `px` within a 128-bit lane.
+    macro_rules! gather {
+        ($ch:expr) => {{
+            let s = if c == 3 { 3 } else { 4 };
+            let idx = |px: i8| -> i8 { px * s + $ch };
+            let (a, b, d, e) = (idx(0), idx(1), idx(2), idx(3));
+            _mm256_setr_epi8(
+                a, -1, -1, -1, b, -1, -1, -1, d, -1, -1, -1, e, -1, -1, -1, a, -1, -1, -1, b, -1,
+                -1, -1, d, -1, -1, -1, e, -1, -1, -1,
+            )
+        }};
+    }
+    let (mr, mg, mb) = (gather!(0), gather!(1), gather!(2));
+    let (kr, kg, kb) = (
+        _mm256_set1_epi32(19595),
+        _mm256_set1_epi32(38470),
+        _mm256_set1_epi32(7471),
+    );
+    let round = _mm256_set1_epi32(0x8000);
+    // Low byte of every 32-bit lane to the front of its 128-bit lane.
+    let pack = _mm256_setr_epi8(
+        0, 4, 8, 12, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 4, 8, 12, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1,
+    );
+
+    let mut i = 0;
+    // Each step reads `8 * c` bytes plus, for RGB, a 16-byte window at +12.
+    let reach = if c == 3 { 28 } else { 32 };
+    while i + 8 <= n && i * c + reach <= src.len() {
+        // SAFETY: `i * c` is within `src` (loop guard).
+        let base = unsafe { src.as_ptr().add(i * c) };
+        let v: __m256i = if c == 3 {
+            // SAFETY: bytes `i*3 .. i*3 + 28` are in bounds (loop guard).
+            unsafe {
+                _mm256_inserti128_si256(
+                    _mm256_castsi128_si256(_mm_loadu_si128(base.cast())),
+                    _mm_loadu_si128(base.add(12).cast()),
+                    1,
+                )
+            }
+        } else {
+            // SAFETY: bytes `i*4 .. i*4 + 32` are in bounds (loop guard).
+            unsafe { _mm256_loadu_si256(base.cast()) }
+        };
+        let r = _mm256_shuffle_epi8(v, mr);
+        let g = _mm256_shuffle_epi8(v, mg);
+        let b = _mm256_shuffle_epi8(v, mb);
+        let acc = _mm256_add_epi32(
+            _mm256_add_epi32(_mm256_mullo_epi32(r, kr), _mm256_mullo_epi32(g, kg)),
+            _mm256_add_epi32(_mm256_mullo_epi32(b, kb), round),
+        );
+        let packed = _mm256_shuffle_epi8(_mm256_srli_epi32(acc, 16), pack);
+        let lo = _mm_cvtsi128_si32(_mm256_castsi256_si128(packed)) as u32;
+        let hi = _mm_cvtsi128_si32(_mm256_extracti128_si256(packed, 1)) as u32;
+        out[i..i + 4].copy_from_slice(&lo.to_le_bytes());
+        out[i + 4..i + 8].copy_from_slice(&hi.to_le_bytes());
+        i += 8;
+    }
+    i
+}
+
+/// Sixteen pixels per step: `vld3q_u8` de-interleaves R/G/B, widening
+/// multiply-accumulate by the u16 luma weights, narrow the byte at bit 16.
+#[cfg(target_arch = "aarch64")]
+#[allow(unsafe_code, unused_unsafe)]
+unsafe fn luma_neon(src: &[u8], c: usize, out: &mut [u8]) -> usize {
+    use core::arch::aarch64::{
+        uint8x16x3_t, uint8x16x4_t, vaddq_u32, vcombine_u16, vcombine_u8, vdupq_n_u32,
+        vget_high_u16, vget_high_u8, vget_low_u16, vget_low_u8, vld3q_u8, vld4q_u8, vmlal_n_u16,
+        vmovl_u8, vmovn_u16, vmull_n_u16, vshrn_n_u32, vst1q_u8,
+    };
+
+    // Luma of four widened pixels: `(19595 r + 38470 g + 7471 b + 0x8000) >> 16`.
+    #[inline(always)]
+    unsafe fn lane4(
+        r: core::arch::aarch64::uint16x4_t,
+        g: core::arch::aarch64::uint16x4_t,
+        b: core::arch::aarch64::uint16x4_t,
+    ) -> core::arch::aarch64::uint16x4_t {
+        // SAFETY: NEON baseline.
+        unsafe {
+            let mut acc = vmull_n_u16(r, 19595);
+            acc = vmlal_n_u16(acc, g, 38470);
+            acc = vmlal_n_u16(acc, b, 7471);
+            vshrn_n_u32::<16>(vaddq_u32(acc, vdupq_n_u32(0x8000)))
+        }
+    }
+
+    let n = out.len();
+    let mut i = 0;
+    while i + 16 <= n && (i + 16) * c <= src.len() {
+        // SAFETY: bytes `i*c .. (i+16)*c` are in bounds (loop guard).
+        let (r, g, b) = unsafe {
+            if c == 3 {
+                let uint8x16x3_t(r, g, b) = vld3q_u8(src.as_ptr().add(i * 3));
+                (r, g, b)
+            } else {
+                let uint8x16x4_t(r, g, b, _) = vld4q_u8(src.as_ptr().add(i * 4));
+                (r, g, b)
+            }
+        };
+        // SAFETY: NEON baseline; `out[i..i+16]` is in bounds (loop guard).
+        unsafe {
+            let (rl, rh) = (vmovl_u8(vget_low_u8(r)), vmovl_u8(vget_high_u8(r)));
+            let (gl, gh) = (vmovl_u8(vget_low_u8(g)), vmovl_u8(vget_high_u8(g)));
+            let (bl, bh) = (vmovl_u8(vget_low_u8(b)), vmovl_u8(vget_high_u8(b)));
+            let lo = vcombine_u16(
+                lane4(vget_low_u16(rl), vget_low_u16(gl), vget_low_u16(bl)),
+                lane4(vget_high_u16(rl), vget_high_u16(gl), vget_high_u16(bl)),
+            );
+            let hi = vcombine_u16(
+                lane4(vget_low_u16(rh), vget_low_u16(gh), vget_low_u16(bh)),
+                lane4(vget_high_u16(rh), vget_high_u16(gh), vget_high_u16(bh)),
+            );
+            vst1q_u8(
+                out.as_mut_ptr().add(i),
+                vcombine_u8(vmovn_u16(lo), vmovn_u16(hi)),
+            );
+        }
+        i += 16;
+    }
+    i
 }
 
 /// Pillow's RGB → HSV (`rgb2hsv_row`): all three outputs scaled to
@@ -120,6 +293,42 @@ struct Coeffs {
     /// `(first source index, tap count)` per output pixel.
     bounds: Vec<(usize, usize)>,
     kk: Vec<i32>,
+    /// `kk` split as `k = hi · 2¹² + lo` into two `i16` tables (rows padded
+    /// with zeros to a multiple of 16), built on first use by the AVX2
+    /// horizontal pass.
+    #[cfg_attr(not(target_arch = "x86_64"), allow(dead_code))]
+    halves: OnceCell<Halves>,
+}
+
+/// The `i16` halves of a coefficient table; see [`Coeffs::halves`].
+#[cfg_attr(not(target_arch = "x86_64"), allow(dead_code))]
+struct Halves {
+    /// Row stride (a multiple of 16).
+    stride: usize,
+    hi: Vec<i16>,
+    lo: Vec<i16>,
+}
+
+#[cfg_attr(not(target_arch = "x86_64"), allow(dead_code))]
+impl Coeffs {
+    /// `k = hi · 4096 + lo` with `lo ∈ [0, 4096)` and `hi` signed: both fit
+    /// `i16` (|k| ≤ 2²³), so `Σ p·k` becomes two `madd_epi16` dot products.
+    fn halves(&self) -> &Halves {
+        self.halves.get_or_init(|| {
+            let stride = self.ksize.next_multiple_of(16);
+            let rows = self.bounds.len();
+            let mut hi = vec![0i16; rows * stride];
+            let mut lo = vec![0i16; rows * stride];
+            for r in 0..rows {
+                for t in 0..self.ksize {
+                    let k = self.kk[r * self.ksize + t];
+                    hi[r * stride + t] = (k >> 12) as i16;
+                    lo[r * stride + t] = (k & 0xfff) as i16;
+                }
+            }
+            Halves { stride, hi, lo }
+        })
+    }
 }
 
 fn compute_coeffs(in_size: usize, out_size: usize, filter: ResamplingFilter) -> Coeffs {
@@ -159,7 +368,12 @@ fn compute_coeffs(in_size: usize, out_size: usize, filter: ResamplingFilter) -> 
         }
         bounds.push((xmin, taps));
     }
-    Coeffs { ksize, bounds, kk }
+    Coeffs {
+        ksize,
+        bounds,
+        kk,
+        halves: OnceCell::new(),
+    }
 }
 
 /// Coefficient tables cached per thread: the kernel evaluates one `sin`
@@ -283,13 +497,83 @@ fn horizontal(src: &[u8], in_w: usize, c: usize, hc: &Coeffs) -> Vec<u8> {
     horizontal_impl(src, in_w, c, hc)
 }
 
-/// The same loops compiled with AVX2 enabled, so the tap reductions
-/// vectorise 8-wide; integer arithmetic, so bit-identical to the baseline.
+/// AVX2 horizontal pass. Single-channel rows (the perceptual hashes' only
+/// shape) use 16-tap `madd_epi16` dot products over the split coefficient
+/// tables; interleaved rows keep the auto-vectorised loops. Integer
+/// arithmetic modulo 2³² on both routes, so the result is bit-identical.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2")]
 #[allow(unsafe_code)]
 unsafe fn horizontal_avx2(src: &[u8], in_w: usize, c: usize, hc: &Coeffs) -> Vec<u8> {
-    horizontal_impl(src, in_w, c, hc)
+    if c != 1 {
+        return horizontal_impl(src, in_w, c, hc);
+    }
+    // SAFETY: AVX2 is enabled for this function (callers detected it).
+    unsafe { horizontal_gray_avx2(src, in_w, hc) }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+#[allow(unsafe_code, unused_unsafe)]
+unsafe fn horizontal_gray_avx2(src: &[u8], in_w: usize, hc: &Coeffs) -> Vec<u8> {
+    use core::arch::x86_64::{
+        __m256i, _mm256_add_epi32, _mm256_cvtepu8_epi16, _mm256_loadu_si256, _mm256_madd_epi16,
+        _mm256_setzero_si256, _mm256_storeu_si256, _mm_loadu_si128,
+    };
+
+    let out_w = hc.bounds.len();
+    let rows = src.len() / in_w;
+    let halves = hc.halves();
+    let mut buf = vec![0u8; rows * out_w];
+    for r in 0..rows {
+        let srow = &src[r * in_w..(r + 1) * in_w];
+        for (xx, &(xmin, taps)) in hc.bounds.iter().enumerate() {
+            let hi = &halves.hi[xx * halves.stride..(xx + 1) * halves.stride];
+            let lo = &halves.lo[xx * halves.stride..(xx + 1) * halves.stride];
+            let mut acc_hi = _mm256_setzero_si256();
+            let mut acc_lo = _mm256_setzero_si256();
+            let mut t = 0;
+            while t < taps {
+                let at = xmin + t;
+                let px = if at + 16 <= in_w {
+                    // SAFETY: 16 bytes in bounds of `srow`.
+                    unsafe { _mm_loadu_si128(srow.as_ptr().add(at).cast()) }
+                } else {
+                    // Tail: `taps` never reaches past the row, the zero
+                    // coefficients cover the padding.
+                    let mut tail = [0u8; 16];
+                    tail[..in_w - at].copy_from_slice(&srow[at..]);
+                    // SAFETY: `tail` is 16 bytes.
+                    unsafe { _mm_loadu_si128(tail.as_ptr().cast()) }
+                };
+                let p = _mm256_cvtepu8_epi16(px);
+                // SAFETY: `t < taps <= ksize <= stride` and `stride % 16 == 0`
+                // leave 16 `i16`s at `t` (`t` steps by 16).
+                let (kh, kl) = unsafe {
+                    (
+                        _mm256_loadu_si256(hi.as_ptr().add(t).cast::<__m256i>()),
+                        _mm256_loadu_si256(lo.as_ptr().add(t).cast::<__m256i>()),
+                    )
+                };
+                acc_hi = _mm256_add_epi32(acc_hi, _mm256_madd_epi16(p, kh));
+                acc_lo = _mm256_add_epi32(acc_lo, _mm256_madd_epi16(p, kl));
+                t += 16;
+            }
+            let (mut h8, mut l8) = ([0i32; 8], [0i32; 8]);
+            // SAFETY: both targets are 32 bytes.
+            unsafe {
+                _mm256_storeu_si256(h8.as_mut_ptr().cast(), acc_hi);
+                _mm256_storeu_si256(l8.as_mut_ptr().cast(), acc_lo);
+            }
+            let sum_hi = h8.iter().fold(0i32, |a, &v| a.wrapping_add(v));
+            let sum_lo = l8.iter().fold(0i32, |a, &v| a.wrapping_add(v));
+            let acc = (1i32 << (PRECISION_BITS - 1))
+                .wrapping_add(sum_hi.wrapping_shl(12))
+                .wrapping_add(sum_lo);
+            buf[r * out_w + xx] = clip8(acc);
+        }
+    }
+    buf
 }
 
 #[inline(always)]

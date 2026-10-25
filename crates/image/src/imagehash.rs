@@ -26,10 +26,11 @@
 //! evaluates the DCT sums in a fixed order and can differ from scipy's
 //! FFT-based `dct` only on such ties.
 
+use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use std::sync::LazyLock;
 
-use crate::raster::{Image, Layout, ResamplingFilter, Sample, resize_u8, rgb_to_hsv, rgb_to_l};
+use crate::raster::{Image, Layout, ResamplingFilter, Sample, resize_u8, rgb_plane_to_l, rgb_to_hsv, rgb_to_l};
 use sillstone_digest::Error;
 
 /// Reduces one sample of any depth to `u8`: identity for `u8`, `v >> 8`
@@ -69,13 +70,26 @@ fn map_pixels<L: Layout, T: Sample, R>(
         .collect())
 }
 
-/// Pillow's `convert("L")` of the image.
-fn luma_plane<L: Layout, T: Sample>(img: &Image<L, T>) -> Result<Vec<u8>, Error> {
-    if L::CHANNELS >= 3 {
-        map_pixels(img, "image buffer undersized", rgb_to_l)
+/// Pillow's `convert("L")` of the image. Gray 8-bit input is borrowed:
+/// Pillow does not convert it either.
+fn luma_plane<L: Layout, T: Sample>(img: &Image<L, T>) -> Result<Cow<'_, [u8]>, Error> {
+    let n = img.width() as usize * img.height() as usize;
+    let c = L::CHANNELS;
+    let src = img.as_slice();
+    if src.len() < n * c {
+        return Err(Error::BadValue("image buffer undersized"));
+    }
+    if let Some(bytes) = T::as_bytes(src) {
+        return Ok(if c >= 3 {
+            Cow::Owned(rgb_plane_to_l(bytes, c, n))
+        } else {
+            Cow::Borrowed(&bytes[..n])
+        });
+    }
+    if c >= 3 {
+        map_pixels(img, "image buffer undersized", rgb_to_l).map(Cow::Owned)
     } else {
-        // Gray: the samples already are L (no conversion in Pillow either).
-        map_pixels(img, "image buffer undersized", |l, _, _| l)
+        map_pixels(img, "image buffer undersized", |l, _, _| l).map(Cow::Owned)
     }
 }
 

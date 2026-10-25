@@ -285,3 +285,30 @@ fn ffi_surface() {
         PITH_E_INVALID
     );
 }
+
+/// The SIMD luma plane must equal the scalar Pillow formula for every
+/// pixel count (vector body plus scalar tail) and both pixel strides.
+#[test]
+fn luma_plane_matches_scalar_formula() {
+    use sillstone_image::raster::{rgb_plane_to_l, rgb_to_l};
+    let mut state = 0x9e37_79b9_7f4a_7c15u64;
+    let mut next = || {
+        state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        (state >> 56) as u8
+    };
+    for c in [3usize, 4] {
+        for n in (0..70usize).chain([255, 1000]) {
+            let mut src: Vec<u8> = (0..n * c).map(|_| next()).collect();
+            if n > 2 {
+                // Saturated corners exercise the rounding term.
+                src[..3].copy_from_slice(&[255, 255, 255]);
+                src[(n - 1) * c..(n - 1) * c + 3].copy_from_slice(&[0, 0, 0]);
+            }
+            let want: Vec<u8> = src
+                .chunks_exact(c)
+                .map(|p| rgb_to_l(p[0], p[1], p[2]))
+                .collect();
+            assert_eq!(rgb_plane_to_l(&src, c, n), want, "c={c} n={n}");
+        }
+    }
+}

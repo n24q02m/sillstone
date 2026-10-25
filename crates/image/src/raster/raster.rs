@@ -101,6 +101,8 @@ pub trait Sample: sealed::Sealed + Copy + Default + Eq {
     fn from_u64(v: u64) -> Self;
     /// The largest value of the type, as `u64`.
     const MAX_U64: u64;
+    /// The samples as bytes when the type is `u8` (no copy), else `None`.
+    fn as_bytes(samples: &[Self]) -> Option<&[u8]>;
 }
 
 impl sealed::Sealed for u8 {}
@@ -115,6 +117,10 @@ impl Sample for u8 {
         v as u8
     }
     const MAX_U64: u64 = 255;
+    #[inline]
+    fn as_bytes(samples: &[Self]) -> Option<&[u8]> {
+        Some(samples)
+    }
 }
 impl Sample for u16 {
     #[inline]
@@ -126,6 +132,10 @@ impl Sample for u16 {
         v as u16
     }
     const MAX_U64: u64 = 65_535;
+    #[inline]
+    fn as_bytes(_: &[Self]) -> Option<&[u8]> {
+        None
+    }
 }
 
 /// A tight row-major image buffer: `width * height * L::CHANNELS`
