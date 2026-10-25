@@ -7,22 +7,34 @@
 
 mod jni;
 
+/// Parses one decimal `CARGO_PKG_VERSION_*` component at compile time.
+const fn version_component(s: &str) -> u32 {
+    let b = s.as_bytes();
+    let mut n = 0u32;
+    let mut i = 0;
+    while i < b.len() {
+        n = n * 10 + (b[i] - b'0') as u32;
+        i += 1;
+    }
+    n
+}
+
 /// Returns the major version of the Sillstone library.
 #[cfg_attr(not(test), unsafe(no_mangle))]
 pub extern "C" fn sillstone_version_major() -> u32 {
-    0
+    version_component(env!("CARGO_PKG_VERSION_MAJOR"))
 }
 
 /// Returns the minor version of the Sillstone library.
 #[cfg_attr(not(test), unsafe(no_mangle))]
 pub extern "C" fn sillstone_version_minor() -> u32 {
-    2
+    version_component(env!("CARGO_PKG_VERSION_MINOR"))
 }
 
 /// Returns the patch version of the Sillstone library.
 #[cfg_attr(not(test), unsafe(no_mangle))]
 pub extern "C" fn sillstone_version_patch() -> u32 {
-    0
+    version_component(env!("CARGO_PKG_VERSION_PATCH"))
 }
 
 /// Computes a standard 64-bit FNV-1a checksum over a raw contiguous byte buffer.
@@ -77,9 +89,15 @@ mod tests {
 
     #[test]
     fn test_ffi_versions() {
-        assert_eq!(sillstone_version_major(), 0);
-        assert_eq!(sillstone_version_minor(), 2);
-        assert_eq!(sillstone_version_patch(), 0);
+        let parts: Vec<u32> = env!("CARGO_PKG_VERSION")
+            .split(['.', '-'])
+            .take(3)
+            .map(|p| p.parse().unwrap())
+            .collect();
+        assert_eq!(
+            [sillstone_version_major(), sillstone_version_minor(), sillstone_version_patch()],
+            [parts[0], parts[1], parts[2]]
+        );
     }
 
     #[test]

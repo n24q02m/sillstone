@@ -353,6 +353,88 @@ fn gen_go(fns: &[Function]) -> String {
     out
 }
 
+/// Image operations that write into a caller-sized `out_buf` of `out_len` bytes.
+fn is_image_buffer_op(f: &Function) -> bool {
+    f.name.starts_with("sillstone_image_") && f.args.iter().any(|a| a.name == "out_buf")
+}
+
+/// Image encoders that return a library-allocated buffer via `out_ptr`/`out_len`.
+fn is_image_encode_fn(f: &Function) -> bool {
+    f.name.starts_with("sillstone_image_")
+        && f.name.ends_with("_encode")
+        && f.args.iter().any(|a| a.name == "out_ptr")
+}
+
+/// Emits the scalar-argument extraction for N-API: every `u32` / `f64` argument in
+/// `scalars` is read from `args[offset + i]`, rejecting non-numbers with a TypeError.
+fn napi_scalar_reads(out: &mut String, scalars: &[&Arg], offset: usize) {
+    for (i, a) in scalars.iter().enumerate() {
+        let idx = offset + i;
+        match a.ty.as_str() {
+            "u32" => {
+                out.push_str(&format!("    uint32_t {} = 0;\n", a.name));
+                out.push_str(&format!("    if (napi_get_value_uint32(env, args[{idx}], &{}) != napi_ok) {{ napi_throw_type_error(env, NULL, \"{}: expected uint32\"); return NULL; }}\n", a.name, a.name));
+            }
+            "f64" => {
+                out.push_str(&format!("    double {} = 0;\n", a.name));
+                out.push_str(&format!("    if (napi_get_value_double(env, args[{idx}], &{}) != napi_ok) {{ napi_throw_type_error(env, NULL, \"{}: expected number\"); return NULL; }}\n", a.name, a.name));
+            }
+            other => panic!("N-API: unsupported scalar type {other} for argument {}", a.name),
+        }
+    }
+}
+
+/// `(data: Buffer, <scalars...>, outLen: number) -> Buffer` for fixed-size image outputs;
+/// `(data: Buffer, <scalars...>) -> Buffer` for encoders.
+fn gen_napi_image_buffer_fn(f: &Function) -> String {
+    let encode = is_image_encode_fn(f);
+    let stop = if encode { "out_ptr" } else { "out_buf" };
+    let scalars: Vec<&Arg> = f.args.iter().skip(2).take_while(|a| a.name != stop).collect();
+    let argc = 1 + scalars.len() + usize::from(!encode);
+    let mut out = String::new();
+    out.push_str(&format!("    size_t argc = {argc};\n    napi_value args[{argc}];\n"));
+    out.push_str("    napi_get_cb_info(env, info, &argc, args, NULL, NULL);\n");
+    out.push_str(&format!("    if (argc < {argc}) {{ napi_throw_type_error(env, NULL, \"expected {argc} arguments\"); return NULL; }}\n"));
+    out.push_str("    void* data = NULL; size_t length = 0;\n");
+    out.push_str("    if (napi_get_buffer_info(env, args[0], &data, &length) != napi_ok) { napi_throw_type_error(env, NULL, \"data: expected Buffer\"); return NULL; }\n");
+    napi_scalar_reads(&mut out, &scalars, 1);
+    let call_scalars: String = scalars.iter().map(|a| format!(", {}", a.name)).collect();
+    if encode {
+        out.push_str("    uint8_t* out_ptr = NULL; size_t out_len = 0;\n");
+        out.push_str(&format!("    int32_t status = {}((const uint8_t*)data, length{call_scalars}, &out_ptr, &out_len);\n", f.name));
+        out.push_str("    if (status != 0) { throw_status(env, status); return NULL; }\n");
+        out.push_str("    napi_value result;\n    napi_create_buffer_copy(env, out_len, out_ptr, NULL, &result);\n");
+        out.push_str("    sillstone_image_free_bytes(out_ptr, out_len);\n    return result;\n");
+    } else {
+        let last = argc - 1;
+        out.push_str("    int64_t out_len_i = 0;\n");
+        out.push_str(&format!("    if (napi_get_value_int64(env, args[{last}], &out_len_i) != napi_ok || out_len_i < 0) {{ napi_throw_type_error(env, NULL, \"outLen: expected non-negative number\"); return NULL; }}\n"));
+        out.push_str("    void* out_buf = NULL; napi_value result;\n");
+        out.push_str("    if (napi_create_buffer(env, (size_t)out_len_i, &out_buf, &result) != napi_ok) { napi_throw_error(env, NULL, \"output allocation failed\"); return NULL; }\n");
+        out.push_str(&format!("    int32_t status = {}((const uint8_t*)data, length{call_scalars}, (uint8_t*)out_buf, (size_t)out_len_i);\n", f.name));
+        out.push_str("    if (status != 0) { throw_status(env, status); return NULL; }\n    return result;\n");
+    }
+    out
+}
+
+/// `(data: Buffer) -> { width, height, layout, data: Buffer }`.
+fn gen_napi_qoi_decode() -> String {
+    let mut out = String::new();
+    out.push_str("    size_t argc = 1;\n    napi_value args[1];\n    napi_get_cb_info(env, info, &argc, args, NULL, NULL);\n");
+    out.push_str("    void* data = NULL; size_t length = 0;\n");
+    out.push_str("    if (argc < 1 || napi_get_buffer_info(env, args[0], &data, &length) != napi_ok) { napi_throw_type_error(env, NULL, \"data: expected Buffer\"); return NULL; }\n");
+    out.push_str("    uint32_t w = 0, h = 0, layout = 0; uint8_t* out_ptr = NULL; size_t out_len = 0;\n");
+    out.push_str("    int32_t status = sillstone_image_qoi_decode((const uint8_t*)data, length, &w, &h, &layout, &out_ptr, &out_len);\n");
+    out.push_str("    if (status != 0) { throw_status(env, status); return NULL; }\n");
+    out.push_str("    napi_value result, v_w, v_h, v_layout, v_data;\n    napi_create_object(env, &result);\n");
+    out.push_str("    napi_create_buffer_copy(env, out_len, out_ptr, NULL, &v_data);\n    sillstone_image_free_bytes(out_ptr, out_len);\n");
+    out.push_str("    napi_create_uint32(env, w, &v_w);\n    napi_set_named_property(env, result, \"width\", v_w);\n");
+    out.push_str("    napi_create_uint32(env, h, &v_h);\n    napi_set_named_property(env, result, \"height\", v_h);\n");
+    out.push_str("    napi_create_uint32(env, layout, &v_layout);\n    napi_set_named_property(env, result, \"layout\", v_layout);\n");
+    out.push_str("    napi_set_named_property(env, result, \"data\", v_data);\n    return result;\n");
+    out
+}
+
 fn gen_node_napi(fns: &[Function]) -> String {
     let mut out = String::new();
     out.push_str("/* Generated by sillstone-idl-gen. DO NOT EDIT. */\n");
@@ -484,11 +566,17 @@ fn gen_node_napi(fns: &[Function]) -> String {
             out.push_str("    napi_set_named_property(env, result, \"slots\", v_slots);\n");
             out.push_str("    napi_create_uint32(env, matched, &v_matched);\n    napi_set_named_property(env, result, \"matched\", v_matched);\n");
             out.push_str("    return result;\n");
+        } else if is_image_buffer_op(f) || is_image_encode_fn(f) {
+            out.push_str(&gen_napi_image_buffer_fn(f));
+        } else if f.name == "sillstone_image_qoi_decode" {
+            out.push_str(&gen_napi_qoi_decode());
         } else if f.name == "sillstone_curator_free" || f.name == "sillstone_image_free_bytes" {
             out.push_str("    napi_value result;\n    napi_get_undefined(env, &result);\n    return result;\n");
-        } else {
+        } else if f.args.is_empty() && f.ret == "u32" {
             out.push_str(&format!("    uint32_t val = {}();\n", f.name));
             out.push_str("    napi_value result;\n    napi_create_uint32(env, val, &result);\n    return result;\n");
+        } else {
+            panic!("N-API: no emitter for {}; add one instead of emitting uncompilable C", f.name);
         }
         out.push_str("}\n\n");
     }
@@ -539,8 +627,13 @@ fn gen_java(fns: &[Function]) -> String {
             out.push_str("    public static native long[] sillstone_curator_match(byte[] a, byte[] b);\n\n");
         } else if f.name == "sillstone_curator_free" {
             out.push_str("    public static native void sillstone_curator_free(long ptr, long len);\n\n");
-        } else {
+        } else if f.args.is_empty() && f.ret == "u32" {
             out.push_str(&format!("    public static native int {}();\n\n", f.name));
+        } else if f.name.starts_with("sillstone_image_") {
+            // Image buffer operations have no JNI implementation yet; declaring a
+            // native method without one only defers the failure to call time.
+        } else {
+            panic!("JNI: no emitter for {}; add one instead of emitting a wrong stub", f.name);
         }
     }
     out.push_str("}\n");

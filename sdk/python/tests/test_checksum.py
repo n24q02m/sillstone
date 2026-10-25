@@ -1,6 +1,8 @@
+import re
 import unittest
 import sys
 import os
+from pathlib import Path
 
 # Add sdk/python to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -11,7 +13,9 @@ import sillstone
 class TestSillstonePython(unittest.TestCase):
     def test_version(self):
         v = sillstone.version()
-        self.assertEqual(v, "0.2.0")
+        text = (Path(__file__).resolve().parents[3] / "Cargo.toml").read_text(encoding="utf-8")
+        want = re.search(r'^version = "(\d+\.\d+\.\d+)', text, re.M).group(1)
+        self.assertEqual(v, want)
 
     def test_checksum_sample(self):
         data = b"sillstone pure rust zero dep"

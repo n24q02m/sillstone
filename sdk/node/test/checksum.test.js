@@ -3,8 +3,10 @@ const assert = require("node:assert");
 const crypto = require("node:crypto");
 const sillstone = require("../index.js");
 
-test("version matches expected", () => {
-  assert.strictEqual(sillstone.version(), "0.2.0");
+test("version matches the workspace version", () => {
+  const toml = require("node:fs").readFileSync(require("node:path").join(__dirname, "..", "..", "..", "Cargo.toml"), "utf8");
+  const want = /^version = "(\d+\.\d+\.\d+)/m.exec(toml)[1];
+  assert.strictEqual(sillstone.version(), want);
 });
 
 test("checksum produces deterministic golden output", () => {

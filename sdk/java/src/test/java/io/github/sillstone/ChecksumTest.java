@@ -5,10 +5,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class ChecksumTest {
     @Test
-    public void testVersion() {
-        assertEquals(0, Generated.sillstone_version_major());
-        assertEquals(2, Generated.sillstone_version_minor());
-        assertEquals(0, Generated.sillstone_version_patch());
+    public void testVersion() throws java.io.IOException {
+        String toml = java.nio.file.Files.readString(java.nio.file.Path.of("..", "..", "Cargo.toml"));
+        java.util.regex.Matcher m = java.util.regex.Pattern
+            .compile("(?m)^version = \"(\\d+)\\.(\\d+)\\.(\\d+)").matcher(toml);
+        assertTrue(m.find());
+        assertEquals(Integer.parseInt(m.group(1)), Generated.sillstone_version_major());
+        assertEquals(Integer.parseInt(m.group(2)), Generated.sillstone_version_minor());
+        assertEquals(Integer.parseInt(m.group(3)), Generated.sillstone_version_patch());
     }
 
     @Test

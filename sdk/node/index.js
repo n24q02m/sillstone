@@ -34,13 +34,24 @@ const candidates = [
   path.join(__dirname, "build", "Debug", "sillstone_napi.node"),
 ];
 
+const loadErrors = [];
 for (const c of candidates) {
   if (fs.existsSync(c)) {
     try {
       native = require(c);
       break;
-    } catch (_) {}
+    } catch (e) {
+      loadErrors.push(`${c}: ${e.message}`);
+    }
   }
+}
+if (!native) {
+  // Fail at require() instead of silently degrading: a package that cannot reach
+  // its native core must not pretend to work (several functions have no fallback).
+  throw new Error(
+    `sillstone: native addon not loadable for ${platformKey}; tried:\n` +
+      (loadErrors.length ? loadErrors : candidates.map((c) => `${c}: not found`)).join("\n"),
+  );
 }
 
 function fnv1a64(data) {

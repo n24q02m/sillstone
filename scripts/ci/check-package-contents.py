@@ -13,7 +13,7 @@ of every publish job.
 
   check-package-contents.py wheels 'wheelhouse-flat/*.whl' --platforms linux-x64,win32-x64 --stem sillstone_ffi
   check-package-contents.py jar    'sdk/java/target/*.jar' --platforms ... --stem sillstone_ffi --prefix github/sillstone/native
-  check-package-contents.py npm    'sdk/node/*.tgz'        --platforms ... --stem sillstone_napi
+  check-package-contents.py npm    'sdk/node/*.tgz'        --platforms ... --stem sillstone_ffi --addon-stem sillstone_napi
 """
 from __future__ import annotations
 
@@ -91,18 +91,23 @@ def check_jar(jar: pathlib.Path, platforms: list[str], stem: str, prefix: str) -
     return problems
 
 
-def check_npm(tgz: pathlib.Path, platforms: list[str], stem: str) -> list[str]:
+def check_npm(tgz: pathlib.Path, platforms: list[str], stem: str, addon_stem: str = "sillstone_napi") -> list[str]:
+    """Every platform needs the N-API addon (the only file `require()` can load)
+    and the cdylib it links against, side by side under prebuilds/<platform>/.
+    A tarball that carries only the cdylib installs fine and then every native
+    call fails with "addon not loaded"."""
     if not tgz.is_file():
         return [f"{tgz}: not a file"]
     with tarfile.open(tgz, "r:gz") as t:
         names = set(t.getnames())
     problems = []
     for platform in platforms:
-        # Prebuild can be named either {stem}.node or {platform}/{stem}.node or similar
-        entry1 = f"package/prebuilds/{platform}/{stem}.node"
-        entry2 = f"package/prebuilds/{platform}/{cdylib_name(platform, stem)}"
-        if entry1 not in names and entry2 not in names and not any(platform in n for n in names):
-            problems.append(f"{tgz.name}: missing prebuild for {platform}")
+        for entry in (
+            f"package/prebuilds/{platform}/{addon_stem}.node",
+            f"package/prebuilds/{platform}/{cdylib_name(platform, stem)}",
+        ):
+            if entry not in names:
+                problems.append(f"{tgz.name}: missing {entry}")
     return problems
 
 
@@ -117,6 +122,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--platforms", required=True, help="comma-separated platform ids")
     ap.add_argument("--stem", required=True, help="cdylib stem, e.g. sillstone_ffi")
     ap.add_argument("--prefix", default="github/sillstone/native", help="jar resource prefix")
+    ap.add_argument("--addon-stem", default="sillstone_napi", help="npm N-API addon stem")
     args = ap.parse_args(argv)
     platforms = [p.strip() for p in args.platforms.split(",") if p.strip()]
     unknown = [p for p in platforms if p not in PLATFORMS]
@@ -134,7 +140,7 @@ def main(argv: list[str] | None = None) -> int:
             problems += (
                 check_jar(f, platforms, args.stem, args.prefix)
                 if args.kind == "jar"
-                else check_npm(f, platforms, args.stem)
+                else check_npm(f, platforms, args.stem, args.addon_stem)
             )
     for p in problems:
         print(f"FAIL: {p}")

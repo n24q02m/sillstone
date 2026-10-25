@@ -1,7 +1,10 @@
 package sillstone
 
 import (
+	"fmt"
 	"math"
+	"os"
+	"regexp"
 	"testing"
 )
 
@@ -22,8 +25,18 @@ func TestChecksum(t *testing.T) {
 }
 
 func TestVersion(t *testing.T) {
-	if SillstoneVersionMajor() != 0 || SillstoneVersionMinor() != 2 || SillstoneVersionPatch() != 0 {
-		t.Fatalf("unexpected version %d.%d.%d", SillstoneVersionMajor(), SillstoneVersionMinor(), SillstoneVersionPatch())
+	toml, err := os.ReadFile("../../../Cargo.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := regexp.MustCompile(`(?m)^version = "(\d+)\.(\d+)\.(\d+)`).FindSubmatch(toml)
+	if m == nil {
+		t.Fatal("workspace version not found in Cargo.toml")
+	}
+	want := fmt.Sprintf("%s.%s.%s", m[1], m[2], m[3])
+	got := fmt.Sprintf("%d.%d.%d", SillstoneVersionMajor(), SillstoneVersionMinor(), SillstoneVersionPatch())
+	if got != want {
+		t.Fatalf("unexpected version %s, want %s", got, want)
 	}
 }
 

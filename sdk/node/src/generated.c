@@ -396,72 +396,253 @@ static napi_value n_sillstone_image_colorhash(napi_env env, napi_callback_info i
 }
 
 static napi_value n_sillstone_image_resize(napi_env env, napi_callback_info info) {
-    uint32_t val = sillstone_image_resize();
-    napi_value result;
-    napi_create_uint32(env, val, &result);
+    size_t argc = 8;
+    napi_value args[8];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    if (argc < 8) { napi_throw_type_error(env, NULL, "expected 8 arguments"); return NULL; }
+    void* data = NULL; size_t length = 0;
+    if (napi_get_buffer_info(env, args[0], &data, &length) != napi_ok) { napi_throw_type_error(env, NULL, "data: expected Buffer"); return NULL; }
+    uint32_t in_w = 0;
+    if (napi_get_value_uint32(env, args[1], &in_w) != napi_ok) { napi_throw_type_error(env, NULL, "in_w: expected uint32"); return NULL; }
+    uint32_t in_h = 0;
+    if (napi_get_value_uint32(env, args[2], &in_h) != napi_ok) { napi_throw_type_error(env, NULL, "in_h: expected uint32"); return NULL; }
+    uint32_t layout = 0;
+    if (napi_get_value_uint32(env, args[3], &layout) != napi_ok) { napi_throw_type_error(env, NULL, "layout: expected uint32"); return NULL; }
+    uint32_t out_w = 0;
+    if (napi_get_value_uint32(env, args[4], &out_w) != napi_ok) { napi_throw_type_error(env, NULL, "out_w: expected uint32"); return NULL; }
+    uint32_t out_h = 0;
+    if (napi_get_value_uint32(env, args[5], &out_h) != napi_ok) { napi_throw_type_error(env, NULL, "out_h: expected uint32"); return NULL; }
+    uint32_t filter = 0;
+    if (napi_get_value_uint32(env, args[6], &filter) != napi_ok) { napi_throw_type_error(env, NULL, "filter: expected uint32"); return NULL; }
+    int64_t out_len_i = 0;
+    if (napi_get_value_int64(env, args[7], &out_len_i) != napi_ok || out_len_i < 0) { napi_throw_type_error(env, NULL, "outLen: expected non-negative number"); return NULL; }
+    void* out_buf = NULL; napi_value result;
+    if (napi_create_buffer(env, (size_t)out_len_i, &out_buf, &result) != napi_ok) { napi_throw_error(env, NULL, "output allocation failed"); return NULL; }
+    int32_t status = sillstone_image_resize((const uint8_t*)data, length, in_w, in_h, layout, out_w, out_h, filter, (uint8_t*)out_buf, (size_t)out_len_i);
+    if (status != 0) { throw_status(env, status); return NULL; }
     return result;
 }
 
 static napi_value n_sillstone_image_crop(napi_env env, napi_callback_info info) {
-    uint32_t val = sillstone_image_crop();
-    napi_value result;
-    napi_create_uint32(env, val, &result);
+    size_t argc = 9;
+    napi_value args[9];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    if (argc < 9) { napi_throw_type_error(env, NULL, "expected 9 arguments"); return NULL; }
+    void* data = NULL; size_t length = 0;
+    if (napi_get_buffer_info(env, args[0], &data, &length) != napi_ok) { napi_throw_type_error(env, NULL, "data: expected Buffer"); return NULL; }
+    uint32_t in_w = 0;
+    if (napi_get_value_uint32(env, args[1], &in_w) != napi_ok) { napi_throw_type_error(env, NULL, "in_w: expected uint32"); return NULL; }
+    uint32_t in_h = 0;
+    if (napi_get_value_uint32(env, args[2], &in_h) != napi_ok) { napi_throw_type_error(env, NULL, "in_h: expected uint32"); return NULL; }
+    uint32_t layout = 0;
+    if (napi_get_value_uint32(env, args[3], &layout) != napi_ok) { napi_throw_type_error(env, NULL, "layout: expected uint32"); return NULL; }
+    uint32_t x0 = 0;
+    if (napi_get_value_uint32(env, args[4], &x0) != napi_ok) { napi_throw_type_error(env, NULL, "x0: expected uint32"); return NULL; }
+    uint32_t y0 = 0;
+    if (napi_get_value_uint32(env, args[5], &y0) != napi_ok) { napi_throw_type_error(env, NULL, "y0: expected uint32"); return NULL; }
+    uint32_t x1 = 0;
+    if (napi_get_value_uint32(env, args[6], &x1) != napi_ok) { napi_throw_type_error(env, NULL, "x1: expected uint32"); return NULL; }
+    uint32_t y1 = 0;
+    if (napi_get_value_uint32(env, args[7], &y1) != napi_ok) { napi_throw_type_error(env, NULL, "y1: expected uint32"); return NULL; }
+    int64_t out_len_i = 0;
+    if (napi_get_value_int64(env, args[8], &out_len_i) != napi_ok || out_len_i < 0) { napi_throw_type_error(env, NULL, "outLen: expected non-negative number"); return NULL; }
+    void* out_buf = NULL; napi_value result;
+    if (napi_create_buffer(env, (size_t)out_len_i, &out_buf, &result) != napi_ok) { napi_throw_error(env, NULL, "output allocation failed"); return NULL; }
+    int32_t status = sillstone_image_crop((const uint8_t*)data, length, in_w, in_h, layout, x0, y0, x1, y1, (uint8_t*)out_buf, (size_t)out_len_i);
+    if (status != 0) { throw_status(env, status); return NULL; }
     return result;
 }
 
 static napi_value n_sillstone_image_transpose(napi_env env, napi_callback_info info) {
-    uint32_t val = sillstone_image_transpose();
-    napi_value result;
-    napi_create_uint32(env, val, &result);
+    size_t argc = 6;
+    napi_value args[6];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    if (argc < 6) { napi_throw_type_error(env, NULL, "expected 6 arguments"); return NULL; }
+    void* data = NULL; size_t length = 0;
+    if (napi_get_buffer_info(env, args[0], &data, &length) != napi_ok) { napi_throw_type_error(env, NULL, "data: expected Buffer"); return NULL; }
+    uint32_t in_w = 0;
+    if (napi_get_value_uint32(env, args[1], &in_w) != napi_ok) { napi_throw_type_error(env, NULL, "in_w: expected uint32"); return NULL; }
+    uint32_t in_h = 0;
+    if (napi_get_value_uint32(env, args[2], &in_h) != napi_ok) { napi_throw_type_error(env, NULL, "in_h: expected uint32"); return NULL; }
+    uint32_t layout = 0;
+    if (napi_get_value_uint32(env, args[3], &layout) != napi_ok) { napi_throw_type_error(env, NULL, "layout: expected uint32"); return NULL; }
+    uint32_t method = 0;
+    if (napi_get_value_uint32(env, args[4], &method) != napi_ok) { napi_throw_type_error(env, NULL, "method: expected uint32"); return NULL; }
+    int64_t out_len_i = 0;
+    if (napi_get_value_int64(env, args[5], &out_len_i) != napi_ok || out_len_i < 0) { napi_throw_type_error(env, NULL, "outLen: expected non-negative number"); return NULL; }
+    void* out_buf = NULL; napi_value result;
+    if (napi_create_buffer(env, (size_t)out_len_i, &out_buf, &result) != napi_ok) { napi_throw_error(env, NULL, "output allocation failed"); return NULL; }
+    int32_t status = sillstone_image_transpose((const uint8_t*)data, length, in_w, in_h, layout, method, (uint8_t*)out_buf, (size_t)out_len_i);
+    if (status != 0) { throw_status(env, status); return NULL; }
     return result;
 }
 
 static napi_value n_sillstone_image_rotate(napi_env env, napi_callback_info info) {
-    uint32_t val = sillstone_image_rotate();
-    napi_value result;
-    napi_create_uint32(env, val, &result);
+    size_t argc = 8;
+    napi_value args[8];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    if (argc < 8) { napi_throw_type_error(env, NULL, "expected 8 arguments"); return NULL; }
+    void* data = NULL; size_t length = 0;
+    if (napi_get_buffer_info(env, args[0], &data, &length) != napi_ok) { napi_throw_type_error(env, NULL, "data: expected Buffer"); return NULL; }
+    uint32_t in_w = 0;
+    if (napi_get_value_uint32(env, args[1], &in_w) != napi_ok) { napi_throw_type_error(env, NULL, "in_w: expected uint32"); return NULL; }
+    uint32_t in_h = 0;
+    if (napi_get_value_uint32(env, args[2], &in_h) != napi_ok) { napi_throw_type_error(env, NULL, "in_h: expected uint32"); return NULL; }
+    uint32_t layout = 0;
+    if (napi_get_value_uint32(env, args[3], &layout) != napi_ok) { napi_throw_type_error(env, NULL, "layout: expected uint32"); return NULL; }
+    double angle = 0;
+    if (napi_get_value_double(env, args[4], &angle) != napi_ok) { napi_throw_type_error(env, NULL, "angle: expected number"); return NULL; }
+    uint32_t expand = 0;
+    if (napi_get_value_uint32(env, args[5], &expand) != napi_ok) { napi_throw_type_error(env, NULL, "expand: expected uint32"); return NULL; }
+    uint32_t filter = 0;
+    if (napi_get_value_uint32(env, args[6], &filter) != napi_ok) { napi_throw_type_error(env, NULL, "filter: expected uint32"); return NULL; }
+    int64_t out_len_i = 0;
+    if (napi_get_value_int64(env, args[7], &out_len_i) != napi_ok || out_len_i < 0) { napi_throw_type_error(env, NULL, "outLen: expected non-negative number"); return NULL; }
+    void* out_buf = NULL; napi_value result;
+    if (napi_create_buffer(env, (size_t)out_len_i, &out_buf, &result) != napi_ok) { napi_throw_error(env, NULL, "output allocation failed"); return NULL; }
+    int32_t status = sillstone_image_rotate((const uint8_t*)data, length, in_w, in_h, layout, angle, expand, filter, (uint8_t*)out_buf, (size_t)out_len_i);
+    if (status != 0) { throw_status(env, status); return NULL; }
     return result;
 }
 
 static napi_value n_sillstone_image_filter(napi_env env, napi_callback_info info) {
-    uint32_t val = sillstone_image_filter();
-    napi_value result;
-    napi_create_uint32(env, val, &result);
+    size_t argc = 6;
+    napi_value args[6];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    if (argc < 6) { napi_throw_type_error(env, NULL, "expected 6 arguments"); return NULL; }
+    void* data = NULL; size_t length = 0;
+    if (napi_get_buffer_info(env, args[0], &data, &length) != napi_ok) { napi_throw_type_error(env, NULL, "data: expected Buffer"); return NULL; }
+    uint32_t in_w = 0;
+    if (napi_get_value_uint32(env, args[1], &in_w) != napi_ok) { napi_throw_type_error(env, NULL, "in_w: expected uint32"); return NULL; }
+    uint32_t in_h = 0;
+    if (napi_get_value_uint32(env, args[2], &in_h) != napi_ok) { napi_throw_type_error(env, NULL, "in_h: expected uint32"); return NULL; }
+    uint32_t layout = 0;
+    if (napi_get_value_uint32(env, args[3], &layout) != napi_ok) { napi_throw_type_error(env, NULL, "layout: expected uint32"); return NULL; }
+    uint32_t filter_id = 0;
+    if (napi_get_value_uint32(env, args[4], &filter_id) != napi_ok) { napi_throw_type_error(env, NULL, "filter_id: expected uint32"); return NULL; }
+    int64_t out_len_i = 0;
+    if (napi_get_value_int64(env, args[5], &out_len_i) != napi_ok || out_len_i < 0) { napi_throw_type_error(env, NULL, "outLen: expected non-negative number"); return NULL; }
+    void* out_buf = NULL; napi_value result;
+    if (napi_create_buffer(env, (size_t)out_len_i, &out_buf, &result) != napi_ok) { napi_throw_error(env, NULL, "output allocation failed"); return NULL; }
+    int32_t status = sillstone_image_filter((const uint8_t*)data, length, in_w, in_h, layout, filter_id, (uint8_t*)out_buf, (size_t)out_len_i);
+    if (status != 0) { throw_status(env, status); return NULL; }
     return result;
 }
 
 static napi_value n_sillstone_image_adjust(napi_env env, napi_callback_info info) {
-    uint32_t val = sillstone_image_adjust();
-    napi_value result;
-    napi_create_uint32(env, val, &result);
+    size_t argc = 7;
+    napi_value args[7];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    if (argc < 7) { napi_throw_type_error(env, NULL, "expected 7 arguments"); return NULL; }
+    void* data = NULL; size_t length = 0;
+    if (napi_get_buffer_info(env, args[0], &data, &length) != napi_ok) { napi_throw_type_error(env, NULL, "data: expected Buffer"); return NULL; }
+    uint32_t in_w = 0;
+    if (napi_get_value_uint32(env, args[1], &in_w) != napi_ok) { napi_throw_type_error(env, NULL, "in_w: expected uint32"); return NULL; }
+    uint32_t in_h = 0;
+    if (napi_get_value_uint32(env, args[2], &in_h) != napi_ok) { napi_throw_type_error(env, NULL, "in_h: expected uint32"); return NULL; }
+    uint32_t layout = 0;
+    if (napi_get_value_uint32(env, args[3], &layout) != napi_ok) { napi_throw_type_error(env, NULL, "layout: expected uint32"); return NULL; }
+    uint32_t op_id = 0;
+    if (napi_get_value_uint32(env, args[4], &op_id) != napi_ok) { napi_throw_type_error(env, NULL, "op_id: expected uint32"); return NULL; }
+    double factor = 0;
+    if (napi_get_value_double(env, args[5], &factor) != napi_ok) { napi_throw_type_error(env, NULL, "factor: expected number"); return NULL; }
+    int64_t out_len_i = 0;
+    if (napi_get_value_int64(env, args[6], &out_len_i) != napi_ok || out_len_i < 0) { napi_throw_type_error(env, NULL, "outLen: expected non-negative number"); return NULL; }
+    void* out_buf = NULL; napi_value result;
+    if (napi_create_buffer(env, (size_t)out_len_i, &out_buf, &result) != napi_ok) { napi_throw_error(env, NULL, "output allocation failed"); return NULL; }
+    int32_t status = sillstone_image_adjust((const uint8_t*)data, length, in_w, in_h, layout, op_id, factor, (uint8_t*)out_buf, (size_t)out_len_i);
+    if (status != 0) { throw_status(env, status); return NULL; }
     return result;
 }
 
 static napi_value n_sillstone_image_color_convert(napi_env env, napi_callback_info info) {
-    uint32_t val = sillstone_image_color_convert();
-    napi_value result;
-    napi_create_uint32(env, val, &result);
+    size_t argc = 6;
+    napi_value args[6];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    if (argc < 6) { napi_throw_type_error(env, NULL, "expected 6 arguments"); return NULL; }
+    void* data = NULL; size_t length = 0;
+    if (napi_get_buffer_info(env, args[0], &data, &length) != napi_ok) { napi_throw_type_error(env, NULL, "data: expected Buffer"); return NULL; }
+    uint32_t in_w = 0;
+    if (napi_get_value_uint32(env, args[1], &in_w) != napi_ok) { napi_throw_type_error(env, NULL, "in_w: expected uint32"); return NULL; }
+    uint32_t in_h = 0;
+    if (napi_get_value_uint32(env, args[2], &in_h) != napi_ok) { napi_throw_type_error(env, NULL, "in_h: expected uint32"); return NULL; }
+    uint32_t from_layout = 0;
+    if (napi_get_value_uint32(env, args[3], &from_layout) != napi_ok) { napi_throw_type_error(env, NULL, "from_layout: expected uint32"); return NULL; }
+    uint32_t to_layout = 0;
+    if (napi_get_value_uint32(env, args[4], &to_layout) != napi_ok) { napi_throw_type_error(env, NULL, "to_layout: expected uint32"); return NULL; }
+    int64_t out_len_i = 0;
+    if (napi_get_value_int64(env, args[5], &out_len_i) != napi_ok || out_len_i < 0) { napi_throw_type_error(env, NULL, "outLen: expected non-negative number"); return NULL; }
+    void* out_buf = NULL; napi_value result;
+    if (napi_create_buffer(env, (size_t)out_len_i, &out_buf, &result) != napi_ok) { napi_throw_error(env, NULL, "output allocation failed"); return NULL; }
+    int32_t status = sillstone_image_color_convert((const uint8_t*)data, length, in_w, in_h, from_layout, to_layout, (uint8_t*)out_buf, (size_t)out_len_i);
+    if (status != 0) { throw_status(env, status); return NULL; }
     return result;
 }
 
 static napi_value n_sillstone_image_qoi_encode(napi_env env, napi_callback_info info) {
-    uint32_t val = sillstone_image_qoi_encode();
+    size_t argc = 4;
+    napi_value args[4];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    if (argc < 4) { napi_throw_type_error(env, NULL, "expected 4 arguments"); return NULL; }
+    void* data = NULL; size_t length = 0;
+    if (napi_get_buffer_info(env, args[0], &data, &length) != napi_ok) { napi_throw_type_error(env, NULL, "data: expected Buffer"); return NULL; }
+    uint32_t in_w = 0;
+    if (napi_get_value_uint32(env, args[1], &in_w) != napi_ok) { napi_throw_type_error(env, NULL, "in_w: expected uint32"); return NULL; }
+    uint32_t in_h = 0;
+    if (napi_get_value_uint32(env, args[2], &in_h) != napi_ok) { napi_throw_type_error(env, NULL, "in_h: expected uint32"); return NULL; }
+    uint32_t layout = 0;
+    if (napi_get_value_uint32(env, args[3], &layout) != napi_ok) { napi_throw_type_error(env, NULL, "layout: expected uint32"); return NULL; }
+    uint8_t* out_ptr = NULL; size_t out_len = 0;
+    int32_t status = sillstone_image_qoi_encode((const uint8_t*)data, length, in_w, in_h, layout, &out_ptr, &out_len);
+    if (status != 0) { throw_status(env, status); return NULL; }
     napi_value result;
-    napi_create_uint32(env, val, &result);
+    napi_create_buffer_copy(env, out_len, out_ptr, NULL, &result);
+    sillstone_image_free_bytes(out_ptr, out_len);
     return result;
 }
 
 static napi_value n_sillstone_image_qoi_decode(napi_env env, napi_callback_info info) {
-    uint32_t val = sillstone_image_qoi_decode();
-    napi_value result;
-    napi_create_uint32(env, val, &result);
+    size_t argc = 1;
+    napi_value args[1];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    void* data = NULL; size_t length = 0;
+    if (argc < 1 || napi_get_buffer_info(env, args[0], &data, &length) != napi_ok) { napi_throw_type_error(env, NULL, "data: expected Buffer"); return NULL; }
+    uint32_t w = 0, h = 0, layout = 0; uint8_t* out_ptr = NULL; size_t out_len = 0;
+    int32_t status = sillstone_image_qoi_decode((const uint8_t*)data, length, &w, &h, &layout, &out_ptr, &out_len);
+    if (status != 0) { throw_status(env, status); return NULL; }
+    napi_value result, v_w, v_h, v_layout, v_data;
+    napi_create_object(env, &result);
+    napi_create_buffer_copy(env, out_len, out_ptr, NULL, &v_data);
+    sillstone_image_free_bytes(out_ptr, out_len);
+    napi_create_uint32(env, w, &v_w);
+    napi_set_named_property(env, result, "width", v_w);
+    napi_create_uint32(env, h, &v_h);
+    napi_set_named_property(env, result, "height", v_h);
+    napi_create_uint32(env, layout, &v_layout);
+    napi_set_named_property(env, result, "layout", v_layout);
+    napi_set_named_property(env, result, "data", v_data);
     return result;
 }
 
 static napi_value n_sillstone_image_bmp_encode(napi_env env, napi_callback_info info) {
-    uint32_t val = sillstone_image_bmp_encode();
+    size_t argc = 4;
+    napi_value args[4];
+    napi_get_cb_info(env, info, &argc, args, NULL, NULL);
+    if (argc < 4) { napi_throw_type_error(env, NULL, "expected 4 arguments"); return NULL; }
+    void* data = NULL; size_t length = 0;
+    if (napi_get_buffer_info(env, args[0], &data, &length) != napi_ok) { napi_throw_type_error(env, NULL, "data: expected Buffer"); return NULL; }
+    uint32_t in_w = 0;
+    if (napi_get_value_uint32(env, args[1], &in_w) != napi_ok) { napi_throw_type_error(env, NULL, "in_w: expected uint32"); return NULL; }
+    uint32_t in_h = 0;
+    if (napi_get_value_uint32(env, args[2], &in_h) != napi_ok) { napi_throw_type_error(env, NULL, "in_h: expected uint32"); return NULL; }
+    uint32_t layout = 0;
+    if (napi_get_value_uint32(env, args[3], &layout) != napi_ok) { napi_throw_type_error(env, NULL, "layout: expected uint32"); return NULL; }
+    uint8_t* out_ptr = NULL; size_t out_len = 0;
+    int32_t status = sillstone_image_bmp_encode((const uint8_t*)data, length, in_w, in_h, layout, &out_ptr, &out_len);
+    if (status != 0) { throw_status(env, status); return NULL; }
     napi_value result;
-    napi_create_uint32(env, val, &result);
+    napi_create_buffer_copy(env, out_len, out_ptr, NULL, &result);
+    sillstone_image_free_bytes(out_ptr, out_len);
     return result;
 }
 
