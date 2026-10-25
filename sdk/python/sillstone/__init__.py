@@ -308,19 +308,19 @@ def dhash(data: bytes, width: int, height: int, layout: int = 0) -> int:
     return out.value
 
 
-def whash(data: bytes, width: int, height: int, layout: int = 0) -> int:
+def whash(data: bytes, width: int, height: int, layout: int = 0, level: int = 3) -> int:
     """Computes 64-bit wavelet hash (wHash) of an image."""
     out = ctypes.c_uint64()
-    rc = sillstone_image_whash_raw(data, len(data), width, height, layout, ctypes.byref(out))
+    rc = sillstone_image_whash_raw(data, len(data), width, height, layout, level, ctypes.byref(out))
     if rc != 0:
         raise FfiError("whash", rc)
     return out.value
 
 
-def colorhash(data: bytes, width: int, height: int, layout: int = 0) -> int:
+def colorhash(data: bytes, width: int, height: int, layout: int = 0, bins: int = 4) -> int:
     """Computes 64-bit color distribution hash of an image."""
     out = ctypes.c_uint64()
-    rc = sillstone_image_colorhash_raw(data, len(data), width, height, layout, ctypes.byref(out))
+    rc = sillstone_image_colorhash_raw(data, len(data), width, height, layout, bins, ctypes.byref(out))
     if rc != 0:
         raise FfiError("colorhash", rc)
     return out.value
