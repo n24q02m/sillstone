@@ -4,6 +4,10 @@ Skipped when `imagehash`/`Pillow`/`numpy` are missing; CI installs them.
 `phash` is compared on content whose DCT has no exactly-zero coefficients:
 `imagehash` thresholds the floating-point noise of such coefficients, which
 is defined by scipy's FFT rounding and is documented in docs/parity.md.
+`whash` is compared only when the installed PyWavelets evaluates the Haar
+taps as separate IEEE operations (x86-64 wheels, and arm64 wheels from 1.10);
+arm64 wheels of older releases fuse `c*x1 + c*x0` into one rounding, which
+moves the oracle itself (docs/parity.md).
 """
 
 import random
@@ -19,6 +23,20 @@ except ImportError:  # pragma: no cover - optional oracle
     imagehash = None
 
 LAYOUT = {"L": 0, "RGB": 2, "RGBA": 4}
+
+
+def _pywt_haar_is_unfused():
+    """True when `pywt.dwt(.., "haar")` rounds each tap product separately."""
+    import pywt
+
+    x = np.random.default_rng(1).random(4096) * 255
+    c = 0.7071067811865476
+    lo, hi = pywt.dwt(x, "haar")
+    x0, x1 = x[0::2], x[1::2]
+    return bool(np.array_equal(lo, c * x1 + c * x0) and np.array_equal(hi, -c * x1 + c * x0))
+
+
+WHASH_ORACLE_EXACT = imagehash is not None and _pywt_haar_is_unfused()
 
 
 def _bits(h):
@@ -57,7 +75,8 @@ class ImagehashParity(unittest.TestCase):
         tag = f"{im.mode} {w}x{h}"
         self.assertEqual(sillstone.ahash(px, w, h, layout), _bits(imagehash.average_hash(im)), f"ahash {tag}")
         self.assertEqual(sillstone.dhash(px, w, h, layout), _bits(imagehash.dhash(im)), f"dhash {tag}")
-        self.assertEqual(sillstone.whash(px, w, h, layout), _bits(imagehash.whash(im)), f"whash {tag}")
+        if WHASH_ORACLE_EXACT:
+            self.assertEqual(sillstone.whash(px, w, h, layout), _bits(imagehash.whash(im)), f"whash {tag}")
         self.assertEqual(sillstone.colorhash(px, w, h, layout), _bits(imagehash.colorhash(im)), f"colorhash {tag}")
         if with_phash:
             self.assertEqual(sillstone.phash(px, w, h, layout), _bits(imagehash.phash(im)), f"phash {tag}")
@@ -86,7 +105,8 @@ class ImagehashParity(unittest.TestCase):
             px = im.tobytes()
             self.assertEqual(sillstone.ahash(px, w, h, 2), _bits(imagehash.average_hash(im)))
             self.assertEqual(sillstone.dhash(px, w, h, 2), _bits(imagehash.dhash(im)))
-            self.assertEqual(sillstone.whash(px, w, h, 2), _bits(imagehash.whash(im)))
+            if WHASH_ORACLE_EXACT:
+                self.assertEqual(sillstone.whash(px, w, h, 2), _bits(imagehash.whash(im)))
 
 
 @unittest.skipIf(imagehash is None, "Pillow oracle not installed")

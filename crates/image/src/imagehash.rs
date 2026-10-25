@@ -260,16 +260,6 @@ pub fn image_whash<L: Layout, T: Sample>(img: &Image<L, T>, level: u32) -> Resul
 /// `pywt`'s Haar low-pass tap, `1/√2` as the library stores it.
 const HAAR: f64 = core::f64::consts::FRAC_1_SQRT_2;
 
-/// `HAAR · x` rounded to `f64` on its own. pywt computes every tap product
-/// and the sum as separate IEEE operations; `black_box` keeps the compiler
-/// from contracting `c·x₁ ± c·x₀` into a fused multiply-add on targets
-/// that have one in the baseline (aarch64), which changes the last bit and
-/// with it the median comparison.
-#[inline(always)]
-fn hm(x: f64) -> f64 {
-    core::hint::black_box(HAAR * x)
-}
-
 /// One level of `pywt.dwt2(x, 'haar')` on an `n × n` raster (`n` even):
 /// `(LL, [HL, LH, HH])` with the exact `f64` operation order of the
 /// library (axis 0 first, then axis 1; each output is `c·x₁ ± c·x₀`).
@@ -286,14 +276,14 @@ fn haar_dwt2(x: &[f64], n: usize) -> (Vec<f64>, [Vec<f64>; 3]) {
         );
         for k in 0..m {
             // axis 0 → (lo, hi) of the four source samples of this cell.
-            let lo = |j: usize| hm(r1[j]) + hm(r0[j]);
-            let hi = |j: usize| -hm(r1[j]) + hm(r0[j]);
+            let lo = |j: usize| HAAR * r1[j] + HAAR * r0[j];
+            let hi = |j: usize| -HAAR * r1[j] + HAAR * r0[j];
             let (l0, l1) = (lo(2 * k), lo(2 * k + 1));
             let (h0, h1) = (hi(2 * k), hi(2 * k + 1));
-            ll[i * m + k] = hm(l1) + hm(l0);
-            lh[i * m + k] = -hm(l1) + hm(l0);
-            hl[i * m + k] = hm(h1) + hm(h0);
-            hh[i * m + k] = -hm(h1) + hm(h0);
+            ll[i * m + k] = HAAR * l1 + HAAR * l0;
+            lh[i * m + k] = -HAAR * l1 + HAAR * l0;
+            hl[i * m + k] = HAAR * h1 + HAAR * h0;
+            hh[i * m + k] = -HAAR * h1 + HAAR * h0;
         }
     }
     (ll, [hl, lh, hh])
@@ -309,9 +299,9 @@ fn haar_dwt_ll(x: &[f64], n: usize) -> Vec<f64> {
             &x[(2 * i + 1) * n..(2 * i + 2) * n],
         );
         for k in 0..m {
-            let l0 = hm(r1[2 * k]) + hm(r0[2 * k]);
-            let l1 = hm(r1[2 * k + 1]) + hm(r0[2 * k + 1]);
-            ll[i * m + k] = hm(l1) + hm(l0);
+            let l0 = HAAR * r1[2 * k] + HAAR * r0[2 * k];
+            let l1 = HAAR * r1[2 * k + 1] + HAAR * r0[2 * k + 1];
+            ll[i * m + k] = HAAR * l1 + HAAR * l0;
         }
     }
     ll
@@ -327,15 +317,15 @@ fn haar_idwt2(ll: &[f64], det: &[Vec<f64>; 3], m: usize) -> Vec<f64> {
         for k in 0..m {
             let at = i * m + k;
             // axis 1: approximation column pair (LL, LH), detail pair (HL, HH).
-            let a0 = hm(ll[at]) + hm(lh[at]);
-            let a1 = hm(ll[at]) - hm(lh[at]);
-            let d0 = hm(hl[at]) + hm(hh[at]);
-            let d1 = hm(hl[at]) - hm(hh[at]);
+            let a0 = HAAR * ll[at] + HAAR * lh[at];
+            let a1 = HAAR * ll[at] - HAAR * lh[at];
+            let d0 = HAAR * hl[at] + HAAR * hh[at];
+            let d1 = HAAR * hl[at] - HAAR * hh[at];
             // axis 0.
-            out[2 * i * n + 2 * k] = hm(a0) + hm(d0);
-            out[(2 * i + 1) * n + 2 * k] = hm(a0) - hm(d0);
-            out[2 * i * n + 2 * k + 1] = hm(a1) + hm(d1);
-            out[(2 * i + 1) * n + 2 * k + 1] = hm(a1) - hm(d1);
+            out[2 * i * n + 2 * k] = HAAR * a0 + HAAR * d0;
+            out[(2 * i + 1) * n + 2 * k] = HAAR * a0 - HAAR * d0;
+            out[2 * i * n + 2 * k + 1] = HAAR * a1 + HAAR * d1;
+            out[(2 * i + 1) * n + 2 * k + 1] = HAAR * a1 - HAAR * d1;
         }
     }
     out
