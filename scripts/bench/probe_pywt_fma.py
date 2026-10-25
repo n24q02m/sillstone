@@ -68,6 +68,33 @@ def main():
     rec = pywt.idwt(lo, hi, "haar")
     for name, fn in (("plain", plain_idwt), ("fused_a", fused_idwt_a), ("fused_b", fused_idwt_b)):
         print(f"idwt  {name:<8} {share(rec, fn(lo, hi)):.4f}")
+    multilevel()
+
+
+def multilevel():
+    """Digest of the whash intermediate (3-level Haar, LL zeroed, reconstructed).
+
+    Deterministic integer input, so the digests are comparable between machines:
+    equal digests mean the two pywt builds agree bit for bit on the whole path.
+    """
+    import hashlib
+
+    for size, seed in ((8, 1), (8, 2), (64, 3), (64, 4)):
+        state = seed
+        px = np.empty((size, size))
+        for i in range(size * size):
+            state = (state * 6364136223846793005 + 1442695040888963407) & 0xFFFFFFFFFFFFFFFF
+            px.flat[i] = ((state >> 33) & 0xFF) / 255.0
+        coeffs = pywt.wavedec2(px, "haar", level=3)
+        coeffs[0] *= 0
+        rec = pywt.waverec2(coeffs, "haar")
+        digest = hashlib.sha256(rec.tobytes()).hexdigest()[:16]
+        low = pywt.wavedec2(rec, "haar", level=0)[0]
+        bits = (low > np.median(low)).flatten()[:64] if low.size >= 64 else (low > np.median(low)).flatten()
+        value = 0
+        for b in bits:
+            value = (value << 1) | int(b)
+        print(f"whash path {size}x{size} seed {seed}: sha {digest} bits {value}")
 
 
 if __name__ == "__main__":
