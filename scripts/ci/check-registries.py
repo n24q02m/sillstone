@@ -63,7 +63,7 @@ PACKAGES: list[tuple[str, str, str]] = [
     ("pypi", "sillstone", "sillstone"),
     ("npm", "sillstone", "sillstone"),
     ("maven", f"{MAVEN_GROUP}:sillstone", "sillstone"),
-    ("go", f"github.com/{ORG}/sillstone/sdk/go/sillstone", "sillstone"),
+    ("go", f"github.com/{ORG}/sillstone/sdk/go", "sillstone"),
 ]
 
 Fetch = Callable[[str], "tuple[int, bytes]"]
