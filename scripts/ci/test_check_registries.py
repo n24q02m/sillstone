@@ -12,6 +12,7 @@ import importlib.util
 import json
 import pathlib
 import unittest
+from unittest import mock
 
 _spec = importlib.util.spec_from_file_location(
     "check_registries", pathlib.Path(__file__).with_name("check-registries.py")
@@ -52,6 +53,44 @@ class CratesTests(unittest.TestCase):
 
     def test_absent_fails(self):
         self.assertTrue(cr.check_crate("sillstone", "0.2.0-beta.1", fake({})))
+
+    def test_prerelease_is_not_required_to_be_default(self):
+        doc = self.doc(num="0.3.0-beta.1", default="0.2.1")
+        doc["versions"].append({"num": "0.2.1", "yanked": False})
+        self.assertEqual(cr.check_crate("sillstone", "0.3.0-beta.1", fake({self.URL: (200, doc)})), [])
+
+    def test_stable_must_be_default(self):
+        doc = self.doc(num="0.3.0", default="0.2.1")
+        got = cr.check_crate("sillstone", "0.3.0", fake({self.URL: (200, doc)}))
+        self.assertTrue(any("default version" in p for p in got))
+
+
+class PropagationTests(unittest.TestCase):
+    def test_waits_until_the_release_appears(self):
+        calls = []
+
+        def check(name, version, get):
+            calls.append(1)
+            return [] if len(calls) >= 3 else [f"version {version} is missing (registry has: none)"]
+
+        patcher = mock.patch.object(cr.time, "sleep")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        got = cr._check_waiting(check, "x", "1.0.0", None, wait_seconds=60)
+        self.assertEqual((got, len(calls)), ([], 3))
+
+    def test_does_not_wait_for_real_defects(self):
+        calls = []
+
+        def check(name, version, get):
+            calls.append(1)
+            return ["version 1.0.0 is yanked"]
+
+        patcher = mock.patch.object(cr.time, "sleep")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.assertEqual(cr._check_waiting(check, "x", "1.0.0", None, wait_seconds=60), ["version 1.0.0 is yanked"])
+        self.assertEqual(len(calls), 1)
 
 
 class PypiTests(unittest.TestCase):

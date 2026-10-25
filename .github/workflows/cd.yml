@@ -373,4 +373,37 @@ jobs:
           echo "Release type: ${{ env.RELEASE_TYPE }}"
           echo "Expected version: ${{ env.EXPECTED_VERSION }}"
           python -m unittest discover -s scripts/ci -p "test_*.py"
-          python scripts/ci/check-registries.py --version "${{ env.EXPECTED_VERSION }}" --only crates,pypi,npm --no-content
+          python scripts/ci/check-registries.py --version "${{ env.EXPECTED_VERSION }}" --only crates,pypi,npm --wait-seconds 300
+
+  github-release:
+    name: Tag and GitHub Release
+    needs: [release-gate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install from registry and exercise native code
+        run: |
+          SMOKE="$(mktemp -d)"
+          cd "$SMOKE"
+          echo '{"name":"smoke","version":"1.0.0"}' > package.json
+          npm install "sillstone@${{ env.EXPECTED_VERSION }}"
+          node "$GITHUB_WORKSPACE/scripts/ci/smoke-npm.js"
+      - name: Tag commit and publish release object
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="${{ env.EXPECTED_VERSION }}"
+          for t in "v$V" "sdk/go/v$V"; do
+            if git ls-remote --exit-code --tags origin "refs/tags/$t" >/dev/null 2>&1; then
+              echo "$t already exists"
+            else
+              git tag "$t" && git push origin "refs/tags/$t"
+            fi
+          done
+          if gh release view "v$V" >/dev/null 2>&1; then
+            echo "release v$V already exists"
+          elif [[ "$V" == *-* ]]; then
+            gh release create "v$V" --title "v$V" --generate-notes --verify-tag --prerelease
+          else
+            gh release create "v$V" --title "v$V" --generate-notes --verify-tag
+          fi

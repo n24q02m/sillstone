@@ -123,7 +123,8 @@ def check_crate(name: str, version: str, get: Fetch) -> list[str]:
         return problems + [f"version {version} is missing (registry has: {', '.join(have) or 'none'})"]
     if found[0].get("yanked"):
         problems.append(f"version {version} is yanked")
-    if crate.get("default_version") != version and not version.startswith("0.2.0-beta"):
+    # crates.io never makes a pre-release the default version.
+    if crate.get("default_version") != version and "-" not in version:
         problems.append(
             f"default version is {crate.get('default_version')!r}, expected {version}"
         )
@@ -177,7 +178,8 @@ def check_pypi(name: str, version: str, get: Fetch, content: bool = False) -> li
         return problems + [f"version {version} has no files (registry has: {', '.join(have) or 'none'})"]
     if all(f.get("yanked") for f in files):
         problems.append(f"every file of version {version} is yanked")
-    if info.get("version") not in (version, py_ver):
+    # PyPI "current" skips pre-releases while a stable release exists.
+    if info.get("version") not in (version, py_ver) and "-" not in version:
         problems.append(f"current version is {info.get('version')!r}, expected {version}")
     if content:
         problems += _wheel_contents(name, files, get)
@@ -195,7 +197,7 @@ def _npm_contents(name: str, dist: dict, get: Fetch) -> list[str]:
             digest = base64.b64encode(hashlib.sha512(path.read_bytes()).digest()).decode()
             if integrity != "sha512-" + digest:
                 return ["the tarball served does not match the integrity hash in the registry's own record"]
-        return pc.check_npm(path, CONTENT_PLATFORMS, "sillstone_napi")
+        return pc.check_npm(path, CONTENT_PLATFORMS, _stem(name))
 
 
 def check_npm(name: str, version: str, get: Fetch, content: bool = False) -> list[str]:
@@ -320,15 +322,51 @@ CHECKS: dict[str, Callable[..., list[str]]] = {
 CONTENT_REGISTRIES = {"pypi", "npm", "maven"}
 
 
-def run_checks(version: str, only: set[str] | None = None, content: bool = True, get: Fetch = fetch) -> int:
-    pkgs = [p for p in PACKAGES if not only or p[0] in only]
+def workspace_crates() -> list[str]:
+    """Every published crate: the `[package]` name of each `crates/*/Cargo.toml`."""
+    names = []
+    for toml in sorted((pathlib.Path(__file__).resolve().parents[2] / "crates").glob("*/Cargo.toml")):
+        m = re.search(r'^\[package\]\s*\nname = "([^"]+)"', toml.read_text(encoding="utf-8"), re.M)
+        if m:
+            names.append(m.group(1))
+    return names
+
+
+_PROPAGATION = ("is missing", "has no files", "not found on the registry")
+
+
+def _check_waiting(fn, name: str, version: str, get: Fetch, wait_seconds: float, **kwargs) -> list[str]:
+    """Run one registry check, re-reading while the release is still propagating."""
+    deadline = time.monotonic() + wait_seconds
+    while True:
+        problems = fn(name, version, get, **kwargs)
+        if not any(marker in p for p in problems for marker in _PROPAGATION) or time.monotonic() >= deadline:
+            return problems
+        time.sleep(20)
+
+
+def run_checks(
+    version: str,
+    only: set[str] | None = None,
+    content: bool = True,
+    get: Fetch = fetch,
+    wait_seconds: float = 0,
+) -> int:
+    pkgs = []
+    for reg, name, repo in PACKAGES:
+        if only and reg not in only:
+            continue
+        if reg == "crates":
+            pkgs.extend(("crates", crate, repo) for crate in workspace_crates())
+        else:
+            pkgs.append((reg, name, repo))
     failures = 0
     with ThreadPoolExecutor(max_workers=5) as ex:
         futures = []
         for reg, name, repo in pkgs:
             fn = CHECKS[reg]
             kwargs = {"content": content} if reg in CONTENT_REGISTRIES else {}
-            futures.append((reg, name, ex.submit(fn, name, version, get, **kwargs)))
+            futures.append((reg, name, ex.submit(_check_waiting, fn, name, version, get, wait_seconds, **kwargs)))
         for reg, name, f in futures:
             problems = f.result()
             if problems:
@@ -347,11 +385,12 @@ def main() -> int:
     ap.add_argument("--only", help="comma-separated list of registries to check")
     ap.add_argument("--content", dest="content", action="store_true", default=True, help="verify package archive contents")
     ap.add_argument("--no-content", dest="content", action="store_false")
+    ap.add_argument("--wait-seconds", type=float, default=0, help="keep re-reading for this long while a release is still propagating")
     args = ap.parse_args()
 
     only = set(args.only.split(",")) if args.only else None
     print(f"Running registry readback gate for sillstone version {args.version}...")
-    failures = run_checks(args.version, only=only, content=args.content)
+    failures = run_checks(args.version, only=only, content=args.content, wait_seconds=args.wait_seconds)
     if failures == 0:
         print(f"All checked registries verified successfully for {args.version}.")
         return 0
