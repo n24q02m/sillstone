@@ -154,20 +154,37 @@ mod avx2 {
             );
             let r = [r24, r16];
             let mut v = [h0, h1, c, d];
-            for s in &SIGMA {
-                let mx = _mm256_set_epi64x(m[s[6]] as i64, m[s[4]] as i64, m[s[2]] as i64, m[s[0]] as i64);
-                let my = _mm256_set_epi64x(m[s[7]] as i64, m[s[5]] as i64, m[s[3]] as i64, m[s[1]] as i64);
-                g(&mut v, mx, my, &r);
-                v[1] = _mm256_permute4x64_epi64(v[1], 0x39);
-                v[2] = _mm256_permute4x64_epi64(v[2], 0x4E);
-                v[3] = _mm256_permute4x64_epi64(v[3], 0x93);
-                let mx = _mm256_set_epi64x(m[s[14]] as i64, m[s[12]] as i64, m[s[10]] as i64, m[s[8]] as i64);
-                let my = _mm256_set_epi64x(m[s[15]] as i64, m[s[13]] as i64, m[s[11]] as i64, m[s[9]] as i64);
-                g(&mut v, mx, my, &r);
-                v[1] = _mm256_permute4x64_epi64(v[1], 0x93);
-                v[2] = _mm256_permute4x64_epi64(v[2], 0x4E);
-                v[3] = _mm256_permute4x64_epi64(v[3], 0x39);
+            // Twelve rounds written out so each message index is a constant
+            // (no per-round index loads, direct word loads into the gathers).
+            macro_rules! round {
+                ($r:literal) => {{
+                    const S: [usize; 16] = SIGMA[$r];
+                    let mx = _mm256_set_epi64x(m[S[6]] as i64, m[S[4]] as i64, m[S[2]] as i64, m[S[0]] as i64);
+                    let my = _mm256_set_epi64x(m[S[7]] as i64, m[S[5]] as i64, m[S[3]] as i64, m[S[1]] as i64);
+                    g(&mut v, mx, my, &r);
+                    v[1] = _mm256_permute4x64_epi64(v[1], 0x39);
+                    v[2] = _mm256_permute4x64_epi64(v[2], 0x4E);
+                    v[3] = _mm256_permute4x64_epi64(v[3], 0x93);
+                    let mx = _mm256_set_epi64x(m[S[14]] as i64, m[S[12]] as i64, m[S[10]] as i64, m[S[8]] as i64);
+                    let my = _mm256_set_epi64x(m[S[15]] as i64, m[S[13]] as i64, m[S[11]] as i64, m[S[9]] as i64);
+                    g(&mut v, mx, my, &r);
+                    v[1] = _mm256_permute4x64_epi64(v[1], 0x93);
+                    v[2] = _mm256_permute4x64_epi64(v[2], 0x4E);
+                    v[3] = _mm256_permute4x64_epi64(v[3], 0x39);
+                }};
             }
+            round!(0);
+            round!(1);
+            round!(2);
+            round!(3);
+            round!(4);
+            round!(5);
+            round!(6);
+            round!(7);
+            round!(8);
+            round!(9);
+            round!(10);
+            round!(11);
             let o0 = _mm256_xor_si256(h0, _mm256_xor_si256(v[0], v[2]));
             let o1 = _mm256_xor_si256(h1, _mm256_xor_si256(v[1], v[3]));
             _mm256_storeu_si256(h.as_mut_ptr().cast(), o0);
