@@ -103,3 +103,9 @@ This document specifies the algorithmic guarantees, operational limits, input bo
   - Node.js: Native N-API addon compiled directly against `node.exe` / `libnode.a`, zero npm dependencies.
   - Go: Zero external Go modules, `cgo` integration.
   - Java: Direct JNI integration with automatic library resolution (`System.load` with fallback chain).
+- **Image / array facades (Node.js, Java, Go):** 8-bit `L`, `RGB`, `RGBA` only; the same operation set as Python (resize, crop, transpose, rotate, filter, brightness, invert, convert, QOI/BMP encode, QOI decode, `Tensor` matmul/add/sum), checked against shared golden vectors (`tests/fixtures/facade/golden.json`, produced by the Python SDK through the same core).
+  - `whash` and `colorhash` use the imagehash defaults (`level` 0, `binbits` 3) in the facades; the ABI accepts other values.
+  - The Java hash JNI entry points return `-1` on error, which is also a valid all-ones hash; the facade cannot tell them apart. JNI does not carry status codes, so the Java facade reports `-1`/`-2` approximately from argument checks.
+  - `sillstone_tensor_matmul_f64` copies its inputs into owned buffers before multiplying.
+  - Maven Central publication is not configured (no OSSRH credential and no registered groupId); the Java artifact is built and tested but not published.
+
