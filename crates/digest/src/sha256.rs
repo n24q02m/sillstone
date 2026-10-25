@@ -196,19 +196,45 @@ mod sha_ni {
                     _mm_shuffle_epi8(_mm_loadu_si128(p.add(32).cast()), mask),
                     _mm_shuffle_epi8(_mm_loadu_si128(p.add(48).cast()), mask),
                 ];
-                for i in 0..16 {
-                    if i >= 4 {
-                        let w4 = m[i % 4];
-                        let w3 = m[(i + 1) % 4];
-                        let w2 = m[(i + 2) % 4];
-                        let w1 = m[(i + 3) % 4];
-                        let t = _mm_add_epi32(_mm_sha256msg1_epu32(w4, w3), _mm_alignr_epi8(w1, w2, 4));
-                        m[i % 4] = _mm_sha256msg2_epu32(t, w1);
-                    }
-                    let wk = _mm_add_epi32(m[i % 4], _mm_loadu_si128(K.as_ptr().add(4 * i).cast()));
-                    s1 = _mm_sha256rnds2_epu32(s1, s0, wk);
-                    s0 = _mm_sha256rnds2_epu32(s0, s1, _mm_shuffle_epi32(wk, 0x0E));
+                // Sixteen groups of four rounds, written out so every index is
+                // a constant: the schedule words then stay in registers.
+                macro_rules! group {
+                    ($i:literal) => {{
+                        if $i >= 4 {
+                            let w4 = m[$i % 4];
+                            let w3 = m[($i + 1) % 4];
+                            let w2 = m[($i + 2) % 4];
+                            let w1 = m[($i + 3) % 4];
+                            let t = _mm_add_epi32(
+                                _mm_sha256msg1_epu32(w4, w3),
+                                _mm_alignr_epi8(w1, w2, 4),
+                            );
+                            m[$i % 4] = _mm_sha256msg2_epu32(t, w1);
+                        }
+                        let wk = _mm_add_epi32(
+                            m[$i % 4],
+                            _mm_loadu_si128(K.as_ptr().add(4 * $i).cast()),
+                        );
+                        s1 = _mm_sha256rnds2_epu32(s1, s0, wk);
+                        s0 = _mm_sha256rnds2_epu32(s0, s1, _mm_shuffle_epi32(wk, 0x0E));
+                    }};
                 }
+                group!(0);
+                group!(1);
+                group!(2);
+                group!(3);
+                group!(4);
+                group!(5);
+                group!(6);
+                group!(7);
+                group!(8);
+                group!(9);
+                group!(10);
+                group!(11);
+                group!(12);
+                group!(13);
+                group!(14);
+                group!(15);
                 s0 = _mm_add_epi32(s0, save0);
                 s1 = _mm_add_epi32(s1, save1);
             }
@@ -248,19 +274,37 @@ mod arm_sha2 {
                     vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(p.add(32)))),
                     vreinterpretq_u32_u8(vrev32q_u8(vld1q_u8(p.add(48)))),
                 ];
-                for i in 0..16 {
-                    if i >= 4 {
-                        m[i % 4] = vsha256su1q_u32(
-                            vsha256su0q_u32(m[i % 4], m[(i + 1) % 4]),
-                            m[(i + 2) % 4],
-                            m[(i + 3) % 4],
-                        );
-                    }
-                    let wk = vaddq_u32(m[i % 4], vld1q_u32(K.as_ptr().add(4 * i)));
-                    let prev = s0;
-                    s0 = vsha256hq_u32(s0, s1, wk);
-                    s1 = vsha256h2q_u32(s1, prev, wk);
+                macro_rules! group {
+                    ($i:literal) => {{
+                        if $i >= 4 {
+                            m[$i % 4] = vsha256su1q_u32(
+                                vsha256su0q_u32(m[$i % 4], m[($i + 1) % 4]),
+                                m[($i + 2) % 4],
+                                m[($i + 3) % 4],
+                            );
+                        }
+                        let wk = vaddq_u32(m[$i % 4], vld1q_u32(K.as_ptr().add(4 * $i)));
+                        let prev = s0;
+                        s0 = vsha256hq_u32(s0, s1, wk);
+                        s1 = vsha256h2q_u32(s1, prev, wk);
+                    }};
                 }
+                group!(0);
+                group!(1);
+                group!(2);
+                group!(3);
+                group!(4);
+                group!(5);
+                group!(6);
+                group!(7);
+                group!(8);
+                group!(9);
+                group!(10);
+                group!(11);
+                group!(12);
+                group!(13);
+                group!(14);
+                group!(15);
                 s0 = vaddq_u32(s0, save0);
                 s1 = vaddq_u32(s1, save1);
             }
