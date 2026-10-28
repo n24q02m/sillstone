@@ -36,18 +36,18 @@ workspace = true
 workspace = true
 
 [dependencies.sillstone-digest]
-version = "0.3.0-beta.2"
+version = "0.3.0"
 path = "../digest"
 
 [dependencies.sillstone-cdc]
-version = "0.3.0-beta.2"
+version = "0.3.0"
 path = "../cdc"
 
 [dependencies.sillstone-pdf]
-version = "0.3.0-beta.2"
+version = "0.3.0"
 path = "../pdf"
 [dependencies.sillstone-zip]
-version = "0.3.0-beta.2"
+version = "0.3.0"
 path = "../zip"
 
 [lints.rust]

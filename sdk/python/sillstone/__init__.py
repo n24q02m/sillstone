@@ -65,7 +65,7 @@ _blake3_bare = _bare("sillstone_digest_blake3", sillstone_digest_blake3_raw)
 
 from .image import Image, ImageFilter, Resampling, Transpose
 from .array import Array, array, asarray, zeros, ones, arange, linspace, matmul, dot
-__version__ = "0.3.0b2"
+__version__ = "0.3.0"
 
 __all__ = [
     "Image",
