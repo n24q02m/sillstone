@@ -328,22 +328,16 @@ jobs:
         with:
           packages-dir: sdk/python/dist/
           skip-existing: true
-      - name: Publish npm package
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish npm package via Trusted Publisher
         run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "NPM_TOKEN is not configured; refusing to report a publish that did not happen."
-            exit 1
-          fi
           cd sdk/node
           TGZ=$(ls *.tgz | tail -1)
           if [ -n "$(npm view "sillstone@${{ inputs.expected_version }}" version 2>/dev/null)" ]; then
             echo "sillstone@${{ inputs.expected_version }} already on npm, skipping"
           elif [[ "${{ inputs.expected_version }}" == *-* ]]; then
-            npm publish "$TGZ" --access public --tag beta
+            npm publish "$TGZ" --access public --tag beta --provenance
           else
-            npm publish "$TGZ" --access public
+            npm publish "$TGZ" --access public --provenance
           fi
       - name: Publish Java package to Maven Central
         env:
