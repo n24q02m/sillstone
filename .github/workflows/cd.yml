@@ -98,7 +98,7 @@ jobs:
           fi
         shell: bash
       - name: Upload cdylib artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cdylib-${{ matrix.platform }}
           path: target/release/${{ matrix.artifact }}
@@ -117,7 +117,7 @@ jobs:
         shell: bash
         run: node scripts/ci/smoke-napi.js "target/release/napi/sillstone_napi.node" "target/release/${{ matrix.artifact }}"
       - name: Upload N-API addon artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: napi-${{ matrix.platform }}
           path: target/release/napi/sillstone_napi.node
@@ -145,7 +145,7 @@ jobs:
             fi
           fi
       - name: Upload wheel artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wheel-${{ matrix.platform }}
           path: sdk/python/dist/*.whl
@@ -158,11 +158,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download cdylib artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: native-libs
       - name: Download wheel artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: wheel-*
           path: sdk/python/dist
@@ -223,7 +223,7 @@ jobs:
           echo "Verifying Java JAR..."
           python scripts/ci/check-package-contents.py jar "sdk/java/target/*.jar" --platforms linux-x64,linux-arm64,darwin-arm64,darwin-x64,win32-x64 --stem sillstone_ffi --prefix io/github/sillstone/native
       - name: Upload packaged SDK artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: packaged-sdks
           path: |
@@ -241,7 +241,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download packaged SDK artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: packaged-sdks
           path: artifacts
