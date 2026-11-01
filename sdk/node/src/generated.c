@@ -709,6 +709,7 @@ static napi_value n_sillstone_text_tlsh_distance(napi_env env, napi_callback_inf
     void* b = NULL; size_t b_len = 0;
     if (argc > 0) napi_get_buffer_info(env, args[0], &a, &a_len);
     if (argc > 1) napi_get_buffer_info(env, args[1], &b, &b_len);
+    if (a_len != 72 || b_len != 72) { napi_throw_range_error(env, NULL, "tlsh digests must be two 72-byte Buffers"); return NULL; }
     uint32_t dist = 0;
     int32_t status = sillstone_text_tlsh_distance((const uint8_t*)a, (const uint8_t*)b, &dist);
     if (status != 0) { throw_status(env, status); return NULL; }

@@ -378,6 +378,9 @@ def tlsh_distance(hash_a: str | bytes, hash_b: str | bytes) -> int:
     """Computes TLSH distance between two 70-hex-char hashes."""
     a_bytes = hash_a.encode("ascii") if isinstance(hash_a, str) else hash_a
     b_bytes = hash_b.encode("ascii") if isinstance(hash_b, str) else hash_b
+    # The C ABI reads exactly 72 bytes from each pointer, so any other length would read past the buffer.
+    if len(a_bytes) != 72 or len(b_bytes) != 72:
+        raise ValueError(f"tlsh digests must be 72 bytes, got {len(a_bytes)} and {len(b_bytes)}")
     out = ctypes.c_uint32()
     rc = sillstone_text_tlsh_distance_raw(a_bytes, b_bytes, ctypes.byref(out))
     if rc != 0:

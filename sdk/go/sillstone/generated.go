@@ -8,7 +8,10 @@ package sillstone
 #include "sillstone.h"
 */
 import "C"
-import "unsafe"
+import (
+    "fmt"
+    "unsafe"
+)
 
 func SillstoneVersionMajor() uint32 {
     return uint32(C.sillstone_version_major())
@@ -279,13 +282,18 @@ func SillstoneTextTlsh(data []byte) []byte {
     return out
 }
 
-func SillstoneTextTlshDistance(a []byte, b []byte) uint32 {
+// SillstoneTextTlshDistance returns the TLSH distance between two digests. The C ABI always
+// reads 72 bytes from each pointer, so any other length is refused here instead of read past.
+func SillstoneTextTlshDistance(a []byte, b []byte) (uint32, error) {
+    if len(a) != 72 || len(b) != 72 {
+        return 0, fmt.Errorf("tlsh digests must be 72 bytes, got %d and %d", len(a), len(b))
+    }
     var out C.uint32_t
-    var ptrA, ptrB *C.uint8_t
-    if len(a) > 0 { ptrA = (*C.uint8_t)(unsafe.Pointer(&a[0])) }
-    if len(b) > 0 { ptrB = (*C.uint8_t)(unsafe.Pointer(&b[0])) }
-    C.sillstone_text_tlsh_distance(ptrA, ptrB, &out)
-    return uint32(out)
+    status := C.sillstone_text_tlsh_distance((*C.uint8_t)(unsafe.Pointer(&a[0])), (*C.uint8_t)(unsafe.Pointer(&b[0])), &out)
+    if status != 0 {
+        return 0, fmt.Errorf("sillstone_text_tlsh_distance failed with status %d", int32(status))
+    }
+    return uint32(out), nil
 }
 
 func SillstoneTensorMatmulF64(a unsafe.Pointer, m uint64, k1 uint64, b unsafe.Pointer, k2 uint64, n uint64, out unsafe.Pointer) int32 {
