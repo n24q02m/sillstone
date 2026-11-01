@@ -4,3 +4,10 @@ Copyright 2026 Sillstone Contributors
 This product includes software originally developed as part of the
 pith-hash and modhash projects, licensed under the MIT License:
 Copyright (c) 2026 pith-hash contributors.
+
+The Brotli decoder in sillstone-inflate embeds the static dictionary of
+RFC 7932 Appendix A (122,784 bytes, CRC-32 0x5136cb04, SHA-256
+20e42eb1b511c21806d4d227d07e5dd06877d8ce7b3a817f378f313653f35c70),
+byte-identical to c/common/dictionary.bin of google/brotli v1.1.0, licensed
+under the MIT License: Copyright (c) 2009, 2010, 2013-2016 by the Brotli
+Authors. Its transform and context lookup tables are derived from RFC 7932.

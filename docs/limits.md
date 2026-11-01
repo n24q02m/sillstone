@@ -55,7 +55,7 @@ This document specifies the algorithmic guarantees, operational limits, input bo
 | Codec | RFC Specification | Features Supported | Limits & Protection |
 |---|---|---|---|
 | **Deflate** | RFC 1951 | Fixed & dynamic Huffman, uncompressed blocks | `max_out` bounds check prevents zip bombs |
-| **Brotli** | RFC 7932 | Stream header, empty / metadata / uncompressed meta-blocks. Compressed meta-blocks (prefix codes, context modeling, 122KB static dictionary) are NOT implemented and return `Unsupported` | Enforced `max_out` buffer cap; corrupted or unsupported stream returns an error, never guessed bytes |
+| **Brotli** | RFC 7932 | Full format except the large-window extension: stream header, empty / metadata / uncompressed / compressed meta-blocks (simple and complex prefix codes, block switching, context maps, all four literal context modes, NPOSTFIX / NDIRECT distance codes, last-distance ring), the 122,784-byte static dictionary with all 121 word transforms. A large-window stream returns `Unsupported` | `max_out` buffer cap and the stream's own window rules; corrupted prefix code, context map, distance, length, padding or truncated input returns an error, never guessed bytes |
 | **Zstandard** | RFC 8878 | Full format except dictionaries: frames, skippable frames, raw / RLE / compressed blocks, raw / RLE / Huffman literals (1 and 4 streams, treeless reuse), FSE-coded sequences (predefined / RLE / compressed / repeat modes, repeat offsets), XXH64 content checksum. A frame naming a nonzero dictionary id returns `Unsupported` | `max_out` buffer cap and the frame's own window / block-size rules; corrupted header, entropy table, bitstream or checksum returns an error, never guessed bytes |
 
 ---

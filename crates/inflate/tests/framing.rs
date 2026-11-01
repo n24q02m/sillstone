@@ -3,11 +3,12 @@
 //! The Zstandard decoder is a complete RFC 8878 decoder minus dictionaries;
 //! the tests here pin its framing rules and error paths (the round-trip
 //! evidence against the reference encoder lives in `zstd_oracle.rs`). The
-//! Brotli decoder still implements only framing, uncompressed meta-blocks and
-//! metadata, and must refuse compressed meta-blocks with `Error::Unsupported`
-//! rather than decode them to guessed bytes. The fixtures were produced by the
-//! reference encoders (python `zstandard` / `brotli`); `random400.bin` is
-//! incompressible, so both encoders emit it as raw / uncompressed blocks.
+//! Brotli decoder is a complete RFC 7932 decoder (the round-trip evidence
+//! lives in `brotli_oracle.rs`); the tests here pin its framing rules, limits
+//! and error paths, and the one thing it refuses: the large-window
+//! extension. The fixtures were produced by the reference encoders (python
+//! `zstandard` / `brotli`); `random400.bin` is incompressible, so both
+//! encoders emit it as raw / uncompressed blocks.
 
 use sillstone_digest::Error;
 use sillstone_inflate::{inflate_brotli, inflate_zstd, Limits};
@@ -17,6 +18,7 @@ const RANDOM_ZST: &[u8] = include_bytes!("fixtures/random400-checksum.zst");
 const RANDOM_ZST_NO_CK: &[u8] = include_bytes!("fixtures/random400-nochecksum.zst");
 const RANDOM_BR: &[u8] = include_bytes!("fixtures/random400.br");
 const TEXT_ZST: &[u8] = include_bytes!("fixtures/text-repeat.zst");
+const TEXT: &[u8] = include_bytes!("fixtures/text-repeat.bin");
 const TEXT_BR: &[u8] = include_bytes!("fixtures/text-repeat.br");
 const RLE_ZST: &[u8] = include_bytes!("fixtures/rle-first-block.zst");
 
@@ -307,10 +309,36 @@ fn brotli_uncompressed_metablock_roundtrips() {
 }
 
 #[test]
-fn brotli_compressed_metablocks_are_refused_not_guessed() {
+fn brotli_compressed_metablock_decodes_to_the_original() {
+    assert_eq!(inflate_brotli(TEXT_BR, Limits::default()).unwrap(), TEXT);
+}
+
+#[test]
+fn brotli_compressed_output_limit_is_enforced() {
     assert!(matches!(
-        inflate_brotli(TEXT_BR, Limits::default()),
-        Err(Error::Unsupported("brotli compressed meta-block"))
+        inflate_brotli(TEXT_BR, cap(TEXT.len() - 1)),
+        Err(Error::TooLarge { .. })
+    ));
+    assert_eq!(inflate_brotli(TEXT_BR, cap(TEXT.len())).unwrap(), TEXT);
+}
+
+#[test]
+fn brotli_every_truncation_of_a_compressed_stream_is_an_error() {
+    for cut in 0..TEXT_BR.len() {
+        assert!(
+            inflate_brotli(&TEXT_BR[..cut], Limits::default()).is_err(),
+            "prefix of {cut} bytes must not decode"
+        );
+    }
+}
+
+#[test]
+fn brotli_nonzero_padding_after_the_last_meta_block_is_rejected() {
+    // WBITS=16, ISLAST, ISLASTEMPTY: three bits, then five padding bits.
+    assert_eq!(inflate_brotli(&[0x06], Limits::default()).unwrap(), b"");
+    assert!(matches!(
+        inflate_brotli(&[0x0e], Limits::default()),
+        Err(Error::BadValue("brotli padding bits nonzero"))
     ));
 }
 
