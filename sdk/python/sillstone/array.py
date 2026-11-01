@@ -541,12 +541,13 @@ class Array:
             dtype = _promote(self._dtype, other._dtype)
         elif isinstance(other, (int, float)):
             dtype = _promote_scalar(self._dtype, other)
-            if isinstance(other, int) and not isinstance(other, bool) and _KIND[dtype] in "iu":
-                _pack_value(dtype, other)  # a Python int that does not fit the dtype raises OverflowError
         else:
             return NotImplemented
         if true_div and _KIND[dtype] != "f":
             dtype = "float64"
+        if isinstance(other, int) and not isinstance(other, bool) and _KIND[dtype] in "iu":
+            # Only integer results can overflow; true division already produced float64 above.
+            _pack_value(dtype, other)  # a Python int that does not fit the dtype raises OverflowError
         if no_bool and dtype == "bool":
             raise TypeError("the boolean subtract operator is not supported, use bitwise_xor instead")
 

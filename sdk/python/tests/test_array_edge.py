@@ -312,6 +312,36 @@ class TestArithmetic(EdgeCase):
         self.assertSame((array([1, -2, 0]) / array([0, 0, 0])).tolist(), [math.inf, -math.inf, NAN])
         self.assertSame((1 / array([0.0, -0.0])).tolist(), [math.inf, -math.inf])
 
+    def test_true_division_by_out_of_range_python_int_yields_float64(self):
+        # NumPy only range-checks the scalar when the result stays integer; "/" always
+        # produces float64, so a Python int outside the dtype range is a valid operand.
+        cases = [
+            ("int8", 300, [1, 2], [0.0033333333333333335, 0.006666666666666667], [300.0, 150.0]),
+            ("int8", -300, [1, 2], [-0.0033333333333333335, -0.006666666666666667], [-300.0, -150.0]),
+            ("uint8", -1, [1, 2], [-1.0, -2.0], [-1.0, -0.5]),
+            ("uint8", 256, [1, 2], [0.00390625, 0.0078125], [256.0, 128.0]),
+            ("uint64", -1, [1, 2], [-1.0, -2.0], [-1.0, -0.5]),
+            ("int32", 2**40, [1, 2], [9.094947017729282e-13, 1.8189894035458565e-12], [1099511627776.0, 549755813888.0]),
+        ]
+        for dtype, scalar, values, forward, reverse in cases:
+            arr = array(values, dtype=dtype)
+            fwd, rev = arr / scalar, scalar / arr
+            self.assertEqual((fwd.dtype, rev.dtype), ("float64", "float64"), (dtype, scalar))
+            self.assertEqual(fwd.tolist(), forward, (dtype, scalar))
+            self.assertEqual(rev.tolist(), reverse, (dtype, scalar))
+            if np is not None:
+                ref = np.array(values, dtype=dtype)
+                self.assertEqual(fwd.tolist(), (ref / scalar).tolist())
+                self.assertEqual(rev.tolist(), (scalar / ref).tolist())
+
+    def test_out_of_range_python_int_still_overflows_for_integer_results(self):
+        small = array([1], dtype="int8")
+        for op in (operator.add, operator.sub, operator.mul):
+            with self.assertRaises(OverflowError):
+                op(small, 300)
+            with self.assertRaises(OverflowError):
+                op(300, small)
+
     def test_integer_arithmetic_wraps_around(self):
         self.assertEqual((array([100], dtype="int8") + array([100], dtype="int8")).tolist(), [-56])
         self.assertEqual((-array([1], dtype="uint8")).tolist(), [255])
