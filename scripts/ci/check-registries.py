@@ -54,7 +54,7 @@ CONTENT_FROM = (0, 2, 0)
 NPM_DOCS_FROM = (0, 3, 1)
 JAR_PREFIX = "github/sillstone/native"
 
-EXPECTED_VERSION = "0.3.0"
+EXPECTED_VERSION = "0.3.1-beta.1"
 USER_AGENT = "sillstone-registry-readback (github.com/n24q02m/sillstone)"
 ORG = "n24q02m"
 MAVEN_GROUP = "io.github.sillstone"
