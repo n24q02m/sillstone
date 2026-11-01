@@ -37,3 +37,17 @@ The Python `Array` is a pure-Python strided engine (with the native kernel used 
 - **Creation**: `array`, `zeros`, `ones`, `arange` (count `ceil((stop - start) / step)`), `linspace` (last element is exactly `stop`).
 
 Not implemented in the Python `Array`: elementwise comparison operators (`<`, `==`, ...), batched (N-d, N > 2) matmul, fancy / boolean-mask / `None` indexing, `float16` and complex dtypes.
+
+### Known deviations from NumPy (intentional, not planned to change)
+
+Python `Array`:
+
+- `a[..., i]` that selects a single element returns a Python scalar; NumPy returns a 0-d array.
+- Float `sum` / `mean` add in sequential order, NumPy adds pairwise, so the last digits can differ.
+- Mixed integer/float arithmetic where an operand exceeds `2**53` in magnitude: Sillstone computes the exact integer result and converts to float afterwards, NumPy converts the operands to float first (for example `uint64 - int64` can give `1.0` here and `0.0` in NumPy).
+- A float32 array times a Python float that overflows float32 (for example `1e300`): zero elements stay `0.0` here, NumPy converts the scalar to `inf` first and returns `nan`.
+
+Rust `Tensor`:
+
+- `mean` of an empty tensor returns an error; NumPy returns `nan` with a warning.
+- Float `sum` is sequential; NumPy uses pairwise summation, so the last digits can differ.
