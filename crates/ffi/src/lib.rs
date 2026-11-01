@@ -107,6 +107,13 @@ mod tests {
     }
 
     #[test]
+    fn test_touch_deps_links_every_exported_symbol() {
+        // The function only takes the address of each C ABI symbol so the linker keeps
+        // them in the cdylib; calling it must simply succeed.
+        _touch_deps();
+    }
+
+    #[test]
     fn test_ffi_checksum_data() {
         let data = b"sillstone sample vector";
         let sum = unsafe { sillstone_buffer_checksum(data.as_ptr(), data.len()) };
