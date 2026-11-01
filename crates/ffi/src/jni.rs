@@ -1,4 +1,11 @@
 //! JNI bridge exports for the Java SDK (`io.github.sillstone.Generated`).
+//!
+//! Every shim is `#[cfg_attr(not(test), unsafe(no_mangle))]`: the exported
+//! `Java_*` symbols exist only in the cdylib, and the unit-test binary keeps
+//! them under their Rust-mangled names. Measured on CI: with an unmangled
+//! symbol in the test binary, `cargo llvm-cov` reported 97 lines of this file
+//! as never run although the tests execute them; with this attribute only the
+//! lines a test cannot reach stay uncovered.
 
 #![allow(unsafe_code)]
 #![allow(missing_docs)]
@@ -43,7 +50,7 @@ unsafe fn table<'a>(env: *mut JNIEnv) -> &'a JniTable {
     unsafe { &**env }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1version_1major(
     _env: *mut c_void,
     _class: *mut c_void,
@@ -51,7 +58,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1vers
     crate::sillstone_version_major() as jint
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1version_1minor(
     _env: *mut c_void,
     _class: *mut c_void,
@@ -59,7 +66,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1vers
     crate::sillstone_version_minor() as jint
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1version_1patch(
     _env: *mut c_void,
     _class: *mut c_void,
@@ -67,7 +74,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1vers
     crate::sillstone_version_patch() as jint
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1buffer_1checksum(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -122,7 +129,7 @@ unsafe fn create_output_byte_array(env: *mut JNIEnv, bytes: &[u8]) -> JArray {
     arr
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1digest_1sha256(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -137,7 +144,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1dige
     unsafe { create_output_byte_array(env, &out) }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1digest_1sha3_1256(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -152,7 +159,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1dige
     unsafe { create_output_byte_array(env, &out) }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1digest_1sha3_1512(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -167,7 +174,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1dige
     unsafe { create_output_byte_array(env, &out) }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1digest_1blake2b_1512(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -182,7 +189,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1dige
     unsafe { create_output_byte_array(env, &out) }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1digest_1blake3(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -238,7 +245,7 @@ unsafe fn create_output_double_array(env: *mut JNIEnv, data: &[f64]) -> JArray {
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1math_1dst1(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -253,7 +260,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1math
     unsafe { create_output_double_array(env, &out) }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1math_1dst2(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -268,7 +275,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1math
     unsafe { create_output_double_array(env, &out) }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1math_1dst3(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -283,7 +290,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1math
     unsafe { create_output_double_array(env, &out) }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1unicode_1grapheme_1count(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -297,7 +304,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1unic
     sillstone_unicode::graphemes(s).count() as jlong
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1unicode_1char_1category(
     _env: *mut JNIEnv,
     _class: *mut c_void,
@@ -310,7 +317,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1unic
     sillstone_unicode::char_category(c) as jint
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1phash(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -338,7 +345,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1imag
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1ahash(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -366,7 +373,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1imag
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1dhash(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -394,7 +401,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1imag
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1whash(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -423,7 +430,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1imag
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1colorhash(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -455,7 +462,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1imag
 /// Length in bytes of the ASCII TLSH digest the text C ABI writes and reads.
 const TLSH_DIGEST_LEN: usize = 72;
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1text_1tlsh(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -477,7 +484,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1text
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1text_1tlsh_1distance(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -553,7 +560,7 @@ unsafe fn run_encode_op(
     result
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1resize(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -576,7 +583,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1imag
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1crop(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -600,7 +607,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1imag
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1transpose(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -620,7 +627,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1imag
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1rotate(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -643,7 +650,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1imag
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1filter(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -663,7 +670,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1imag
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1adjust(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -684,7 +691,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1imag
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1color_1convert(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -704,7 +711,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1imag
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1qoi_1encode(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -722,7 +729,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1imag
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1bmp_1encode(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -740,7 +747,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1imag
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1qoi_1decode(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -773,7 +780,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1imag
     unsafe { create_output_byte_array(env, &packed) }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1tensor_1matmul_1f64(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -811,7 +818,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1tens
     unsafe { create_output_double_array(env, &out) }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1tensor_1add_1f64(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -838,7 +845,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1tens
     unsafe { create_output_double_array(env, &out) }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1tensor_1sum_1f64(
     env: *mut JNIEnv,
     _class: *mut c_void,
@@ -855,7 +862,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1tens
     if status != 0 { f64::NAN } else { total }
 }
 
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1image_1rotate_1size(
     env: *mut JNIEnv,
     _class: *mut c_void,
