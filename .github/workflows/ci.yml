@@ -138,7 +138,11 @@ jobs:
       - name: Build instrumented FFI library
         run: |
           source "$RUNNER_TEMP/llvm-cov-env.sh"
-          cargo build -p sillstone-ffi
+          # [profile.test] sets opt-level = 2. A no_mangle shim (Java_*, sillstone_*) built
+          # at the dev opt-level has a different coverage hash than the copy in the Rust
+          # test binaries, and llvm-cov then drops the test counters for it. Matching the
+          # opt-level lets both profiles land on the same function record.
+          CARGO_PROFILE_DEV_OPT_LEVEL=2 cargo build -p sillstone-ffi
 
       - name: Set up Python
         uses: actions/setup-python@v7
