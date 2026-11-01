@@ -4,7 +4,7 @@ path = "tools/gen-reference/main.rs"
 
 [package]
 name = "sillstone-jpeg"
-description = "pith jpeg lane: baseline and progressive JPEG decoding, byte-exact with libjpeg islow (zero-dep Rust)"
+description = "sillstone jpeg: baseline and progressive JPEG decoding, byte-exact with libjpeg islow (zero-dep Rust)"
 readme = "README.md"
 license = "Apache-2.0"
 categories = [ "algorithms", "multimedia::encoding",]
