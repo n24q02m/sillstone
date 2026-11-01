@@ -440,6 +440,9 @@ unsafe fn byte_array(env: *mut JNIEnv, op: &str, result: Result<Vec<u8>, i32>) -
             return core::ptr::null_mut();
         }
     };
+    if env.is_null() {
+        return core::ptr::null_mut();
+    }
     let table = unsafe { &*(*env) };
     let array =
         unsafe { (table.new_byte_array.expect("NewByteArray slot"))(env, bytes.len() as Jint) };

@@ -100,13 +100,18 @@ unsafe fn run_scalar(
     out: *mut f64,
     kernel: fn(&[f64]) -> Result<f64, i32>,
 ) -> i32 {
-    if let Some(status) = null_status_scalar(input, out) {
-        return status;
+    // SAFETY: the caller guarantees `out` is null or points to one writable
+    // `f64`; `as_mut` turns the null case into `None` at the point of use.
+    let Some(slot) = (unsafe { out.as_mut() }) else {
+        return PITH_E_INVALID;
+    };
+    if input.is_null() {
+        return PITH_E_INVALID;
     }
     let x = unsafe { core::slice::from_raw_parts(input, in_len) };
     match kernel(x) {
         Ok(value) => {
-            unsafe { *out = value };
+            *slot = value;
             PITH_OK
         }
         Err(status) => status,
