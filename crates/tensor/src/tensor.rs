@@ -215,15 +215,22 @@ impl<T: Dtype> Tensor<T> {
     }
 
     /// Materializes any strided or sliced view into a fresh contiguous buffer.
+    ///
+    /// A view that already starts at the buffer origin with C-order strides is
+    /// returned as-is only when the buffer holds exactly its elements; a leading
+    /// slice of a larger tensor shares that prefix property but not the length,
+    /// so it is copied to keep `data` and `shape` in agreement.
     pub fn contiguous(&self) -> Self {
-        if self.is_contiguous() {
+        let numel = self.numel();
+        if self.is_contiguous() && self.data.len() == numel {
             return self.clone();
         }
 
-        let numel = self.numel();
         let mut out_data = Vec::with_capacity(numel);
 
-        if self.ndim() == 0 {
+        if numel == 0 {
+            // Nothing to copy; walking the index space would read past an empty buffer.
+        } else if self.ndim() == 0 {
             if let Some(val) = self.get(&[]) {
                 out_data.push(val);
             }

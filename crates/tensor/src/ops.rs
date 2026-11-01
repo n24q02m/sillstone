@@ -59,7 +59,9 @@ impl<T: Dtype> Tensor<T> {
         let numel: usize = out_shape.iter().product();
         let mut out_data = Vec::with_capacity(numel);
 
-        if out_shape.is_empty() {
+        if numel == 0 {
+            // Zero-sized result: there is no element to compute.
+        } else if out_shape.is_empty() {
             let val_a = a_bcast.get(&[]).unwrap_or(T::ZERO);
             let val_b = b_bcast.get(&[]).unwrap_or(T::ZERO);
             out_data.push(op(val_a, val_b));
@@ -93,7 +95,9 @@ impl<T: Dtype> Tensor<T> {
         let numel = self.numel();
         let mut out_data = Vec::with_capacity(numel);
 
-        if self.ndim() == 0 {
+        if numel == 0 {
+            // Zero-sized input: nothing to map.
+        } else if self.ndim() == 0 {
             if let Some(val) = self.get(&[]) {
                 out_data.push(op(val));
             }

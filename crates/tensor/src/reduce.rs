@@ -41,7 +41,7 @@ impl<T: Dtype + Add<Output = T>> Tensor<T> {
                 let numel: usize = out_shape.iter().product();
                 let mut out_data = vec![T::ZERO; numel.max(1)];
 
-                if self.ndim() > 0 {
+                if self.ndim() > 0 && self.numel() > 0 {
                     let mut idx = vec![0usize; self.ndim()];
                     loop {
                         let off = linear_offset(&idx, self.strides(), self.offset);
