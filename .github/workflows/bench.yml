@@ -59,7 +59,7 @@ jobs:
         run: python scripts/bench/bench_parity.py
 
       - name: Upload raw results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bench-${{ matrix.os }}
           path: bench-hash-${{ matrix.os }}.json
