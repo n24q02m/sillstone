@@ -169,6 +169,9 @@ jobs:
         run: |
           source "$RUNNER_TEMP/llvm-cov-env.sh"
           cargo llvm-cov report --json --summary-only --output-path rust-cov.json
+          # Per-line detail so the artifact shows which lines are still unexecuted,
+          # not only the per-file totals the report below summarises.
+          cargo llvm-cov report --lcov --output-path rust-cov.lcov
 
       - name: Report Rust coverage
         run: python scripts/ci/coverage_report.py llvm rust-cov.json --target 95
@@ -182,4 +185,5 @@ jobs:
           name: coverage-reports
           path: |
             rust-cov.json
+            rust-cov.lcov
             py-cov.json
