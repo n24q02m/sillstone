@@ -73,7 +73,7 @@ This document specifies the algorithmic guarantees, operational limits, input bo
 | **MP4 / MOV** | `sillstone-video` | ISO base media (AVC/H.264), fragmented MP4 (`moof`, `traf`, `trun`) | - | Rejects non-AVC bitstreams with status -2 |
 | **PDF** | `sillstone-file` | FlateDecode text extraction, font CID/ToUnicode, AcroForm fields | - | Linear stream parser, bounds-checked |
 | **ZIP** | `sillstone-file` | Standard ZIP, ZIP64 (EOCD64, extra field 0x0001) | Stored / Deflate writer | Traversal sanitization (`..` stripped) |
-| **TAR** | `sillstone-file` | USTAR, PAX extended headers, GNU long-name/link | - | Traversal sanitization, safe extraction |
+| **TAR** | `sillstone-file` | USTAR, PAX extended headers (`path`, `size`; records parsed by length), GNU long-name (`L`) and long-link (`K`, skipped) | - | Traversal sanitization (`..`, absolute paths, drive letters), ustar prefix honored only for POSIX headers, base-256 sizes checked (negative or overflowing values refused) |
 | **DOCX/XLSX**| `sillstone-file` | Fast XML extraction from Office Open XML containers | - | XML memory limits prevent entity expansion |
 
 ---

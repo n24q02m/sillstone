@@ -27,6 +27,12 @@ pub fn is_path_traversal(path: &str) -> bool {
     if p.starts_with('/') {
         return true;
     }
+    // A drive designator ("C:" or "C:foo") escapes the extraction root on Windows.
+    if let [drive, b':', ..] = p.as_bytes() {
+        if drive.is_ascii_alphabetic() {
+            return true;
+        }
+    }
     for comp in p.split('/') {
         if comp == ".." {
             return true;
@@ -49,11 +55,16 @@ fn parse_octal(bytes: &[u8]) -> Option<usize> {
         return Some(0);
     }
 
-    // GNU binary extension: if high bit of first byte is set
+    // GNU binary extension: if the high bit of the first byte is set the field
+    // is a big-endian base-256 number. 0xFF marks a negative value, and a value
+    // that does not fit `usize` is refused rather than wrapped.
     if (bytes[0] & 0x80) != 0 {
+        if bytes[0] == 0xFF {
+            return None;
+        }
         let mut val = (bytes[0] & 0x7F) as usize;
-        for &b in &bytes[1..end] {
-            val = (val << 8) | (b as usize);
+        for &b in &bytes[1..] {
+            val = val.checked_mul(256)?.checked_add(b as usize)?;
         }
         return Some(val);
     }
@@ -92,6 +103,52 @@ fn parse_c_string(bytes: &[u8]) -> &str {
     core::str::from_utf8(&bytes[..len]).unwrap_or("")
 }
 
+/// Extended-header overrides that apply to the next entry.
+#[derive(Default)]
+struct Pax {
+    path: Option<String>,
+    size: Option<usize>,
+}
+
+/// Reads PAX records (`"<len> key=value\n"`). The decimal length covers the whole
+/// record, so a value may itself contain newlines. Parsing stops at the first record
+/// that is malformed or not valid UTF-8; what was read before it still applies.
+fn parse_pax(data: &[u8], out: &mut Pax) {
+    let mut pos = 0;
+    while pos < data.len() {
+        let rest = &data[pos..];
+        let Some(space) = rest.iter().position(|&b| b == b' ') else {
+            return;
+        };
+        let Some(len) = core::str::from_utf8(&rest[..space])
+            .ok()
+            .and_then(|digits| digits.parse::<usize>().ok())
+        else {
+            return;
+        };
+        // The record must hold at least one byte after "<digits> " and fit the data.
+        if len <= space + 1 || len > rest.len() {
+            return;
+        }
+        let Ok(record) = core::str::from_utf8(&rest[space + 1..len]) else {
+            return;
+        };
+        let record = record.strip_suffix('\n').unwrap_or(record);
+        if let Some((key, value)) = record.split_once('=') {
+            match key {
+                "path" => out.path = Some(value.to_string()),
+                "size" => {
+                    if let Ok(n) = value.parse::<usize>() {
+                        out.size = Some(n);
+                    }
+                }
+                _ => {}
+            }
+        }
+        pos += len;
+    }
+}
+
 /// Parses all file entries from a TAR archive byte slice.
 ///
 /// If `allow_escape` is false, paths with `..` or leading `/` are rejected with `Error::BadValue`.
@@ -99,6 +156,7 @@ pub fn entries(data: &[u8], allow_escape: bool) -> Result<Vec<TarEntry>> {
     let mut result = Vec::new();
     let mut pos = 0;
     let mut next_long_name: Option<String> = None;
+    let mut next_size: Option<usize> = None;
 
     while pos + BLOCK_SIZE <= data.len() {
         let header = &data[pos..pos + BLOCK_SIZE];
@@ -118,49 +176,55 @@ pub fn entries(data: &[u8], allow_escape: bool) -> Result<Vec<TarEntry>> {
         }
 
         let raw_name = parse_c_string(&header[0..100]);
-        let size = parse_octal(&header[124..136])
+        let header_size = parse_octal(&header[124..136])
             .ok_or(Error::BadValue("invalid tar entry size"))?;
         let typeflag = header[156];
+        // A PAX `size` replaces the header field of the entry that follows it.
+        let size = if matches!(typeflag, b'L' | b'K' | b'x' | b'g') {
+            header_size
+        } else {
+            next_size.take().unwrap_or(header_size)
+        };
 
-        let prefix = if &header[257..262] == b"ustar" {
+        // The ustar `prefix` field exists only in POSIX headers ("ustar\0" + "00");
+        // GNU headers ("ustar  \0") keep atime/ctime in those bytes.
+        let prefix = if &header[257..263] == b"ustar\0" {
             parse_c_string(&header[345..500])
         } else {
             ""
         };
 
         let data_offset = pos + BLOCK_SIZE;
-        let content_blocks = size.div_ceil(BLOCK_SIZE);
-        let next_pos = data_offset
-            .checked_add(content_blocks * BLOCK_SIZE)
+        let data_end = data_offset
+            .checked_add(size)
+            .ok_or(Error::BadValue("tar entry size overflow"))?;
+        if data_end > data.len() {
+            return Err(Error::truncated("tar entry data", data_end, data.len()));
+        }
+        let next_pos = size
+            .div_ceil(BLOCK_SIZE)
+            .checked_mul(BLOCK_SIZE)
+            .and_then(|padded| data_offset.checked_add(padded))
             .ok_or(Error::BadValue("tar archive offset overflow"))?;
 
-        if data_offset + size > data.len() {
-            return Err(Error::truncated("tar entry data", data_offset + size, data.len()));
-        }
-
         match typeflag {
+            // GNU long link target: not an entry, and nothing here uses link targets.
+            b'K' => {}
             // GNU long name
             b'L' => {
-                let name_bytes = &data[data_offset..data_offset + size];
+                let name_bytes = &data[data_offset..data_end];
                 let long_name = parse_c_string(name_bytes);
                 next_long_name = Some(long_name.to_string());
             }
             // PAX extended header
             b'x' | b'g' => {
-                let pax_data = &data[data_offset..data_offset + size];
-                if let Ok(pax_str) = core::str::from_utf8(pax_data) {
-                    for line in pax_str.lines() {
-                        if let Some(space_idx) = line.find(' ') {
-                            let rec = &line[space_idx + 1..];
-                            if let Some(eq_idx) = rec.find('=') {
-                                let key = &rec[..eq_idx];
-                                let val = &rec[eq_idx + 1..];
-                                if key == "path" {
-                                    next_long_name = Some(val.to_string());
-                                }
-                            }
-                        }
-                    }
+                let mut pax = Pax::default();
+                parse_pax(&data[data_offset..data_end], &mut pax);
+                if pax.path.is_some() {
+                    next_long_name = pax.path;
+                }
+                if pax.size.is_some() {
+                    next_size = pax.size;
                 }
             }
             // Regular file or directory or symlink
