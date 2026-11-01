@@ -3,10 +3,11 @@
 //! Handles `mvex`/`trex`, `moof`/`mfhd`/`traf`/`tfhd`/`tfdt`/`trun`, and builds
 //! a unified `SampleTable` for fragmented movie tracks.
 
+use alloc::vec;
 use alloc::vec::Vec;
-use sillstone_digest::Result;
+use sillstone_digest::{Error, Result};
 
-use crate::boxes::{Boxes, Reader, full_box};
+use crate::boxes::{BoxHead, Boxes, Reader, full_box};
 use crate::sample_table::{ChunkRun, CompRun, SampleTable, TimeRun};
 
 /// Track extends defaults from `trex` box under `mvex`.
@@ -64,28 +65,42 @@ pub struct FragSample {
     pub keyframe: bool,
 }
 
+/// `sample_is_non_sync_sample` in the 32-bit sample flags (§8.8.3.1): bit 16,
+/// directly above the 16-bit `sample_degradation_priority`.
+const SAMPLE_IS_NON_SYNC: u32 = 0x0001_0000;
+
 /// Parses all `moof` boxes and groups their samples by `track_id`.
+///
+/// `moofs` are the `moof` box headers as found in `data`; offsets in a
+/// movie fragment are relative to the first byte of its box (the size field),
+/// not to its payload. Every sample must lie inside `data`, and the total sample
+/// count is bounded by `data.len()`, so a hostile `trun` cannot make the parser
+/// allocate more than the input itself justifies.
 pub fn parse_moof_fragments(
     data: &[u8],
-    moof_ranges: &[core::ops::Range<usize>],
+    moofs: &[BoxHead],
     trex_defaults: &[TrexDefaults],
 ) -> Result<alloc::collections::BTreeMap<u32, Vec<FragSample>>> {
     use alloc::collections::BTreeMap;
     let mut track_samples: BTreeMap<u32, Vec<FragSample>> = BTreeMap::new();
+    let mut budget = data.len();
 
-    for moof_range in moof_ranges {
-        let moof_offset = moof_range.start as u64;
-        let moof_bytes = &data[moof_range.clone()];
-        for head in Boxes::new(moof_bytes, 0..moof_bytes.len()) {
+    for moof in moofs {
+        let moof_offset = moof.offset as u64;
+        // Without an explicit base, the first `traf` starts at the `moof` box and
+        // each later one where the previous `traf` stopped (§8.8.7).
+        let mut implicit_base = moof_offset;
+        for head in Boxes::new(data, moof.payload.clone()) {
             let head = head?;
             if head.four == *b"traf" {
-                parse_traf(
-                    data,
+                implicit_base = parse_traf(
+                    data.len() as u64,
                     moof_offset,
-                    head.offset as u64 + moof_offset,
-                    &moof_bytes[head.payload],
+                    implicit_base,
+                    &data[head.payload],
                     trex_defaults,
                     &mut track_samples,
+                    &mut budget,
                 )?;
             }
         }
@@ -94,14 +109,17 @@ pub fn parse_moof_fragments(
     Ok(track_samples)
 }
 
+/// Parses one `traf`; returns the file offset just past its last sample, the
+/// implicit base of the next `traf` in the same `moof`.
 fn parse_traf(
-    _data: &[u8],
+    file_len: u64,
     moof_start_offset: u64,
-    _traf_offset: u64,
+    implicit_base: u64,
     traf_bytes: &[u8],
     trex_defaults: &[TrexDefaults],
     track_samples: &mut alloc::collections::BTreeMap<u32, Vec<FragSample>>,
-) -> Result<()> {
+    budget: &mut usize,
+) -> Result<u64> {
     let mut tfhd: Option<Tfhd> = None;
     let mut _tfdt_decode_time: Option<u64> = None;
     let mut trun_boxes = Vec::new();
@@ -132,7 +150,7 @@ fn parse_traf(
 
     let tfhd = match tfhd {
         Some(t) => t,
-        None => return Ok(()),
+        None => return Ok(implicit_base),
     };
 
     let trex = trex_defaults
@@ -149,7 +167,7 @@ fn parse_traf(
         .default_sample_flags
         .unwrap_or(trex.default_sample_flags);
 
-    let mut current_offset = tfhd.base_data_offset.unwrap_or(moof_start_offset);
+    let mut current_offset = tfhd.base_data_offset.unwrap_or(implicit_base);
 
     let samples = track_samples.entry(tfhd.track_id).or_default();
 
@@ -157,6 +175,10 @@ fn parse_traf(
         let mut r = Reader::new(trun_body);
         let (version, flags) = full_box(&mut r, "trun")?;
         let sample_count = r.u32("trun sample_count")? as usize;
+        if sample_count > *budget {
+            return Err(Error::BadValue("trun sample_count exceeds the file size"));
+        }
+        *budget -= sample_count;
 
         let data_offset_present = (flags & 0x000001) != 0;
         let first_sample_flags_present = (flags & 0x000004) != 0;
@@ -177,7 +199,9 @@ fn parse_traf(
             None
         };
 
-        let mut sample_offset = (current_offset as i64 + trun_data_offset) as u64;
+        let mut sample_offset = current_offset
+            .checked_add_signed(trun_data_offset)
+            .ok_or(Error::BadValue("trun data_offset leaves the file"))?;
 
         for i in 0..sample_count {
             let duration = if sample_duration_present {
@@ -210,8 +234,12 @@ fn parse_traf(
                 0
             };
 
-            // Non-sync sample is flag bit 0x01000000 (sample_is_non_sync_sample)
-            let is_sync = (s_flags & 0x0100_0000) == 0;
+            let is_sync = (s_flags & SAMPLE_IS_NON_SYNC) == 0;
+
+            let sample_end = sample_offset
+                .checked_add(u64::from(size))
+                .filter(|&end| end <= file_len)
+                .ok_or(Error::truncated("sample payload", usize::MAX, file_len as usize))?;
 
             samples.push(FragSample {
                 offset: sample_offset,
@@ -221,13 +249,13 @@ fn parse_traf(
                 keyframe: is_sync,
             });
 
-            sample_offset += size as u64;
+            sample_offset = sample_end;
         }
 
         current_offset = sample_offset;
     }
 
-    Ok(())
+    Ok(current_offset)
 }
 
 struct Tfhd {
@@ -365,7 +393,7 @@ pub fn demux_fragmented(data: &[u8]) -> Result<crate::Mp4> {
     }
     let (major_brand, compatible_brands) = crate::demux::parse_ftyp(&data[first.payload.clone()])?;
     let mut moov = None;
-    let mut moof_ranges = Vec::new();
+    let mut moofs = Vec::new();
     for head in top {
         let head = head?;
         match &head.four {
@@ -376,7 +404,7 @@ pub fn demux_fragmented(data: &[u8]) -> Result<crate::Mp4> {
                 moov = Some(head.payload);
             }
             b"moof" => {
-                moof_ranges.push(head.payload);
+                moofs.push(head);
             }
             _ => {}
         }
@@ -401,10 +429,14 @@ pub fn demux_fragmented(data: &[u8]) -> Result<crate::Mp4> {
             _ => {}
         }
     }
-    if !moof_ranges.is_empty() {
-        let frag_map = parse_moof_fragments(data, &moof_ranges, &trex_defaults)?;
+    if !moofs.is_empty() {
+        let frag_map = parse_moof_fragments(data, &moofs, &trex_defaults)?;
         for track in &mut tracks {
             if let Some(samples) = frag_map.get(&track.id) {
+                // Replacing a populated table would silently drop its samples.
+                if track.table.sample_count > 0 && !samples.is_empty() {
+                    return Err(Error::Unsupported("fragments after samples in moov"));
+                }
                 synthesize_sample_table(&mut track.table, samples);
             }
         }

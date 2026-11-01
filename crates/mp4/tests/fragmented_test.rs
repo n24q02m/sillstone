@@ -127,13 +127,20 @@ fn test_fragmented_demux() {
     traf_payload.extend_from_slice(&full_box_bytes(b"trun", 0, 0x000301, &trun_payload));
 
     moof_payload.extend_from_slice(&box_bytes(b"traf", &traf_payload));
+    let moof_start = file.len();
     file.extend_from_slice(&box_bytes(b"moof", &moof_payload));
+    // The samples sit 1000 bytes after the moof box; the file must reach them.
+    file.extend_from_slice(&box_bytes(b"mdat", &[0u8; 1100]));
 
     let demuxed = demux_fragmented(&file).expect("demux fragmented succeeds");
     assert_eq!(demuxed.tracks.len(), 1);
     let track = &demuxed.tracks[0];
     assert_eq!(track.table.sample_count, 2);
     assert_eq!(track.table.sizes, vec![50, 60]);
+    assert_eq!(
+        track.table.chunk_offsets,
+        vec![moof_start as u64 + 1000, moof_start as u64 + 1050]
+    );
     assert_eq!(track.table.times.len(), 1);
     assert_eq!(track.table.times[0].count, 2);
     assert_eq!(track.table.times[0].delta, 1000);
