@@ -351,7 +351,8 @@ pub unsafe extern "C" fn sillstone_digest_blake3_xof(
         return PITH_E_INVALID;
     }
     let bytes = borrow(data, len);
-    let out_slice = unsafe { core::slice::from_raw_parts_mut(out, out_len) };
+    // A zero-length request may come with a null `out`.
+    let out_slice = borrow_mut_bytes(out, out_len);
     match crate::blake3_xof(bytes, out_slice) {
         Ok(()) => PITH_OK,
         Err(_) => PITH_E_REJECTED,

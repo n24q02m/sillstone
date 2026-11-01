@@ -288,3 +288,53 @@ pub fn blake2b_512(data: &[u8]) -> Result<Digest<64>> {
     blake2b_into(data, b"", &mut bytes)?;
     Ok(Digest::from_bytes(bytes))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The portable compression must agree with whichever kernel `compress`
+    /// dispatches to, so the scalar path stays verified on AVX2 machines.
+    #[test]
+    fn scalar_compression_matches_the_dispatched_kernel() {
+        let mut state = 0x9e37_79b9_7f4a_7c15_u64;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        for round in 0..64u32 {
+            let mut h = [0u64; 8];
+            h.iter_mut().for_each(|w| *w = next());
+            let mut block = [0u8; 128];
+            block.iter_mut().for_each(|b| *b = next() as u8);
+            let t = ((next() as u128) << 64) | next() as u128;
+            let is_last = round % 2 == 1;
+
+            let mut dispatched = h;
+            compress(&mut dispatched, &block, t, is_last);
+            let mut scalar = h;
+            compress_scalar(&mut scalar, &block, t, is_last);
+            assert_eq!(dispatched, scalar, "round {round}");
+        }
+    }
+
+    /// RFC 7693 appendix A: BLAKE2b-512("abc") through the scalar kernel.
+    #[test]
+    fn scalar_kernel_reproduces_the_rfc_abc_vector() {
+        let mut h = IV;
+        h[0] ^= 0x0101_0040;
+        let mut block = [0u8; 128];
+        block[..3].copy_from_slice(b"abc");
+        compress_scalar(&mut h, &block, 3, true);
+        let mut out = [0u8; 64];
+        for (i, word) in h.iter().enumerate() {
+            out[8 * i..8 * (i + 1)].copy_from_slice(&word.to_le_bytes());
+        }
+        assert_eq!(
+            out[..8],
+            [0xba, 0x80, 0xa5, 0x3f, 0x98, 0x1c, 0x4d, 0x0d]
+        );
+    }
+}

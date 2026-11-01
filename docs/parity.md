@@ -56,7 +56,7 @@ All 45 reference vectors defined in `reference.json` are executed across all fou
 | **Cryptographic Digest** | FIPS 180-4 (SHA-256) | Full bit-exact | NIST CAVP vectors |
 | **Cryptographic Digest** | FIPS 202 (SHA3-256, SHA3-512) | Full bit-exact | NIST CAVP short/long message KAT vectors |
 | **Cryptographic Digest** | RFC 7693 (BLAKE2b) | Full bit-exact | Official BLAKE2 KAT vector suite (`blake2-kat.json`) |
-| **Cryptographic Digest** | BLAKE3 Specification (2020) | Full bit-exact | Official BLAKE3 test vectors (`test_vectors.json`) |
+| **Cryptographic Digest** | BLAKE3 Specification (2020) | Hash, keyed hash and XOF bit-exact (derive-key mode is not provided) | Official vector inputs (`i % 251`, 42 lengths from 0 to 102,400 bytes) checked against the reference implementation for 131-byte plain and keyed output, plus streaming splits (`tests/blake3_vectors.rs`) |
 | **Unicode Graphemes** | Unicode Standard 15.1.0 UAX #29 | Full bit-exact | Official `GraphemeBreakTest.txt` test suite |
 | **Decompression** | RFC 1951 (Deflate) | Full decompression | Round-trip tests with gzip/deflate bitstreams |
 | **Decompression** | RFC 7932 (Brotli) | Full except the large-window extension (refused with `Unsupported`) | Hand-built header streams (`tests/framing.rs`); 160 streams from the reference `brotli` v1.1.0 CLI checked by SHA-256 (`tests/brotli_oracle.rs`); all 121 dictionary transforms (1,394 cases) and the dictionary's RFC CRC-32 / SHA-256; 2,500 randomized round trips against that CLI (quality 0-11, lgwin 10-24, text / HTML / UTF-8 / random / runs / structured data); every truncation and mutated stream returns an error or a result, never a panic |
