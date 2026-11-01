@@ -22,3 +22,18 @@
 | Axis Reductions | ✓ | ✓ | ✓ | ✓ |
 | Image Zero-Copy Bridge | ✓ | ✓ | ✓ | ✓ |
 | `__array_interface__` | ✓ | N/A | N/A | N/A |
+
+## Python SDK (`sillstone.Array`) behaviour and limits
+
+The Python `Array` is a pure-Python strided engine (with the native kernel used for contiguous `float64` add and matmul when the shared library is present). It follows NumPy 2 semantics for the surface it implements:
+
+- **dtypes**: `bool`, `int8`-`int64`, `uint8`-`uint64`, `float32`, `float64`, plus the usual aliases (`i4`, `<f8`, `bool_`, `float`, `int`, NumPy dtype objects). Any other dtype (`float16`, `complex*`, `datetime64`, `object`, ...) raises `TypeError`; it is never silently converted.
+- **Promotion**: array-array results use NumPy's `result_type` table; Python scalars are weak (NEP 50), so `uint8_array + 1` stays `uint8` and an out-of-range scalar raises `OverflowError`.
+- **Integer arithmetic wraps** (two's complement) like NumPy; `float32` results are rounded to `float32` and overflow to infinity; `x / 0` follows IEEE (`inf`/`nan`), never `ZeroDivisionError`. Boolean `-` and unary `-` raise `TypeError`.
+- **Indexing**: integers (negative allowed), slices with any step, `...` and tuples of those, bounds-checked (`IndexError`). Basic indexing returns views; assignment broadcasts and reads the source before writing, so overlapping assignment is safe. Assigning floats to integer arrays truncates; assigning an out-of-range integer raises `OverflowError`.
+- **Shape ops**: `reshape` accepts one `-1`; `transpose` validates axes (`ValueError` for repeats, `AxisError` for out-of-range).
+- **Reductions**: `sum`, `mean`, `max`, `min`, `argmax`, `argmin` over `axis=None`, an int, or a negative int. `sum` of bool/int widens to `int64` (`uint64` for unsigned); `mean` of ints is `float64`; NaN propagates through `max`/`min`/`argmax`/`argmin`; an out-of-range axis raises `AxisError`; `max`/`min`/`argmax`/`argmin` of an empty array raise `ValueError`.
+- **Matmul / `dot`**: 1-D and 2-D operands (`1-D @ 1-D` returns a scalar) with dtype promotion.
+- **Creation**: `array`, `zeros`, `ones`, `arange` (count `ceil((stop - start) / step)`), `linspace` (last element is exactly `stop`).
+
+Not implemented in the Python `Array`: elementwise comparison operators (`<`, `==`, ...), batched (N-d, N > 2) matmul, fancy / boolean-mask / `None` indexing, `float16` and complex dtypes.
