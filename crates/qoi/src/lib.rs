@@ -80,6 +80,16 @@ pub fn decode(bytes: &[u8]) -> Result<(QoiHeader, Vec<u8>)> {
         None => return Err(Error::BadValue("QOI byte length overflow")),
     };
 
+    // Every opcode byte yields at most 62 pixels (the longest run), so a
+    // header promising more than that cannot be satisfied by this stream.
+    // Refuse before reserving a buffer sized by an attacker-chosen header.
+    let chunk_bytes = bytes.len() - 8 - 14;
+    if total_pixels > chunk_bytes.saturating_mul(62) {
+        return Err(Error::BadValue(
+            "QOI header promises more pixels than the stream can hold",
+        ));
+    }
+
     let mut pixels = vec![0u8; total_bytes];
     let mut index = [[0u8; 4]; 64];
 
@@ -189,13 +199,20 @@ pub fn encode(
         Some(p) => p,
         None => return Err(Error::BadValue("dimension overflow")),
     };
-    if pixels.len() != total_pixels * channels as usize {
-        return Err(Error::BadValue("pixel buffer length mismatch"));
+    match total_pixels.checked_mul(channels as usize) {
+        Some(expected) if expected == pixels.len() => {}
+        Some(_) => return Err(Error::BadValue("pixel buffer length mismatch")),
+        None => return Err(Error::BadValue("byte length overflow")),
     }
 
-    // Maximum theoretical QOI size: 14 header + pixels * 5 + 8 padding
-    let max_size = 14 + total_pixels * 5 + 8;
-    let mut out = Vec::with_capacity(max_size.min(1024 * 1024));
+    // Maximum theoretical QOI size is 14 header + pixels * 5 + 8 padding;
+    // reserve at most 1 MiB up front and let the vector grow on demand.
+    let mut out = Vec::with_capacity(
+        total_pixels
+            .saturating_mul(5)
+            .saturating_add(22)
+            .min(1024 * 1024),
+    );
 
     // Write header
     out.extend_from_slice(&QOI_MAGIC);

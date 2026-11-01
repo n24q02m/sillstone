@@ -107,5 +107,6 @@ This document specifies the algorithmic guarantees, operational limits, input bo
   - `whash` and `colorhash` use the imagehash defaults (`level` 0, `binbits` 3) in the facades; the ABI accepts other values.
   - The Java hash JNI entry points return `-1` on error, which is also a valid all-ones hash; the facade cannot tell them apart. JNI does not carry status codes, so the Java facade reports `-1`/`-2` approximately from argument checks.
   - `sillstone_tensor_matmul_f64` copies its inputs into owned buffers before multiplying.
+  - QOI decode refuses a header whose pixel count exceeds what the stream can encode (62 pixels per opcode byte) before it reserves the output buffer, so a 22-byte file cannot request gigabytes. QOI encode returns an error, not a panic, when `width * height * channels` overflows.
   - Maven Central publication is not configured (no OSSRH credential and no registered groupId); the Java artifact is built and tested but not published.
 
