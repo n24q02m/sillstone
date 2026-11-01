@@ -169,7 +169,7 @@ func main() {
 
 <!-- New -->
 <dependency>
-    <groupId>io.github.sillstone</groupId>
+    <groupId>io.github.n24q02m</groupId>
     <artifactId>sillstone</artifactId>
     <version>0.2.0</version>
 </dependency>

@@ -3,7 +3,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>io.github.sillstone</groupId>
+    <groupId>io.github.n24q02m</groupId>
     <artifactId>sillstone</artifactId>
     <version>0.3.1-beta.1</version>
     <packaging>jar</packaging>
@@ -21,15 +21,15 @@
 
     <developers>
         <developer>
-            <name>Sillstone Contributors</name>
-            <organization>Sillstone</organization>
-            <organizationUrl>https://github.com/sillstone</organizationUrl>
+            <id>n24q02m</id>
+            <name>n24q02m</name>
+            <url>https://github.com/n24q02m</url>
         </developer>
     </developers>
 
     <scm>
         <connection>scm:git:git://github.com/n24q02m/sillstone.git</connection>
-        <developerConnection>scm:git:ssh://github.com:sillstone/sillstone.git</developerConnection>
+        <developerConnection>scm:git:ssh://git@github.com/n24q02m/sillstone.git</developerConnection>
         <url>https://github.com/n24q02m/sillstone</url>
     </scm>
 
@@ -53,4 +53,96 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <!--
+      Maven Central (Central Portal) release profile. It is inert unless
+      activated with -Prelease, so `mvn package` and CI test runs are unchanged.
+
+      Central requires, for every release: the sources and javadoc jars, a GPG
+      signature on every artifact, and a verified namespace. The namespace
+      io.github.n24q02m is verified by the GitHub account n24q02m in the
+      Central Portal (Namespaces -> Add Namespace -> verify via a temporary
+      GitHub repository); the portal login and the user token are held by the
+      account owner, never by this repository.
+
+      Credentials come from the environment, never from this file:
+        CENTRAL_PORTAL_USERNAME / CENTRAL_PORTAL_PASSWORD  Portal user token
+        MAVEN_GPG_PASSPHRASE                               key passphrase
+      and the signing key is imported into the keyring before `mvn deploy`.
+    -->
+    <profiles>
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>3.4.0</version>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>3.12.0</version>
+                        <configuration>
+                            <doclint>none</doclint>
+                            <quiet>true</quiet>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.2.8</version>
+                        <configuration>
+                            <gpgArguments>
+                                <arg>--pinentry-mode</arg>
+                                <arg>loopback</arg>
+                            </gpgArguments>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.12.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                            <!--
+                              The first release is validated by the portal and
+                              then published by hand from the portal UI; flip
+                              autoPublish to true once a release has gone out.
+                            -->
+                            <autoPublish>false</autoPublish>
+                            <waitUntil>validated</waitUntil>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

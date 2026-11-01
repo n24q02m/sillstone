@@ -24,7 +24,7 @@ Pure-Rust, zero-dependency multimedia, hashing, and array computing suite.
 | **Python** | `sillstone` | `pip install sillstone` | [pypi.org/project/sillstone](https://pypi.org/project/sillstone) |
 | **JavaScript / TypeScript** | `sillstone` | `npm install sillstone` | [npmjs.com/package/sillstone](https://npmjs.com/package/sillstone) |
 | **Go** | `sillstone` | `go get github.com/n24q02m/sillstone/sdk/go/sillstone` | [pkg.go.dev/github.com/n24q02m/sillstone/sdk/go/sillstone](https://pkg.go.dev/github.com/n24q02m/sillstone/sdk/go/sillstone) |
-| **Java** | `sillstone` | `io.github.sillstone:sillstone` | [central.sonatype.com/artifact/io.github.sillstone/sillstone](https://central.sonatype.com/artifact/io.github.sillstone/sillstone) |
+| **Java** | `sillstone` | `io.github.n24q02m:sillstone` | [central.sonatype.com/artifact/io.github.n24q02m/sillstone](https://central.sonatype.com/artifact/io.github.n24q02m/sillstone) |
 
 ## Documentation
 
