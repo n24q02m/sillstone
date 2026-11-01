@@ -11,14 +11,16 @@
 //!   `(center, support)` window rule of `precompute_coeffs`, normalised to
 //!   sum 1, then quantised to `PRECISION_BITS = 22` fixed point with
 //!   round-half-away-from-zero;
-//! * the horizontal pass always runs first (checked against Pillow 12.3: it
-//!   has no vertical-first mode) and stores an 8-bit intermediate (clipped),
-//!   the second pass reads that intermediate — two roundings, exactly as
-//!   Pillow does;
+//! * the horizontal pass runs first, unless the height shrinks by more than
+//!   twice the width's shrink (`dh > 0 && dh > 2 * dw`, the rule of Pillow
+//!   13.0, measured against its output; Pillow 12.3 always filters
+//!   horizontally first). The first pass stores an 8-bit intermediate
+//!   (clipped), the second pass reads that intermediate — two roundings,
+//!   exactly as Pillow does;
 //! * accumulators start at `1 << 21` (the rounding term) and are shifted
 //!   right by 22 and clamped to `0..=255`.
 //!
-//! Because the horizontal pass is first, only the rows the vertical pass reads
+//! With the horizontal pass first, only the rows the vertical pass reads
 //! are filtered.
 
 use alloc::rc::Rc;
@@ -518,30 +520,49 @@ pub fn resize_u8_box(
     let hc = need_h.then(|| precompute(in_w, out_w, filter, bx[0], bx[2]));
     let vc = need_v.then(|| precompute(in_h, out_h, filter, bx[1], bx[3]));
 
-    // Pillow (12.3, checked against its output) always filters horizontally
-    // first, whatever the shrink ratios; there is no vertical-first mode.
-    // Rows of `src` the vertical pass reads.
-    let (ybox_first, ybox_last) = match &vc {
-        Some(vc) => {
-            let (first, _) = vc.bounds[0];
-            let (lm, ln) = vc.bounds[out_h - 1];
-            (first, lm + ln)
+    if !vertical_first(in_w, in_h, out_w, out_h) {
+        // Rows of `src` the vertical pass reads.
+        let (ybox_first, ybox_last) = match &vc {
+            Some(vc) => {
+                let (first, _) = vc.bounds[0];
+                let (lm, ln) = vc.bounds[out_h - 1];
+                (first, lm + ln)
+            }
+            None => (0, in_h),
+        };
+        let mid = match &hc {
+            Some(hc) => horizontal(
+                &src[ybox_first * in_w * c..ybox_last * in_w * c],
+                in_w,
+                c,
+                hc,
+            ),
+            None => src[ybox_first * in_w * c..ybox_last * in_w * c].to_vec(),
+        };
+        match &vc {
+            Some(vc) => vertical(&mid, out_w * c, ybox_first, vc),
+            None => mid,
         }
-        None => (0, in_h),
-    };
-    let mid = match &hc {
-        Some(hc) => horizontal(
-            &src[ybox_first * in_w * c..ybox_last * in_w * c],
-            in_w,
-            c,
-            hc,
-        ),
-        None => src[ybox_first * in_w * c..ybox_last * in_w * c].to_vec(),
-    };
-    match &vc {
-        Some(vc) => vertical(&mid, out_w * c, ybox_first, vc),
-        None => mid,
+    } else {
+        let mid = match &vc {
+            Some(vc) => vertical(src, in_w * c, 0, vc),
+            None => src.to_vec(),
+        };
+        match &hc {
+            Some(hc) => horizontal(&mid, in_w, c, hc),
+            None => mid,
+        }
     }
+}
+
+/// Pillow's pass-order rule (`ImagingResampleInner`): filter vertically
+/// first when the height shrinks by more than twice the width's shrink,
+/// otherwise horizontally first. The two orders differ because each pass
+/// rounds its intermediate.
+fn vertical_first(in_w: usize, in_h: usize, out_w: usize, out_h: usize) -> bool {
+    let dh = in_h as i64 - out_h as i64;
+    let dw = in_w as i64 - out_w as i64;
+    dh > 0 && dh > dw * 2
 }
 
 /// Horizontal pass over every row of `src` (`in_w` pixels of `c` channels
@@ -850,6 +871,18 @@ pub(crate) fn resize_wide<T: Copy + Default>(
         }
         out
     };
+
+    if vertical_first(in_w, in_h, out_w, out_h) {
+        let all: Vec<f64> = src.iter().map(|&v| get(v)).collect();
+        let mid = match &vw {
+            Some(vw) => v_pass(&all, in_w * c, 0, vw),
+            None => all,
+        };
+        return match &hw {
+            Some(hw) => h_pass(&mid, hw),
+            None => mid,
+        };
+    }
 
     // Only the source rows the vertical pass reads are filtered.
     let (first, last) = match &vw {

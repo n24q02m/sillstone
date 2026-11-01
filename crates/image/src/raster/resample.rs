@@ -331,9 +331,9 @@ pub fn resize<L: Layout, T: Sample>(
 /// works on at most `reducing_gap` times the output size, which is faster
 /// and slightly different, exactly as in Pillow.
 ///
-/// `reducing_gap` must be at least 1.0. Like Pillow it has no effect for
-/// `Nearest` and for alpha layouts (`Rgba`, `La`), whose recursive
-/// premultiplied resize does not forward it.
+/// `reducing_gap` must be at least 1.0. It has no effect for `Nearest`.
+/// Alpha layouts (`Rgba`, `La`) forward it to the premultiplied resize, as
+/// Pillow 13 does (Pillow 12 dropped it on that path).
 ///
 /// `Error::BadValue` on a zero output dimension or an invalid gap.
 pub fn resize_with_gap<L: Layout, T: Sample>(
@@ -362,7 +362,7 @@ pub fn resize_with_gap<L: Layout, T: Sample>(
             let mut pre = img.as_slice().to_vec();
             premultiply(&mut pre, L::CHANNELS, a);
             let pre = Image::<L, T>::from_vec(img.width(), img.height(), pre)?;
-            let mut out = resize_reduced(&pre, ow, oh, filter, None)?;
+            let mut out = resize_reduced(&pre, ow, oh, filter, reducing_gap)?;
             unpremultiply(out.as_mut_slice(), L::CHANNELS, a);
             Ok(out)
         }
