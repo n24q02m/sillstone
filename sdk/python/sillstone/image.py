@@ -203,11 +203,60 @@ class Image:
                         pixels[dst_start + x * 3 + 1] = g
                         pixels[dst_start + x * 3 + 2] = b
                 return cls("RGB", (w_abs, h_abs), bytes(pixels))
+            elif bpp == 32:
+                return cls._open_bmp32(content, w, h, offset)
             else:
                 raise NotImplementedError(f"BMP bpp {bpp} not supported in direct python decoder")
 
         else:
             raise ValueError("Unsupported or unrecognized image format signature")
+
+    @classmethod
+    def _open_bmp32(cls, content: bytes, w: int, h: int, offset: int) -> Image:
+        """Decodes a 32-bit BMP: ``BI_RGB`` (fourth byte is padding, as Pillow reads it) or
+        ``BI_BITFIELDS`` with 8-bit-wide channel masks (alpha kept when the file declares an alpha mask)."""
+        compression = int.from_bytes(content[30:34], "little")
+        header_size = int.from_bytes(content[14:18], "little")
+        if compression == 0:
+            masks = (0x00FF0000, 0x0000FF00, 0x000000FF, 0)
+        elif compression == 3 and len(content) >= 14 + 52:
+            r, g, b = (int.from_bytes(content[o : o + 4], "little") for o in (54, 58, 62))
+            a = int.from_bytes(content[66:70], "little") if header_size >= 56 and len(content) >= 70 else 0
+            masks = (r, g, b, a)
+        else:
+            raise NotImplementedError(f"32-bit BMP compression {compression} not supported in direct python decoder")
+
+        shifts = []
+        for m in masks:
+            if m == 0:
+                shifts.append(None)
+                continue
+            shift = (m & -m).bit_length() - 1
+            if (m >> shift) != 0xFF:
+                raise NotImplementedError("32-bit BMP channel masks other than 8 bits wide are not supported")
+            shifts.append(shift)
+        if shifts[0] is None or shifts[1] is None or shifts[2] is None:
+            raise ValueError("32-bit BMP is missing a colour channel mask")
+
+        w_abs, h_abs = abs(w), abs(h)
+        has_alpha = shifts[3] is not None
+        ch = 4 if has_alpha else 3
+        if len(content) < offset + w_abs * h_abs * 4:
+            raise ValueError("truncated 32-bit BMP pixel data")
+        pixels = bytearray(w_abs * h_abs * ch)
+        for y in range(h_abs):
+            src_y = (h_abs - 1 - y) if h > 0 else y
+            row = content[offset + src_y * w_abs * 4 : offset + (src_y + 1) * w_abs * 4]
+            dst = y * w_abs * ch
+            for x in range(w_abs):
+                px = int.from_bytes(row[x * 4 : x * 4 + 4], "little")
+                o = dst + x * ch
+                pixels[o] = (px >> shifts[0]) & 0xFF
+                pixels[o + 1] = (px >> shifts[1]) & 0xFF
+                pixels[o + 2] = (px >> shifts[2]) & 0xFF
+                if has_alpha:
+                    pixels[o + 3] = (px >> shifts[3]) & 0xFF
+        return cls("RGBA" if has_alpha else "RGB", (w_abs, h_abs), bytes(pixels))
 
     def resize(self, size: Tuple[int, int], resample: int = Resampling.BICUBIC) -> Image:
         """Resizes the image to the specified size using the given resampling filter."""
