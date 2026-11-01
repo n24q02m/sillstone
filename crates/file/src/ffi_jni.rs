@@ -257,6 +257,9 @@ unsafe fn byte_array(env: *mut JNIEnv, op: &str, result: Result<Vec<u8>, i32>) -
             return core::ptr::null_mut();
         }
     };
+    if env.is_null() {
+        return core::ptr::null_mut();
+    }
     let table = unsafe { &*(*env) };
     let array =
         unsafe { (table.new_byte_array.expect("NewByteArray slot"))(env, bytes.len() as Jint) };
@@ -745,6 +748,14 @@ mod tests {
             JVM.with(|j| (j.pending_status.get(), j.threw.get())),
             (-1, true)
         );
+    }
+
+    #[test]
+    fn byte_array_with_null_env_and_ok_result_returns_null() {
+        reset();
+        let out = unsafe { byte_array(core::ptr::null_mut(), "op", Ok(alloc::vec![1u8, 2, 3])) };
+        assert!(out.is_null());
+        assert!(JVM.with(|j| !j.threw.get()));
     }
 
     #[test]
