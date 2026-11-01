@@ -47,6 +47,11 @@ Python `Array`:
 - Mixed integer/float arithmetic where an operand exceeds `2**53` in magnitude: Sillstone computes the exact integer result and converts to float afterwards, NumPy converts the operands to float first (for example `uint64 - int64` can give `1.0` here and `0.0` in NumPy).
 - A float32 array times a Python float that overflows float32 (for example `1e300`): zero elements stay `0.0` here, NumPy converts the scalar to `inf` first and returns `nan`.
 
+Python `Image`:
+
+- `Image.from_array` takes `uint8` arrays only and raises `TypeError` for any other dtype; Pillow maps `uint16`, `int32` and `float32` arrays to the `I;16`, `I` and `F` modes, which Sillstone does not have. Two-channel arrays (`LA`) are refused.
+- The array exposed through `__array_interface__` is read-only (the pixels are immutable `bytes`); change pixels with `putpixel`.
+
 Rust `Tensor`:
 
 - `mean` of an empty tensor returns an error; NumPy returns `nan` with a warning.
