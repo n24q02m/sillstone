@@ -5,7 +5,7 @@ from __future__ import annotations
 import ctypes
 import io
 import os
-from typing import BinaryIO, Tuple, Union
+from typing import BinaryIO, Optional, Tuple, Union
 
 from ._generated import (
     sillstone_image_adjust_raw,
@@ -132,7 +132,16 @@ class Image:
         expected_len = self._width * self._height * CHANNELS[mode]
         if len(data) != expected_len:
             raise ValueError(f"Data length {len(data)} does not match size {size} and mode {mode}")
-        self._data = bytes(data)
+        # Mutable pixel store so putpixel is O(1); native calls and tobytes() read an
+        # immutable ``bytes`` snapshot that is rebuilt lazily after a write.
+        self._buf = bytearray(data)
+        self._snapshot: Optional[bytes] = None
+
+    @property
+    def _data(self) -> bytes:
+        if self._snapshot is None:
+            self._snapshot = bytes(self._buf)
+        return self._snapshot
 
     @property
     def mode(self) -> str:
@@ -392,6 +401,8 @@ class Image:
 
     def convert(self, mode: str) -> Image:
         """Converts image to another color mode (e.g. 'RGB', 'RGBA', 'L')."""
+        if mode not in MODE_TO_LAYOUT:
+            raise ValueError(f"Unsupported mode {mode}; expected 'L', 'RGB', or 'RGBA'")
         if mode == self._mode:
             return Image(self._mode, self.size, self._data)
 
@@ -502,13 +513,12 @@ class Image:
         """NumPy Array Interface (version 3) for zero-copy buffer sharing with numpy.asarray()."""
         channels = CHANNELS[self._mode]
         shape = (self._height, self._width) if channels == 1 else (self._height, self._width, channels)
-        buf_type = ctypes.c_char * len(self._data)
-        addr = ctypes.addressof(buf_type.from_buffer(self._data))
         return {
             "version": 3,
             "shape": shape,
             "typestr": "|u1",
-            "data": (addr, False),
+            # The pixels are immutable ``bytes``: the buffer protocol hands NumPy a read-only view.
+            "data": self._data,
             "strides": None,
         }
 
@@ -525,8 +535,12 @@ class Image:
     def from_array(cls, arr, mode: Optional[str] = None) -> "Image":
         """Creates an Image from a Sillstone Array or NumPy-compatible array."""
         shape = arr.shape
+        dtype = str(getattr(arr, "dtype", "uint8"))
+        if dtype != "uint8":
+            raise TypeError(f"Image.from_array needs a uint8 array, got dtype {dtype}")
         if len(shape) == 2:
             h, w = shape
+            c = 1
             m = mode or "L"
         elif len(shape) == 3:
             h, w, c = shape
@@ -536,6 +550,10 @@ class Image:
                 m = "RGB" if c == 3 else ("RGBA" if c == 4 else "L")
         else:
             raise ValueError("Array must have 2 or 3 dimensions to convert to Image")
+        if m not in CHANNELS:
+            raise ValueError(f"Unsupported mode {m}; expected 'L', 'RGB', or 'RGBA'")
+        if c != CHANNELS[m]:
+            raise ValueError(f"Array with {c} channel(s) cannot be converted to mode {m} ({CHANNELS[m]} expected)")
         raw_bytes = arr.tobytes() if hasattr(arr, "tobytes") else bytes(arr)
         return cls.frombytes(m, (w, h), raw_bytes)
 
@@ -548,18 +566,35 @@ class Image:
         c = CHANNELS[self._mode]
         off = (y * self._width + x) * c
         if c == 1:
-            return self._data[off]
-        return tuple(self._data[off : off + c])
+            return self._buf[off]
+        return tuple(self._buf[off : off + c])
 
     def putpixel(self, xy: Tuple[int, int], value: Union[int, Tuple[int, ...]]):
-        """Sets the pixel value at a given coordinate."""
+        """Sets the pixel value at a given coordinate; channel values are clamped to 0..255 like Pillow.
+
+        ``L`` takes an int or a 1-tuple, ``RGB`` a 3- or 4-tuple (a fourth value is dropped),
+        ``RGBA`` a 3-tuple (opaque) or 4-tuple.
+        """
         x, y = xy
         if x < 0 or x >= self._width or y < 0 or y >= self._height:
             raise IndexError("pixel coordinate out of range")
         c = CHANNELS[self._mode]
-        off = (y * self._width + x) * c
-        if c == 1:
-            self._data[off] = int(value)
+        if isinstance(value, int):
+            values = (value,)
         else:
-            for i, v in enumerate(value):
-                self._data[off + i] = int(v)
+            try:
+                values = tuple(value)
+            except TypeError:
+                raise TypeError(
+                    f"color must be an int or a tuple of ints, got {type(value).__name__}"
+                ) from None
+        if self._mode == "RGBA" and len(values) == 3:
+            values += (255,)
+        elif self._mode == "RGB" and len(values) == 4:
+            values = values[:3]
+        if len(values) != c:
+            raise TypeError(f"{self._mode} pixel needs {c} channel value(s), got {len(values)}")
+        pixel = bytes(min(255, max(0, int(v))) for v in values)
+        off = (y * self._width + x) * c
+        self._buf[off : off + c] = pixel
+        self._snapshot = None
