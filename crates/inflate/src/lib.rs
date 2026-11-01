@@ -54,7 +54,7 @@ pub mod ffi;
 #[cfg(not(test))]
 mod ffi_jni;
 pub mod stream;
-/// Pure Rust Brotli decompressor (RFC 7932).
+/// Pure Rust Brotli decompressor (RFC 7932), large-window streams excepted.
 pub mod brotli;
 /// Pure Rust Zstandard decompressor (RFC 8878), dictionaries excepted.
 pub mod zstd;
