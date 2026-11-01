@@ -55,8 +55,8 @@ This document specifies the algorithmic guarantees, operational limits, input bo
 | Codec | RFC Specification | Features Supported | Limits & Protection |
 |---|---|---|---|
 | **Deflate** | RFC 1951 | Fixed & dynamic Huffman, uncompressed blocks | `max_out` bounds check prevents zip bombs |
-| **Brotli** | RFC 7932 | Static 122KB dictionary, meta-blocks, context modeling | Enforced `max_out` buffer cap; corrupted stream fails safely |
-| **Zstandard** | RFC 8878 | FSE (Finite State Entropy), Huffman, raw/RLE/compressed blocks, XXH64 checksum | Window size capped; corrupted header returns error |
+| **Brotli** | RFC 7932 | Stream header, empty / metadata / uncompressed meta-blocks. Compressed meta-blocks (prefix codes, context modeling, 122KB static dictionary) are NOT implemented and return `Unsupported` | Enforced `max_out` buffer cap; corrupted or unsupported stream returns an error, never guessed bytes |
+| **Zstandard** | RFC 8878 | Frames, skippable frames, raw / RLE blocks, raw / RLE literal sections, XXH64 content checksum. Huffman literals, FSE sequences and dictionaries are NOT implemented and return `Unsupported` | `max_out` buffer cap; corrupted header or checksum returns an error, never guessed bytes |
 
 ---
 

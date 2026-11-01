@@ -13,7 +13,7 @@ This document outlines the milestones, landed capabilities, and forward developm
 - **Hashing & Digest:** SHA3-256, SHA3-512, BLAKE2b (64-byte keyed), BLAKE3 (Merkle tree & XOF).
 - **Mathematical Transforms:** DST-I, DST-II, DST-III, numerical quadratures (Trapezoid, Simpson, Gauss-Legendre), Runge-Kutta ODE solvers (RK4, adaptive RK45).
 - **Unicode:** Full UAX #29 extended grapheme clustering, general category and character name lookups matching Unicode 15.1.0.
-- **Decompression:** RFC 7932 Brotli (with 122KB embedded static dictionary) and RFC 8878 Zstandard decompression with XXH64 validation.
+- **Decompression:** DEFLATE/zlib/gzip complete. Brotli (RFC 7932) and Zstandard (RFC 8878) cover framing, raw/RLE/uncompressed blocks and the Zstandard XXH64 checksum; the entropy-coded payloads (Brotli compressed meta-blocks with the 122KB static dictionary, Zstandard Huffman literals and FSE sequences) are not implemented yet and are refused with `Unsupported`.
 - **Codecs & Formats:** Complete PNG encoder, JPEG baseline encoder (Annex K), fragmented MP4/MOV parser (`moof`, `traf`, `trun`), FLAC Vorbis comment writer, MP3 ID3v2/Xing parser, Zip64 writer.
 - **Perceptual Fingerprints:** Image hashes (aHash, dHash, wHash Haar DWT, colorhash), text locality-sensitive hashing (TrendMicro TLSH bit-exact), audio landmark peaks and fingerprints, video scene-cut detection.
 - **File Containers:** TAR (USTAR, PAX, GNU long-name) archive reader with path traversal protection, Office Open XML (DOCX/XLSX) text extraction.
