@@ -100,6 +100,50 @@ class PutPixelTests(unittest.TestCase):
                 with self.assertRaises(IndexError):
                     img.putpixel(xy, 1)
 
+    def test_putpixel_is_visible_to_getpixel_and_later_snapshots_only(self):
+        img = Image.new("RGB", (3, 2), (1, 2, 3))
+        before = img.tobytes()
+        img.putpixel((2, 1), (9, 8, 7))
+        self.assertEqual(img.getpixel((2, 1)), (9, 8, 7))
+        self.assertEqual(img.getpixel((0, 0)), (1, 2, 3))
+        self.assertEqual(before, bytes([1, 2, 3]) * 6)
+        after = img.tobytes()
+        self.assertEqual(after, bytes([1, 2, 3]) * 5 + bytes([9, 8, 7]))
+        self.assertIs(img.tobytes(), after)  # unchanged image: the cached snapshot is reused
+        img.putpixel((0, 0), (4, 4, 4))
+        self.assertEqual(after[:3], b"")
+        self.assertEqual(img.tobytes()[:3], b"")
+
+    def test_native_operations_see_pixels_written_by_putpixel(self):
+        img = Image.new("L", (4, 4), 0)
+        img.putpixel((3, 3), 255)
+        self.assertEqual(img.transpose(Transpose.FLIP_TOP_BOTTOM).getpixel((3, 0)), 255)
+        self.assertEqual(img.resize((2, 2)).size, (2, 2))
+        self.assertEqual(img.convert("RGB").getpixel((3, 3)), (255, 255, 255))
+
+    def test_putpixel_cost_does_not_grow_with_the_image(self):
+        # The first implementation copied the whole buffer per call: ~2.5 us on 64x64 but
+        # ~430 us on 512x512. A constant-time write keeps the two within a small factor.
+        import time
+
+        def per_call(side):
+            img = Image.new("RGB", (side, side), 0)
+            start = time.perf_counter()
+            for i in range(2000):
+                img.putpixel((i % side, (i // side) % side), (1, 2, 3))
+            return (time.perf_counter() - start) / 2000
+
+        small = min(per_call(64) for _ in range(3))
+        large = min(per_call(512) for _ in range(3))
+        self.assertLess(large, small * 8 + 20e-6, f"64x64 {small * 1e6:.1f} us, 512x512 {large * 1e6:.1f} us")
+
+    def test_putpixel_names_the_expected_color_type(self):
+        img = Image.new("L", (1, 1), 0)
+        for bad in [1.5, None, object()]:
+            with self.subTest(bad=type(bad).__name__):
+                with self.assertRaisesRegex(TypeError, "color must be an int or a tuple"):
+                    img.putpixel((0, 0), bad)
+
 
 class ArrayConversionTests(unittest.TestCase):
     def test_from_array_keeps_row_major_pixels(self):

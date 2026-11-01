@@ -5,7 +5,7 @@ from __future__ import annotations
 import ctypes
 import io
 import os
-from typing import BinaryIO, Tuple, Union
+from typing import BinaryIO, Optional, Tuple, Union
 
 from ._generated import (
     sillstone_image_adjust_raw,
@@ -132,7 +132,16 @@ class Image:
         expected_len = self._width * self._height * CHANNELS[mode]
         if len(data) != expected_len:
             raise ValueError(f"Data length {len(data)} does not match size {size} and mode {mode}")
-        self._data = bytes(data)
+        # Mutable pixel store so putpixel is O(1); native calls and tobytes() read an
+        # immutable ``bytes`` snapshot that is rebuilt lazily after a write.
+        self._buf = bytearray(data)
+        self._snapshot: Optional[bytes] = None
+
+    @property
+    def _data(self) -> bytes:
+        if self._snapshot is None:
+            self._snapshot = bytes(self._buf)
+        return self._snapshot
 
     @property
     def mode(self) -> str:
@@ -557,8 +566,8 @@ class Image:
         c = CHANNELS[self._mode]
         off = (y * self._width + x) * c
         if c == 1:
-            return self._data[off]
-        return tuple(self._data[off : off + c])
+            return self._buf[off]
+        return tuple(self._buf[off : off + c])
 
     def putpixel(self, xy: Tuple[int, int], value: Union[int, Tuple[int, ...]]):
         """Sets the pixel value at a given coordinate; channel values are clamped to 0..255 like Pillow.
@@ -570,7 +579,15 @@ class Image:
         if x < 0 or x >= self._width or y < 0 or y >= self._height:
             raise IndexError("pixel coordinate out of range")
         c = CHANNELS[self._mode]
-        values = (value,) if isinstance(value, int) else tuple(value)
+        if isinstance(value, int):
+            values = (value,)
+        else:
+            try:
+                values = tuple(value)
+            except TypeError:
+                raise TypeError(
+                    f"color must be an int or a tuple of ints, got {type(value).__name__}"
+                ) from None
         if self._mode == "RGBA" and len(values) == 3:
             values += (255,)
         elif self._mode == "RGB" and len(values) == 4:
@@ -579,4 +596,5 @@ class Image:
             raise TypeError(f"{self._mode} pixel needs {c} channel value(s), got {len(values)}")
         pixel = bytes(min(255, max(0, int(v))) for v in values)
         off = (y * self._width + x) * c
-        self._data = self._data[:off] + pixel + self._data[off + c :]
+        self._buf[off : off + c] = pixel
+        self._snapshot = None

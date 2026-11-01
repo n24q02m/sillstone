@@ -49,8 +49,9 @@ Python `Array`:
 
 Python `Image`:
 
-- `Image.from_array` takes `uint8` arrays only and raises `TypeError` for any other dtype; Pillow maps `uint16`, `int32` and `float32` arrays to the `I;16`, `I` and `F` modes, which Sillstone does not have. Two-channel arrays (`LA`) are refused.
-- The array exposed through `__array_interface__` is read-only (the pixels are immutable `bytes`); change pixels with `putpixel`.
+- `Image.from_array` takes `uint8` arrays only and raises `TypeError` for any other dtype; Pillow maps `uint16`, `int32` and `float32` arrays to the `I;16`, `I` and `F` modes, which Sillstone does not have. Two-channel arrays (`LA`) are refused. `int8` and `bool` arrays are refused too (one byte per element, but not pixel data).
+- The array exposed through `__array_interface__` is read-only and is a snapshot taken when it is requested; change pixels with `putpixel`, which writes in place in constant time.
+- `Image.putpixel` takes a tuple (or an `int` for `L`). Pillow also accepts a single `int` as a packed pixel for `RGB` and `RGBA`; Sillstone raises `TypeError` for that form (measured with Pillow 12.3.0: `putpixel((0, 0), 0x010203)` on an `RGB` image succeeds).
 
 Rust `Tensor`:
 
