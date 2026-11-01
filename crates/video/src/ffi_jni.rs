@@ -26,8 +26,19 @@
 //! [`crate::ffi`]: `-1` invalid argument, `-2` core refusal) and
 //! returns a Java `null`; if the exception class cannot be resolved,
 //! a plain `java.lang.RuntimeException` is thrown via `ThrowNew`.
+//!
+//! # Test builds
+//!
+//! Every export is `#[cfg_attr(not(test), unsafe(no_mangle))]`: the unmangled symbols exist only
+//! in the cdylib and in non-test builds of the crate, and the in-module unit-test binary keeps the
+//! functions under their Rust names. Observed on CI (not explained): with the symbols unmangled
+//! in the test binary, `cargo llvm-cov` reported lines of these functions as never run although
+//! the tests execute them.
 
 #![allow(unsafe_code)]
+// JNI resolves `Java_<package>_<class>_<method>` names verbatim; rustc exempts `no_mangle` functions from
+// the snake-case lint, and the test build no longer carries that attribute.
+#![allow(non_snake_case)]
 
 use alloc::ffi::CString;
 use alloc::vec::Vec;
@@ -130,7 +141,7 @@ pub type JNIEnv = *const JnInterface;
 ///
 /// `env` must be the `JNIEnv*` the JVM passed in (or null, which is
 /// reported as `-1`); `input` must be a `jbyteArray` handle (or null).
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_hash_pith_PithVideo_fingerprint(
     env: *mut JNIEnv,
     _class: JClass,
