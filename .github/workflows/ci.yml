@@ -140,6 +140,8 @@ jobs:
           source "$RUNNER_TEMP/llvm-cov-env.sh"
           cargo build -p sillstone-ffi
           mkdir -p target/debug
+          echo "CARGO_TARGET_DIR=${CARGO_TARGET_DIR:-unset}"
+          find target -name 'libsillstone_ffi*' -not -path '*/incremental/*'
           cp target/llvm-cov-target/debug/libsillstone_ffi.so target/debug/
 
       - name: Set up Python
