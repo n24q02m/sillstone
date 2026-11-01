@@ -69,7 +69,7 @@ This document specifies the algorithmic guarantees, operational limits, input bo
 | **BMP** | `sillstone-image` | 24-bit RGB, 32-bit RGBA, bottom-up & top-down | 24-bit RGB uncompressed; 32-bit RGBA as V4 header with BITFIELDS masks (alpha preserved) | Header bounds check; FFI geometry checked against buffer length |
 | **WAV** | `sillstone-audio` | PCM 16-bit, 24-bit, 32-bit float, mono/stereo | 16-bit PCM mono/stereo | RIFF size sanity verification |
 | **FLAC** | `sillstone-audio` | Native lossless FLAC, Vorbis comment, seektable | Vorbis comment write | Frame sync header check |
-| **MP3** | `sillstone-audio` | MPEG-1/2 Audio Layer III, ID3v1, ID3v2.3/v2.4, Xing header | Header stripping & frame sync | Layer III only (rejects Layer I/II) |
+| **MP3** | `sillstone-audio` | MPEG-1/2 Audio Layer III, ID3v1, ID3v2.3/v2.4, Xing header | Header stripping & frame sync | Layer III only (rejects Layer I/II); ID3v2 frames that are compressed or encrypted are skipped; ID3v1 text is read as UTF-8 when valid, otherwise Latin-1 |
 | **MP4 / MOV** | `sillstone-video` | ISO base media (AVC/H.264), fragmented MP4 (`moof`, `traf`, `trun`) | - | Rejects non-AVC bitstreams with status -2 |
 | **PDF** | `sillstone-file` | FlateDecode text extraction, font CID/ToUnicode, AcroForm fields | - | Linear stream parser, bounds-checked |
 | **ZIP** | `sillstone-file` | Standard ZIP, ZIP64 (EOCD64, extra field 0x0001) | Stored / Deflate writer | Traversal sanitization (`..` stripped) |
