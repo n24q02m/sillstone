@@ -208,6 +208,9 @@ jobs:
       - name: Package npm tarball and Java JAR
         shell: bash
         run: |
+          # `files` in package.json lists README.md and LICENSE, but npm only
+          # packs files that exist next to it; stage the repository's own.
+          cp README.md LICENSE sdk/node/
           cd sdk/node && npm pack
           cd ../../sdk/java && mvn package -DskipTests
       - name: Verify Package Contents Gate
@@ -346,13 +349,20 @@ jobs:
           OSSRH_JIRA_USERNAME: ${{ secrets.OSSRH_USERNAME }}
           OSSRH_JIRA_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
         run: |
-          if [ -n "$OSSRH_JIRA_USERNAME" ]; then
-            echo "Deploying to Maven Central..."
-            cd sdk/java && mvn deploy -DskipTests
-          else
-            echo "Maven Central credentials not configured. Running package validation."
-            cd sdk/java && mvn package -DskipTests
+          if [ -z "$OSSRH_JIRA_USERNAME" ] || [ -z "$OSSRH_JIRA_PASSWORD" ]; then
+            # Never report a publish that did not happen: a stable release
+            # fails hard, a beta records an explicit SKIPPED notice instead of
+            # a green step that only ran `mvn package`.
+            if [[ "${{ inputs.expected_version }}" != *-* ]]; then
+              echo "::error title=Maven Central::OSSRH_USERNAME/OSSRH_PASSWORD are not configured; refusing to release a stable version without the Java package."
+              exit 1
+            fi
+            echo "::warning title=Maven Central SKIPPED::OSSRH credentials are not configured; sillstone-java ${{ inputs.expected_version }} was NOT published."
+            echo "### Maven Central: SKIPPED (no OSSRH credentials), nothing was published" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
+          echo "Deploying to Maven Central..."
+          cd sdk/java && mvn deploy -DskipTests
 
   release-gate:
     name: Release Gate & Registry Readback
@@ -403,3 +413,25 @@ jobs:
           else
             gh release create "v$V" --title "v$V" --generate-notes --verify-tag
           fi
+      - name: Download packaged SDK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: packaged-sdks
+          path: release-assets
+      - name: Attach packages to the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="${{ env.EXPECTED_VERSION }}"
+          # Keep the release object that already exists; only fill it when it
+          # carries no assets, so a re-run never swaps published files.
+          if [ "$(gh release view "v$V" --json assets --jq '.assets | length')" != "0" ]; then
+            echo "release v$V already has assets, leaving them untouched"
+            exit 0
+          fi
+          cd release-assets
+          mapfile -t FILES < <(find . -type f \( -name '*.whl' -o -name '*.tgz' -o -name '*.jar' \) | sort)
+          [ "${#FILES[@]}" -gt 0 ] || { echo "no packaged artifacts found"; exit 1; }
+          sha256sum "${FILES[@]}" > SHA256SUMS.txt
+          gh release upload "v$V" "${FILES[@]}" SHA256SUMS.txt
+          gh release view "v$V" --json assets --jq '.assets[].name'
