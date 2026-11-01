@@ -119,7 +119,7 @@ class NpmTests(unittest.TestCase):
             f"package/prebuilds/{p}/{n}"
             for p in ALL
             for n in ("sillstone_napi.node", cpc.cdylib_name(p, "sillstone_ffi"))
-        ]
+        ] + list(cpc.NPM_DOCS)
         tgz = make_tgz(self.tmp / "sillstone-0.2.0-beta.1.tgz", entries)
         self.assertEqual(cpc.check_npm(tgz, ALL, "sillstone_ffi"), [])
 
@@ -135,10 +135,29 @@ class NpmTests(unittest.TestCase):
     def test_npm_cdylib_without_addon_fails(self):
         # The shipped 0.2.1 tarball: raw cdylibs only, nothing require() can load.
         entries = [f"package/prebuilds/{p}/{cpc.cdylib_name(p, 'sillstone_ffi')}" for p in ALL]
-        tgz = make_tgz(self.tmp / "sillstone-0.2.1.tgz", entries)
+        tgz = make_tgz(self.tmp / "sillstone-0.2.1.tgz", entries + list(cpc.NPM_DOCS))
         problems = cpc.check_npm(tgz, ALL, "sillstone_ffi")
         self.assertEqual(len(problems), len(ALL))
         self.assertTrue(all("sillstone_napi.node" in p for p in problems))
+
+    def _prebuilds(self):
+        return [
+            f"package/prebuilds/{p}/{n}"
+            for p in ALL
+            for n in ("sillstone_napi.node", cpc.cdylib_name(p, "sillstone_ffi"))
+        ]
+
+    def test_npm_without_readme_and_license_fails(self):
+        # The shipped 0.3.0 tarball: prebuilds only, `files` named two missing docs.
+        tgz = make_tgz(self.tmp / "sillstone-0.3.0.tgz", self._prebuilds())
+        problems = cpc.check_npm(tgz, ALL, "sillstone_ffi")
+        self.assertEqual(len(problems), 2)
+        self.assertTrue(any("README.md" in p for p in problems))
+        self.assertTrue(any("LICENSE" in p for p in problems))
+
+    def test_npm_docs_check_can_be_waived_for_old_releases(self):
+        tgz = make_tgz(self.tmp / "sillstone-0.3.0.tgz", self._prebuilds())
+        self.assertEqual(cpc.check_npm(tgz, ALL, "sillstone_ffi", require_docs=False), [])
 
 
 if __name__ == "__main__":

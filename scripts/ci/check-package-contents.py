@@ -91,16 +91,28 @@ def check_jar(jar: pathlib.Path, platforms: list[str], stem: str, prefix: str) -
     return problems
 
 
-def check_npm(tgz: pathlib.Path, platforms: list[str], stem: str, addon_stem: str = "sillstone_napi") -> list[str]:
+NPM_DOCS = ("package/README.md", "package/LICENSE")
+
+
+def check_npm(
+    tgz: pathlib.Path,
+    platforms: list[str],
+    stem: str,
+    addon_stem: str = "sillstone_napi",
+    require_docs: bool = True,
+) -> list[str]:
     """Every platform needs the N-API addon (the only file `require()` can load)
     and the cdylib it links against, side by side under prebuilds/<platform>/.
     A tarball that carries only the cdylib installs fine and then every native
-    call fails with "addon not loaded"."""
+    call fails with "addon not loaded". The package must also ship its README.md
+    and LICENSE (`require_docs`; releases up to 0.3.0 shipped without them)."""
     if not tgz.is_file():
         return [f"{tgz}: not a file"]
     with tarfile.open(tgz, "r:gz") as t:
         names = set(t.getnames())
     problems = []
+    if require_docs:
+        problems += [f"{tgz.name}: missing {entry}" for entry in NPM_DOCS if entry not in names]
     for platform in platforms:
         for entry in (
             f"package/prebuilds/{platform}/{addon_stem}.node",

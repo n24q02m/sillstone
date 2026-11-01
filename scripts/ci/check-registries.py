@@ -49,6 +49,9 @@ def _load_contents_gate():
 pc = _load_contents_gate()
 CONTENT_PLATFORMS = list(pc.PLATFORMS)
 CONTENT_FROM = (0, 2, 0)
+# First release whose npm tarball must carry README.md and LICENSE (0.3.0 and
+# earlier were published without them and stay as they are).
+NPM_DOCS_FROM = (0, 3, 1)
 JAR_PREFIX = "github/sillstone/native"
 
 EXPECTED_VERSION = "0.3.0"
@@ -186,7 +189,11 @@ def check_pypi(name: str, version: str, get: Fetch, content: bool = False) -> li
     return problems
 
 
-def _npm_contents(name: str, dist: dict, get: Fetch) -> list[str]:
+def _core_version(version: str) -> tuple[int, ...]:
+    return tuple(int(p) for p in re.match(r"\d+\.\d+\.\d+", version).group(0).split("."))
+
+
+def _npm_contents(name: str, version: str, dist: dict, get: Fetch) -> list[str]:
     with tempfile.TemporaryDirectory() as tmp:
         path = pathlib.Path(tmp) / "package.tgz"
         err = _download(get, dist["tarball"], path)
@@ -197,7 +204,12 @@ def _npm_contents(name: str, dist: dict, get: Fetch) -> list[str]:
             digest = base64.b64encode(hashlib.sha512(path.read_bytes()).digest()).decode()
             if integrity != "sha512-" + digest:
                 return ["the tarball served does not match the integrity hash in the registry's own record"]
-        return pc.check_npm(path, CONTENT_PLATFORMS, _stem(name))
+        return pc.check_npm(
+            path,
+            CONTENT_PLATFORMS,
+            _stem(name),
+            require_docs=_core_version(version) >= NPM_DOCS_FROM,
+        )
 
 
 def check_npm(name: str, version: str, get: Fetch, content: bool = False) -> list[str]:
@@ -223,7 +235,7 @@ def check_npm(name: str, version: str, get: Fetch, content: bool = False) -> lis
     if not dist.get("tarball") or not dist.get("integrity"):
         problems.append(f"version {version} has no tarball/integrity in its dist record")
     if content and dist.get("tarball"):
-        problems += _npm_contents(name, dist, get)
+        problems += _npm_contents(name, version, dist, get)
     return problems
 
 

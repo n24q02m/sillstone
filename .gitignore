@@ -42,3 +42,7 @@ yarn-error.log*
 *.exe
 *.test
 *.prof
+
+# Staged copies of the repository README/LICENSE for the npm tarball (see cd.yml)
+sdk/node/README.md
+sdk/node/LICENSE
