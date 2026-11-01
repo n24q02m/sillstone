@@ -324,7 +324,8 @@ mod tests {
         PITH_E_INVALID, PITH_E_REJECTED, PITH_OK, casefold_bytes, casefold_simple_bytes, nfc_bytes,
         nfd_bytes, nfkc_bytes, nfkd_bytes, sillstone_unicode_casefold, sillstone_unicode_casefold_simple,
         sillstone_unicode_free, sillstone_unicode_is_normalized, sillstone_unicode_nfc, sillstone_unicode_nfd,
-        sillstone_unicode_nfkc, sillstone_unicode_nfkd,
+        sillstone_unicode_char_category, sillstone_unicode_grapheme_count, sillstone_unicode_nfkc,
+        sillstone_unicode_nfkd,
     };
 
     /// Every buffer-handed-out export, for the shared-contract loops.
@@ -587,5 +588,73 @@ mod tests {
         let status =
             unsafe { sillstone_unicode_is_normalized(1, composed.as_ptr(), 2, core::ptr::null_mut()) };
         assert_eq!(status, PITH_E_INVALID);
+    }
+
+    /// Counts extended grapheme clusters, not scalar values or bytes: a base
+    /// letter plus a combining mark is one cluster, a CRLF pair is one, and
+    /// an emoji ZWJ sequence is one. The empty input is a valid zero.
+    #[test]
+    fn grapheme_count_counts_clusters() {
+        let count = |bytes: &[u8]| {
+            let mut n: usize = usize::MAX;
+            let status = unsafe { sillstone_unicode_grapheme_count(bytes.as_ptr(), bytes.len(), &mut n) };
+            (status, n)
+        };
+        assert_eq!(count(b""), (PITH_OK, 0));
+        assert_eq!(count(b"abc"), (PITH_OK, 3));
+        assert_eq!(count("e\u{301}".as_bytes()), (PITH_OK, 1));
+        assert_eq!(count(b"\r\n"), (PITH_OK, 1));
+        // man + ZWJ + woman + ZWJ + girl
+        assert_eq!(count("\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}".as_bytes()), (PITH_OK, 1));
+    }
+
+    /// The error paths of the grapheme counter leave the output untouched:
+    /// invalid UTF-8 is rejected, null pointers are invalid.
+    #[test]
+    fn grapheme_count_rejects_bad_input() {
+        let mut n: usize = 7;
+        let bad = [0xff, 0xfe];
+        let status = unsafe { sillstone_unicode_grapheme_count(bad.as_ptr(), bad.len(), &mut n) };
+        assert_eq!(status, PITH_E_REJECTED);
+        assert_eq!(n, 7);
+        let status = unsafe { sillstone_unicode_grapheme_count(core::ptr::null(), 1, &mut n) };
+        assert_eq!(status, PITH_E_INVALID);
+        let status = unsafe { sillstone_unicode_grapheme_count(b"a".as_ptr(), 1, core::ptr::null_mut()) };
+        assert_eq!(status, PITH_E_INVALID);
+        assert_eq!(n, 7);
+        // len == 0 with a null data pointer is the legal empty input.
+        let status = unsafe { sillstone_unicode_grapheme_count(core::ptr::null(), 0, &mut n) };
+        assert_eq!(status, PITH_OK);
+        assert_eq!(n, 0);
+    }
+
+    /// The category export writes the numeric tag of `GeneralCategory`.
+    #[test]
+    fn char_category_reports_the_general_category_tag() {
+        use crate::GeneralCategory;
+        let cat = |cp: u32| {
+            let mut out: u8 = u8::MAX;
+            let status = unsafe { sillstone_unicode_char_category(cp, &mut out) };
+            (status, out)
+        };
+        assert_eq!(cat('A' as u32), (PITH_OK, GeneralCategory::Lu as u8));
+        assert_eq!(cat('a' as u32), (PITH_OK, GeneralCategory::Ll as u8));
+        assert_eq!(cat('5' as u32), (PITH_OK, GeneralCategory::Nd as u8));
+        assert_eq!(cat(0x0301), (PITH_OK, GeneralCategory::Mn as u8));
+        assert_eq!(cat(0x0000), (PITH_OK, GeneralCategory::Cc as u8));
+    }
+
+    /// A surrogate or out-of-range code point and a null out pointer are
+    /// invalid arguments; the output byte is left alone.
+    #[test]
+    fn char_category_rejects_invalid_arguments() {
+        let mut out: u8 = 0xAB;
+        for cp in [0xD800u32, 0xDFFF, 0x11_0000, u32::MAX] {
+            let status = unsafe { sillstone_unicode_char_category(cp, &mut out) };
+            assert_eq!(status, PITH_E_INVALID, "cp {cp:#x}");
+        }
+        let status = unsafe { sillstone_unicode_char_category('A' as u32, core::ptr::null_mut()) };
+        assert_eq!(status, PITH_E_INVALID);
+        assert_eq!(out, 0xAB);
     }
 }
