@@ -5,7 +5,7 @@ path = "tools/gen-reference/main.rs"
 [package]
 name = "sillstone-file"
 license = "Apache-2.0"
-description = "File-domain hashing for the pith suite: FastCDC chunk signatures, exact chunk-set Jaccard, PDF text extraction"
+description = "File-domain hashing for the sillstone suite: FastCDC chunk signatures, exact chunk-set Jaccard, PDF text extraction"
 readme = "README.md"
 categories = [ "algorithms", "cryptography",]
 keywords = [ "fastcdc", "deduplication", "jaccard", "pdf", "hashing",]

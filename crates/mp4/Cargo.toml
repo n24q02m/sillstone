@@ -5,7 +5,7 @@ path = "tools/gen-reference/main.rs"
 [package]
 name = "sillstone-mp4"
 license = "Apache-2.0"
-description = "pith foundation: mp4 (zero-dep Rust)"
+description = "sillstone mp4: ISO base media file format demuxing, avcC records and sample tables (zero-dep Rust)"
 readme = "README.md"
 
 [lib]

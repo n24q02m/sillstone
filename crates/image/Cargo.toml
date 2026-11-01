@@ -4,7 +4,7 @@ path = "tools/gen-reference/main.rs"
 
 [package]
 name = "sillstone-image"
-description = "pith image lane: raster buffers, BMP decode, tier-3 features, pHash (zero-dep Rust)"
+description = "sillstone image: raster buffers, BMP decode, tier-3 features, pHash (zero-dep Rust)"
 readme = "README.md"
 license = "Apache-2.0"
 
