@@ -139,10 +139,10 @@ jobs:
         run: |
           source "$RUNNER_TEMP/llvm-cov-env.sh"
           cargo build -p sillstone-ffi
-          mkdir -p target/debug
-          echo "CARGO_TARGET_DIR=${CARGO_TARGET_DIR:-unset}"
-          find target -name 'libsillstone_ffi*' -not -path '*/incremental/*'
-          cp target/llvm-cov-target/debug/libsillstone_ffi.so target/debug/
+          sed 's/=.*//' "$RUNNER_TEMP/llvm-cov-env.sh"
+          echo "RUSTFLAGS=$RUSTFLAGS"
+          echo "TARGET=${CARGO_TARGET_DIR:-unset} LLVMCOV=${CARGO_LLVM_COV_TARGET_DIR:-unset}"
+          nm -D target/debug/libsillstone_ffi.so | grep -c llvm_profile || true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -163,7 +163,7 @@ jobs:
 
       - name: Java binding tests (profile the JNI shim)
         working-directory: sdk/java
-        run: mvn test -DargLine="-Djava.library.path=$GITHUB_WORKSPACE/target/llvm-cov-target/debug"
+        run: mvn test -DargLine="-Djava.library.path=$GITHUB_WORKSPACE/target/debug"
 
       - name: Rust line coverage (merged profiles)
         run: |
