@@ -46,7 +46,16 @@ pub fn crop<L: Layout, T: Sample>(
     let out_h = y1 - y0;
     let c = L::CHANNELS;
     let src = img.as_slice();
-    let mut out = Vec::with_capacity((out_w * out_h) as usize * c);
+    // Widen before multiplying: `out_w * out_h` in u32 would wrap for a
+    // geometry the `Image` constructor ceiling does not stop on its own.
+    let samples = (out_w as usize)
+        .checked_mul(out_h as usize)
+        .and_then(|px| px.checked_mul(c))
+        .ok_or(Error::TooLarge {
+            what: "crop output",
+            limit: crate::raster::MAX_BUFFER_BYTES,
+        })?;
+    let mut out = Vec::with_capacity(samples);
 
     for y in y0..y1 {
         let row_start = (y as usize * in_w as usize + x0 as usize) * c;
