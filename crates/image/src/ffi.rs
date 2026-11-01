@@ -312,10 +312,14 @@ pub unsafe extern "C" fn sillstone_image_resize(
         _ => return PITH_E_INVALID,
     };
 
-    if len != (in_w as usize) * (in_h as usize) * channels {
+    // Geometry is untrusted: an overflowing `width * height * channels` is a
+    // refusal, not an arithmetic panic (the cdylib aborts on panic).
+    if expected_samples(in_w, in_h, channels, 1) != Some(len) {
         return PITH_E_INVALID;
     }
-    let expected_out_len = (out_w as usize) * (out_h as usize) * channels;
+    let Some(expected_out_len) = expected_samples(out_w, out_h, channels, 1) else {
+        return PITH_E_INVALID;
+    };
     if out_len < expected_out_len {
         return PITH_E_INVALID;
     }
@@ -387,6 +391,11 @@ pub unsafe extern "C" fn sillstone_image_crop(
         PITH_LAYOUT_RGBA8 => 4,
         _ => return PITH_E_INVALID,
     };
+    // The row copies below index `src` directly, so `len` must cover the
+    // whole declared geometry; a shorter buffer used to panic out of bounds.
+    if expected_samples(in_w, in_h, channels, 1) != Some(len) {
+        return PITH_E_INVALID;
+    }
     let out_w = x1 - x0;
     let out_h = y1 - y0;
     let needed = (out_w as usize) * (out_h as usize) * channels;
@@ -440,7 +449,9 @@ pub unsafe extern "C" fn sillstone_image_transpose(
         PITH_LAYOUT_RGBA8 => 4,
         _ => return PITH_E_INVALID,
     };
-    let total_samples = (in_w as usize) * (in_h as usize) * channels;
+    let Some(total_samples) = expected_samples(in_w, in_h, channels, 1) else {
+        return PITH_E_INVALID;
+    };
     if len != total_samples || out_len < total_samples {
         return PITH_E_INVALID;
     }
@@ -674,7 +685,13 @@ pub unsafe extern "C" fn sillstone_image_color_convert(
         return PITH_E_INVALID;
     }
     let src = unsafe { core::slice::from_raw_parts(data, len) };
-    let total_pixels = (in_w as usize) * (in_h as usize);
+    let (Some(total_pixels), Some(total_rgb), Some(total_rgba)) = (
+        expected_samples(in_w, in_h, 1, 1),
+        expected_samples(in_w, in_h, 3, 1),
+        expected_samples(in_w, in_h, 4, 1),
+    ) else {
+        return PITH_E_INVALID;
+    };
 
     if from_layout == PITH_LAYOUT_RGB8 && to_layout == PITH_LAYOUT_GRAY8 {
         if out_len < total_pixels {
@@ -683,7 +700,7 @@ pub unsafe extern "C" fn sillstone_image_color_convert(
         // Pillow's `convert("L")` luma (19595/38470/7471 >> 16), not the
         // BT.601 /1000 form that pHash uses: this entry point is the
         // Pillow-compatible conversion.
-        if src.len() != total_pixels * 3 {
+        if src.len() != total_rgb {
             return PITH_E_REJECTED;
         }
         let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_pixels) };
@@ -693,14 +710,14 @@ pub unsafe extern "C" fn sillstone_image_color_convert(
         if out_len < total_pixels {
             return PITH_E_INVALID;
         }
-        if src.len() != total_pixels * 4 {
+        if src.len() != total_rgba {
             return PITH_E_REJECTED;
         }
         let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_pixels) };
         dst.copy_from_slice(&crate::raster::rgb_plane_to_l(src, 4, total_pixels));
         PITH_OK
     } else if from_layout == PITH_LAYOUT_RGBA8 && to_layout == PITH_LAYOUT_RGB8 {
-        if out_len < total_pixels * 3 {
+        if out_len < total_rgb {
             return PITH_E_INVALID;
         }
         let img = match Image::<Rgba, u8>::from_vec(in_w, in_h, src.to_vec()) {
@@ -708,11 +725,11 @@ pub unsafe extern "C" fn sillstone_image_color_convert(
             Err(_) => return PITH_E_REJECTED,
         };
         let rgb = img.to_rgb();
-        let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_pixels * 3) };
+        let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_rgb) };
         dst.copy_from_slice(rgb.as_slice());
         PITH_OK
     } else if from_layout == PITH_LAYOUT_RGB8 && to_layout == PITH_LAYOUT_RGBA8 {
-        if out_len < total_pixels * 4 {
+        if out_len < total_rgba {
             return PITH_E_INVALID;
         }
         let img = match Image::<Rgb, u8>::from_vec(in_w, in_h, src.to_vec()) {
@@ -720,11 +737,11 @@ pub unsafe extern "C" fn sillstone_image_color_convert(
             Err(_) => return PITH_E_REJECTED,
         };
         let rgba = img.to_rgba();
-        let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_pixels * 4) };
+        let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_rgba) };
         dst.copy_from_slice(rgba.as_slice());
         PITH_OK
     } else if from_layout == PITH_LAYOUT_GRAY8 && to_layout == PITH_LAYOUT_RGB8 {
-        if out_len < total_pixels * 3 {
+        if out_len < total_rgb {
             return PITH_E_INVALID;
         }
         let img = match Image::<Gray, u8>::from_vec(in_w, in_h, src.to_vec()) {
@@ -732,11 +749,11 @@ pub unsafe extern "C" fn sillstone_image_color_convert(
             Err(_) => return PITH_E_REJECTED,
         };
         let rgb = img.to_rgb();
-        let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_pixels * 3) };
+        let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_rgb) };
         dst.copy_from_slice(rgb.as_slice());
         PITH_OK
     } else if from_layout == PITH_LAYOUT_GRAY8 && to_layout == PITH_LAYOUT_RGBA8 {
-        if out_len < total_pixels * 4 {
+        if out_len < total_rgba {
             return PITH_E_INVALID;
         }
         let img = match Image::<Gray, u8>::from_vec(in_w, in_h, src.to_vec()) {
@@ -744,7 +761,7 @@ pub unsafe extern "C" fn sillstone_image_color_convert(
             Err(_) => return PITH_E_REJECTED,
         };
         let rgba = img.to_rgba();
-        let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_pixels * 4) };
+        let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_rgba) };
         dst.copy_from_slice(rgba.as_slice());
         PITH_OK
     } else {
