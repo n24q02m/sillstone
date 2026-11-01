@@ -156,7 +156,10 @@ pub fn entries(data: &[u8], allow_escape: bool) -> Result<Vec<TarEntry>> {
     let mut result = Vec::new();
     let mut pos = 0;
     let mut next_long_name: Option<String> = None;
+    // `x` records override the next entry only; `g` records are defaults for every entry
+    // after them, and a local `x` record wins over a global one (POSIX.1-2001 pax).
     let mut next_size: Option<usize> = None;
+    let mut global_size: Option<usize> = None;
 
     while pos + BLOCK_SIZE <= data.len() {
         let header = &data[pos..pos + BLOCK_SIZE];
@@ -179,11 +182,12 @@ pub fn entries(data: &[u8], allow_escape: bool) -> Result<Vec<TarEntry>> {
         let header_size = parse_octal(&header[124..136])
             .ok_or(Error::BadValue("invalid tar entry size"))?;
         let typeflag = header[156];
-        // A PAX `size` replaces the header field of the entry that follows it.
+        // A PAX `size` replaces the header field: the local (`x`) value for the entry that
+        // follows it, otherwise the global (`g`) value for every entry after the `g` header.
         let size = if matches!(typeflag, b'L' | b'K' | b'x' | b'g') {
             header_size
         } else {
-            next_size.take().unwrap_or(header_size)
+            next_size.take().or(global_size).unwrap_or(header_size)
         };
 
         // The ustar `prefix` field exists only in POSIX headers ("ustar\0" + "00");
@@ -224,7 +228,11 @@ pub fn entries(data: &[u8], allow_escape: bool) -> Result<Vec<TarEntry>> {
                     next_long_name = pax.path;
                 }
                 if pax.size.is_some() {
-                    next_size = pax.size;
+                    if typeflag == b'g' {
+                        global_size = pax.size;
+                    } else {
+                        next_size = pax.size;
+                    }
                 }
             }
             // Regular file or directory or symlink
