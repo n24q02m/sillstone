@@ -389,12 +389,19 @@ mod tests {
         assert!(json.contains("\"policy\": \"exact\""));
     }
 
-    /// `gen` rewrites the committed root copy and `verify` stays green on
-    /// it immediately after — the same-run gen→verify roundtrip the CD
-    /// artifacts rely on.
+    /// `gen` writes a scratch copy and `verify` stays green on it
+    /// immediately after — the same-run gen→verify roundtrip the CD
+    /// artifacts rely on. The committed root copy is only read: rewriting
+    /// it would race the tests that read it in parallel.
     #[test]
-    fn gen_then_verify_roundtrip_on_the_root_copy() {
-        assert_eq!(run("gen", None), ExitCode::SUCCESS);
+    fn gen_then_verify_roundtrip_on_a_scratch_copy() {
+        let path = std::env::temp_dir().join(format!(
+            "sillstone-text-genref-{}.json",
+            std::process::id()
+        ));
+        assert_eq!(run("gen", Some(&path)), ExitCode::SUCCESS);
+        assert_eq!(run("verify", Some(&path)), ExitCode::SUCCESS);
         assert_eq!(run("verify", None), ExitCode::SUCCESS);
+        let _ = std::fs::remove_file(&path);
     }
 }

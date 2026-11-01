@@ -194,11 +194,15 @@ fn reference_json() -> String {
 
 /// Compares the committed `reference.json` against a fresh regeneration,
 /// returning a diff summary when they diverge.
-fn verify() -> Result<(), String> {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(REFERENCE_PATH);
-    let committed = std::fs::read_to_string(&path)
+fn verify(path: &std::path::Path) -> Result<(), String> {
+    let committed = std::fs::read_to_string(path)
         .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
     verify_str(&committed)
+}
+
+/// The committed `reference.json` next to this crate's manifest.
+fn committed_path() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(REFERENCE_PATH)
 }
 
 /// The comparison underlying [`verify`]: a committed render against a
@@ -213,9 +217,11 @@ fn verify_str(committed: &str) -> Result<(), String> {
     ))
 }
 
-fn run(arg: Option<&str>) -> ExitCode {
+/// `path` is the file `verify` reads and `gen` writes; tests pass a
+/// scratch path so `gen` never rewrites the committed copy under them.
+fn run(arg: Option<&str>, path: &std::path::Path) -> ExitCode {
     match arg {
-        Some("verify") => match verify() {
+        Some("verify") => match verify(path) {
             Ok(()) => {
                 println!("reference vectors are current");
                 ExitCode::SUCCESS
@@ -226,8 +232,7 @@ fn run(arg: Option<&str>) -> ExitCode {
             }
         },
         Some("gen") => {
-            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(REFERENCE_PATH);
-            std::fs::write(&path, reference_json())
+            std::fs::write(path, reference_json())
                 .unwrap_or_else(|e| panic!("cannot write {}: {e}", path.display()));
             println!("wrote {}", path.display());
             ExitCode::SUCCESS
@@ -240,12 +245,14 @@ fn run(arg: Option<&str>) -> ExitCode {
 }
 
 fn main() -> ExitCode {
-    run(std::env::args().nth(1).as_deref())
+    run(std::env::args().nth(1).as_deref(), &committed_path())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{FIXTURES, canonical_bytes, measure, reference_json, run, verify_str};
+    use super::{
+        FIXTURES, canonical_bytes, committed_path, measure, reference_json, run, verify_str,
+    };
     use sillstone_png::{Limits, decode};
     use std::process::ExitCode;
 
@@ -296,9 +303,8 @@ mod tests {
     /// so plain `cargo test` catches drift without invoking the binary).
     #[test]
     fn committed_reference_is_current() {
-        let committed =
-            std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/reference.json"))
-                .expect("reference.json is committed at the repo root");
+        let committed = std::fs::read_to_string(committed_path())
+            .expect("reference.json is committed at the repo root");
         verify_str(&committed).expect("committed reference.json is stale");
     }
 
@@ -320,9 +326,15 @@ mod tests {
     /// else is a usage error with exit code 2.
     #[test]
     fn run_modes() {
-        assert_eq!(run(Some("verify")), ExitCode::SUCCESS);
-        assert_eq!(run(Some("gen")), ExitCode::SUCCESS);
-        assert_eq!(run(Some("bogus")), ExitCode::from(2));
-        assert_eq!(run(None), ExitCode::from(2));
+        let scratch = std::env::temp_dir().join(format!(
+            "sillstone-png-genref-{}.json",
+            std::process::id()
+        ));
+        assert_eq!(run(Some("gen"), &scratch), ExitCode::SUCCESS);
+        assert_eq!(run(Some("verify"), &scratch), ExitCode::SUCCESS);
+        assert_eq!(run(Some("verify"), &committed_path()), ExitCode::SUCCESS);
+        assert_eq!(run(Some("bogus"), &scratch), ExitCode::from(2));
+        assert_eq!(run(None, &scratch), ExitCode::from(2));
+        let _ = std::fs::remove_file(&scratch);
     }
 }
