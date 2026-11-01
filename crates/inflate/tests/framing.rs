@@ -1,12 +1,13 @@
 //! Framing, refusal and bounds tests for the Brotli and Zstandard decoders.
 //!
-//! The decoders implement frame/meta-block framing, raw/RLE/uncompressed
-//! blocks and the zstd content checksum. Everything that would need real
-//! entropy decoding (Huffman literals, sequences, compressed Brotli
-//! meta-blocks, dictionaries) must be refused with `Error::Unsupported`, never
-//! decoded to guessed bytes. The fixtures were produced by the reference
-//! encoders (python `zstandard` / `brotli`); `random400.bin` is incompressible,
-//! so both encoders emit it as raw / uncompressed blocks.
+//! The Zstandard decoder is a complete RFC 8878 decoder minus dictionaries;
+//! the tests here pin its framing rules and error paths (the round-trip
+//! evidence against the reference encoder lives in `zstd_oracle.rs`). The
+//! Brotli decoder still implements only framing, uncompressed meta-blocks and
+//! metadata, and must refuse compressed meta-blocks with `Error::Unsupported`
+//! rather than decode them to guessed bytes. The fixtures were produced by the
+//! reference encoders (python `zstandard` / `brotli`); `random400.bin` is
+//! incompressible, so both encoders emit it as raw / uncompressed blocks.
 
 use sillstone_digest::Error;
 use sillstone_inflate::{inflate_brotli, inflate_zstd, Limits};
@@ -26,11 +27,11 @@ fn cap(max_output: usize) -> Limits {
     }
 }
 
-/// A single-segment zstd frame (1-byte content size) with one last
-/// compressed block holding `block`.
-fn zstd_compressed_block_frame(content_size: u8, block: &[u8]) -> Vec<u8> {
+/// A zstd frame with a 1 KiB window and no declared content size, holding
+/// one last compressed block `block`.
+fn zstd_compressed_block_frame(block: &[u8]) -> Vec<u8> {
     let hdr = ((block.len() as u32) << 3) | (2 << 1) | 1;
-    let mut f = vec![0x28, 0xB5, 0x2F, 0xFD, 0x20, content_size];
+    let mut f = vec![0x28, 0xB5, 0x2F, 0xFD, 0x00, 0x00];
     f.extend_from_slice(&hdr.to_le_bytes()[..3]);
     f.extend_from_slice(block);
     f
@@ -69,11 +70,9 @@ fn zstd_every_truncation_is_an_error_never_output() {
 }
 
 #[test]
-fn zstd_compressed_blocks_are_refused_not_guessed() {
-    assert!(matches!(
-        inflate_zstd(TEXT_ZST, Limits::default()),
-        Err(Error::Unsupported(_))
-    ));
+fn zstd_compressed_frame_decodes_to_the_original() {
+    let text = include_bytes!("fixtures/text-repeat.bin");
+    assert_eq!(inflate_zstd(TEXT_ZST, Limits::default()).unwrap(), text);
 }
 
 #[test]
@@ -118,7 +117,7 @@ fn zstd_header_errors() {
     // Dictionary id present: refused.
     assert!(matches!(
         inflate_zstd(
-            &[0x28, 0xB5, 0x2F, 0xFD, 0x21, 0, 1, 0, 0, 0],
+            &[0x28, 0xB5, 0x2F, 0xFD, 0x21, 5, 1, 0, 0, 0],
             Limits::default()
         ),
         Err(Error::Unsupported("zstd dictionary"))
@@ -150,41 +149,42 @@ fn zstd_output_limit_is_enforced() {
 #[test]
 fn zstd_literal_only_compressed_blocks() {
     // Raw literals "hi!", zero sequences.
-    let f = zstd_compressed_block_frame(3, &[0x18, b'h', b'i', b'!', 0x00]);
+    let f = zstd_compressed_block_frame(&[0x18, b'h', b'i', b'!', 0x00]);
     assert_eq!(inflate_zstd(&f, Limits::default()).unwrap(), b"hi!");
-    // Sequence-count byte omitted: the literals are the whole block.
-    let f = zstd_compressed_block_frame(3, &[0x18, b'h', b'i', b'!']);
-    assert_eq!(inflate_zstd(&f, Limits::default()).unwrap(), b"hi!");
+    // Sequence-count byte omitted: the section is mandatory.
+    let f = zstd_compressed_block_frame(&[0x18, b'h', b'i', b'!']);
+    assert!(matches!(
+        inflate_zstd(&f, Limits::default()),
+        Err(Error::Truncated { .. })
+    ));
     // RLE literals: 4 x 'a'.
-    let f = zstd_compressed_block_frame(4, &[0x21, b'a', 0x00]);
+    let f = zstd_compressed_block_frame(&[0x21, b'a', 0x00]);
     assert_eq!(inflate_zstd(&f, Limits::default()).unwrap(), b"aaaa");
     // Raw literals, 12-bit size format: size 40 = low nibble 8, high byte 2.
     let mut blk = vec![0x04 | (8u8 << 4), 2];
     blk.extend(std::iter::repeat_n(7u8, 40));
     blk.push(0);
-    let f = zstd_compressed_block_frame(40, &blk);
+    let f = zstd_compressed_block_frame(&blk);
     assert_eq!(inflate_zstd(&f, Limits::default()).unwrap(), vec![7u8; 40]);
     // Raw literals, 20-bit size format (size_fmt 3): size 40.
     let mut blk = vec![0x0C | (8u8 << 4), 2, 0];
     blk.extend(std::iter::repeat_n(9u8, 40));
     blk.push(0);
-    let f = zstd_compressed_block_frame(40, &blk);
+    let f = zstd_compressed_block_frame(&blk);
     assert_eq!(inflate_zstd(&f, Limits::default()).unwrap(), vec![9u8; 40]);
     // RLE literals through the 12-bit and 20-bit size formats.
-    let f = zstd_compressed_block_frame(40, &[0x05 | (8u8 << 4), 2, b'z', 0]);
+    let f = zstd_compressed_block_frame(&[0x05 | (8u8 << 4), 2, b'z', 0]);
     assert_eq!(inflate_zstd(&f, Limits::default()).unwrap(), vec![b'z'; 40]);
-    let f = zstd_compressed_block_frame(40, &[0x0D | (8u8 << 4), 2, 0, b'y', 0]);
+    let f = zstd_compressed_block_frame(&[0x0D | (8u8 << 4), 2, 0, b'y', 0]);
     assert_eq!(inflate_zstd(&f, Limits::default()).unwrap(), vec![b'y'; 40]);
-    // Empty compressed block.
-    let f = zstd_compressed_block_frame(0, &[]);
-    assert_eq!(inflate_zstd(&f, Limits::default()).unwrap(), b"");
-    // Literal-only blocks honour the output cap.
-    let f = zstd_compressed_block_frame(3, &[0x18, b'h', b'i', b'!', 0x00]);
+    // A compressed block cannot be empty: the literals header is mandatory.
+    let f = zstd_compressed_block_frame(&[]);
     assert!(matches!(
-        inflate_zstd(&f, cap(2)),
-        Err(Error::TooLarge { .. })
+        inflate_zstd(&f, Limits::default()),
+        Err(Error::Truncated { .. })
     ));
-    let f = zstd_compressed_block_frame(3, &[0x18, b'h', b'i', b'!']);
+    // Literal-only blocks honour the output cap.
+    let f = zstd_compressed_block_frame(&[0x18, b'h', b'i', b'!', 0x00]);
     assert!(matches!(
         inflate_zstd(&f, cap(2)),
         Err(Error::TooLarge { .. })
@@ -192,17 +192,48 @@ fn zstd_literal_only_compressed_blocks() {
 }
 
 #[test]
-fn zstd_sequences_and_huffman_literals_are_refused() {
-    let f = zstd_compressed_block_frame(3, &[0x18, b'h', b'i', b'!', 0x01]);
+fn zstd_malformed_entropy_sections_are_rejected() {
+    // One sequence announced but no symbol compression modes byte.
+    let f = zstd_compressed_block_frame(&[0x18, b'h', b'i', b'!', 0x01]);
     assert!(matches!(
         inflate_zstd(&f, Limits::default()),
-        Err(Error::Unsupported("zstd sequences"))
+        Err(Error::Truncated { .. })
     ));
-    // Huffman-compressed literal section header (type 2), size_fmt 0.
-    let f = zstd_compressed_block_frame(0, &[0x02, 0x00, 0x00, 0x00]);
+    // Huffman-compressed literals with an empty tree description.
+    let f = zstd_compressed_block_frame(&[0x02, 0x00, 0x00, 0x00]);
     assert!(matches!(
         inflate_zstd(&f, Limits::default()),
-        Err(Error::Unsupported("zstd huffman-compressed literals"))
+        Err(Error::Truncated { .. })
+    ));
+    // Treeless literals before any tree was sent.
+    let f = zstd_compressed_block_frame(&[0x03, 0x00, 0x00, 0x00, 0x00]);
+    assert!(matches!(
+        inflate_zstd(&f, Limits::default()),
+        Err(Error::BadValue("zstd treeless literals without a previous table"))
+    ));
+    // Repeat mode for all three tables in the first block of a frame.
+    let f = zstd_compressed_block_frame(&[0x00, 0x01, 0xFC, 0x01]);
+    assert!(matches!(
+        inflate_zstd(&f, Limits::default()),
+        Err(Error::BadValue("zstd repeat table without a previous table"))
+    ));
+    // Reserved bits of the compression modes byte.
+    let f = zstd_compressed_block_frame(&[0x00, 0x01, 0x01, 0x01]);
+    assert!(matches!(
+        inflate_zstd(&f, Limits::default()),
+        Err(Error::BadValue("zstd reserved compression mode bits"))
+    ));
+    // Literals-only block with trailing garbage after the zero count.
+    let f = zstd_compressed_block_frame(&[0x00, 0x00, 0x00]);
+    assert!(matches!(
+        inflate_zstd(&f, Limits::default()),
+        Err(Error::BadValue(_))
+    ));
+    // Declared content size disagrees with what the blocks produce.
+    let f = vec![0x28, 0xB5, 0x2F, 0xFD, 0x20, 4, 0x19, 0, 0, b'h', b'i', b'!'];
+    assert!(matches!(
+        inflate_zstd(&f, Limits::default()),
+        Err(Error::BadValue("zstd frame content size mismatch"))
     ));
 }
 
@@ -219,7 +250,7 @@ fn zstd_literal_section_truncation_errors() {
         &[0x18, b'h', b'i', b'!', 0x80][..],    // 2-byte sequence count cut short
         &[0x18, b'h', b'i', b'!', 0xFF, 1][..], // 3-byte sequence count cut short
     ] {
-        let f = zstd_compressed_block_frame(0, blk);
+        let f = zstd_compressed_block_frame(blk);
         assert!(
             inflate_zstd(&f, Limits::default()).is_err(),
             "block {blk:02x?}"
@@ -230,31 +261,31 @@ fn zstd_literal_section_truncation_errors() {
 #[test]
 fn zstd_block_header_errors() {
     // Reserved block type 3.
-    let f = vec![0x28, 0xB5, 0x2F, 0xFD, 0x20, 0, 0x07, 0, 0];
+    let f = vec![0x28, 0xB5, 0x2F, 0xFD, 0x00, 0x00, 0x07, 0, 0];
     assert!(matches!(
         inflate_zstd(&f, Limits::default()),
-        Err(Error::BadValue("unsupported zstd block type"))
+        Err(Error::BadValue("reserved zstd block type"))
     ));
     // Block header cut off.
-    let f = vec![0x28, 0xB5, 0x2F, 0xFD, 0x20, 0, 0x01];
+    let f = vec![0x28, 0xB5, 0x2F, 0xFD, 0x00, 0x00, 0x01];
     assert!(matches!(
         inflate_zstd(&f, Limits::default()),
         Err(Error::Truncated { .. })
     ));
     // Raw block declares more than is present.
-    let f = vec![0x28, 0xB5, 0x2F, 0xFD, 0x20, 0, 0x41, 0, 0, 1];
+    let f = vec![0x28, 0xB5, 0x2F, 0xFD, 0x00, 0x00, 0x41, 0, 0, 1];
     assert!(matches!(
         inflate_zstd(&f, Limits::default()),
         Err(Error::Truncated { .. })
     ));
     // RLE block missing its byte.
-    let f = vec![0x28, 0xB5, 0x2F, 0xFD, 0x20, 0, 0x0B, 0, 0];
+    let f = vec![0x28, 0xB5, 0x2F, 0xFD, 0x00, 0x00, 0x0B, 0, 0];
     assert!(matches!(
         inflate_zstd(&f, Limits::default()),
         Err(Error::Truncated { .. })
     ));
     // Compressed block declares more than is present.
-    let f = vec![0x28, 0xB5, 0x2F, 0xFD, 0x20, 0, 0x55, 0, 0, 1];
+    let f = vec![0x28, 0xB5, 0x2F, 0xFD, 0x00, 0x00, 0x55, 0, 0, 1];
     assert!(matches!(
         inflate_zstd(&f, Limits::default()),
         Err(Error::Truncated { .. })

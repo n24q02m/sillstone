@@ -60,7 +60,7 @@ All 45 reference vectors defined in `reference.json` are executed across all fou
 | **Unicode Graphemes** | Unicode Standard 15.1.0 UAX #29 | Full bit-exact | Official `GraphemeBreakTest.txt` test suite |
 | **Decompression** | RFC 1951 (Deflate) | Full decompression | Round-trip tests with gzip/deflate bitstreams |
 | **Decompression** | RFC 7932 (Brotli) | Partial: framing and uncompressed meta-blocks; compressed meta-blocks refused (`Unsupported`) | Reference-encoder fixtures + hand-built header streams (`tests/framing.rs`) |
-| **Decompression** | RFC 8878 (Zstandard) | Partial: framing, raw/RLE blocks, literal-only blocks, XXH64 checksum; Huffman literals, sequences and dictionaries refused (`Unsupported`) | Official golden frames + reference-encoder fixtures (`tests/framing.rs`) |
+| **Decompression** | RFC 8878 (Zstandard) | Full except dictionaries (a nonzero dictionary id is refused with `Unsupported`) | Official golden frames + malformed-input cases (`tests/framing.rs`); 160 frames from the reference `zstd` v1.5.7 CLI checked by SHA-256 (`tests/zstd_oracle.rs`); 2,500 randomized round trips against that CLI (levels 1-22, with and without checksum / content size, small windows, `--long`) |
 | **Locality Sensitive Hash**| TrendMicro TLSH (2013) | Full bit-exact | Official TrendMicro TLSH test suite vectors |
 | **Container Standards** | POSIX.1-1988 (USTAR), POSIX.1-2001 (PAX) | Full compliance | Path traversal protection, long names |
 | **Archive Standards** | ZIP Format Specification / ZIP64 | Full compliance | Zip64 extra field 0x0001, EOCD64 |
