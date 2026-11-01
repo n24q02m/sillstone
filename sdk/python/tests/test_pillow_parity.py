@@ -1,20 +1,9 @@
 """Pillow Parity and Regression Verification against PIL.Image."""
 
-import math
-import os
 import unittest
 from PIL import Image as PilImage
 
 from sillstone import Image as SillImage, Resampling, Transpose
-
-
-def compute_psnr(data_a: bytes, data_b: bytes) -> float:
-    if len(data_a) != len(data_b) or not data_a:
-        return 0.0
-    mse = sum((a - b) ** 2 for a, b in zip(data_a, data_b)) / len(data_a)
-    if mse == 0:
-        return 999.0
-    return 10.0 * math.log10((255.0 ** 2) / mse)
 
 
 class TestPillowParity(unittest.TestCase):
@@ -57,28 +46,64 @@ class TestPillowParity(unittest.TestCase):
             self.assertEqual(sill_res.tobytes(), pil_res.tobytes())
 
     def test_color_convert_parity(self):
-        pil_gray = self.pil_im.convert("L")
-        sill_gray = self.sill_im.convert("L")
-
-        self.assertEqual(sill_gray.size, pil_gray.size)
-        psnr = compute_psnr(sill_gray.tobytes(), pil_gray.tobytes())
-        # BT.601 integer luma matches Pillow exactly or within rounding threshold (> 50 dB)
-        self.assertGreater(psnr, 50.0)
+        # Pillow's integer luma (19595/38470/7471 >> 16) bit for bit, and the
+        # pure layout conversions, over every 8-bit value of each channel.
+        n = 256 * 3
+        noise = bytes((i * 73 + (i >> 3) * 29 + 11) % 256 for i in range(n * 4))
+        for mode, raw in (("RGB", noise[: n * 3]), ("RGBA", noise[: n * 4])):
+            pil_im = PilImage.frombytes(mode, (n, 1), raw)
+            sill_im = SillImage.frombytes(mode, (n, 1), raw)
+            for target in ("L", "RGB", "RGBA"):
+                if target == mode:
+                    continue
+                self.assertEqual(
+                    sill_im.convert(target).tobytes(),
+                    pil_im.convert(target).tobytes(),
+                    f"{mode} -> {target}",
+                )
+        gray = bytes(range(256))
+        for target in ("RGB", "RGBA"):
+            self.assertEqual(
+                SillImage.frombytes("L", (256, 1), gray).convert(target).tobytes(),
+                PilImage.frombytes("L", (256, 1), gray).convert(target).tobytes(),
+                f"L -> {target}",
+            )
 
     def test_resample_parity(self):
-        # Test downsampling to 8x8 and upsampling to 32x32
-        for target_size in [(8, 8), (32, 32)]:
-            for sill_f, pil_f, min_psnr in [
-                (Resampling.NEAREST, PilImage.Resampling.NEAREST, 28.0),
-                (Resampling.BILINEAR, PilImage.Resampling.BILINEAR, 35.0),
-                (Resampling.BICUBIC, PilImage.Resampling.BICUBIC, 35.0),
-            ]:
-                pil_resized = self.pil_im.resize(target_size, resample=pil_f)
-                sill_resized = self.sill_im.resize(target_size, resample=sill_f)
+        # Bit-exact against Pillow for L / RGB / RGBA (RGBA is premultiplied
+        # by Pillow, so alpha has to vary), every filter, up and down.
+        filters = [
+            ("NEAREST", Resampling.NEAREST, PilImage.Resampling.NEAREST),
+            ("BOX", Resampling.BOX, PilImage.Resampling.BOX),
+            ("BILINEAR", Resampling.BILINEAR, PilImage.Resampling.BILINEAR),
+            ("BICUBIC", Resampling.BICUBIC, PilImage.Resampling.BICUBIC),
+            ("LANCZOS", Resampling.LANCZOS, PilImage.Resampling.LANCZOS),
+        ]
+        sizes = [(8, 8), (32, 32), (5, 13), (3, 40), (16, 1), (23, 9)]
+        w, h = 37, 29
+        for mode, ch in (("L", 1), ("RGB", 3), ("RGBA", 4)):
+            raw = bytes((i * 137 + (i >> 2) * 59 + 7) % 256 for i in range(w * h * ch))
+            pil_im = PilImage.frombytes(mode, (w, h), raw)
+            sill_im = SillImage.frombytes(mode, (w, h), raw)
+            for size in sizes:
+                for name, sill_f, pil_f in filters:
+                    pil_resized = pil_im.resize(size, resample=pil_f)
+                    sill_resized = sill_im.resize(size, resample=sill_f)
+                    self.assertEqual(sill_resized.size, pil_resized.size)
+                    self.assertEqual(
+                        sill_resized.tobytes(),
+                        pil_resized.tobytes(),
+                        f"{mode} {w}x{h} -> {size} {name}",
+                    )
 
-                self.assertEqual(sill_resized.size, pil_resized.size)
-                psnr = compute_psnr(sill_resized.tobytes(), pil_resized.tobytes())
-                self.assertGreater(psnr, min_psnr, f"Failed at {target_size} with filter {sill_f}")
+    def test_resampling_ids_are_not_pillows_numeric_ids(self):
+        # Sillstone numbers its filters NEAREST..LANCZOS as 0..4; Pillow's
+        # enum differs (LANCZOS = 1, BOX = 4), so callers must map by name.
+        self.assertEqual(int(PilImage.Resampling.LANCZOS), 1)
+        self.assertEqual(Resampling.LANCZOS, 4)
+        self.assertEqual(int(PilImage.Resampling.BOX), 4)
+        self.assertEqual(Resampling.BOX, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

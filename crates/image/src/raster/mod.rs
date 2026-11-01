@@ -30,6 +30,8 @@ pub use self::color::{
     yuv420p_to_rgb_pixel,
 };
 pub use self::exif::apply_orientation;
-pub use self::pillow::{resize_u8, rgb_plane_to_l, rgb_to_hsv, rgb_to_l};
+pub use self::pillow::{resize_u8, resize_u8_box, rgb_plane_to_l, rgb_to_hsv, rgb_to_l};
 pub use self::raster::{Cmyk, Gray, Image, La, Layout, MAX_BUFFER_BYTES, Rgb, Rgba, Sample};
-pub use self::resample::{ResamplingFilter, box_average, resize};
+pub use self::resample::{
+    ResamplingFilter, box_average, reduce, resize, resize_f32, resize_with_gap,
+};

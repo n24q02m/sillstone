@@ -11,14 +11,14 @@
 //!   `(center, support)` window rule of `precompute_coeffs`, normalised to
 //!   sum 1, then quantised to `PRECISION_BITS = 22` fixed point with
 //!   round-half-away-from-zero;
-//! * the horizontal pass runs first (unless the height shrinks by more than
-//!   twice the width's shrink) and stores an 8-bit intermediate (clipped),
+//! * the horizontal pass always runs first (checked against Pillow 12.3: it
+//!   has no vertical-first mode) and stores an 8-bit intermediate (clipped),
 //!   the second pass reads that intermediate — two roundings, exactly as
 //!   Pillow does;
 //! * accumulators start at `1 << 21` (the rounding term) and are shifted
 //!   right by 22 and clamped to `0..=255`.
 //!
-//! With the horizontal pass first, only the rows the vertical pass reads
+//! Because the horizontal pass is first, only the rows the vertical pass reads
 //! are filtered.
 
 use alloc::rc::Rc;
@@ -81,10 +81,10 @@ fn finish_luma(src: &[u8], c: usize, mut out: Vec<u8>, from: usize) -> Vec<u8> {
 #[allow(unsafe_code, unused_unsafe)]
 unsafe fn luma_avx2(src: &[u8], c: usize, out: &mut [u8]) -> usize {
     use core::arch::x86_64::{
-        __m256i, _mm256_add_epi32, _mm256_castsi128_si256, _mm256_castsi256_si128,
-        _mm256_extracti128_si256, _mm256_inserti128_si256, _mm256_loadu_si256, _mm256_mullo_epi32,
-        _mm256_set1_epi32, _mm256_setr_epi8, _mm256_shuffle_epi8, _mm256_srli_epi32,
-        _mm_cvtsi128_si32, _mm_loadu_si128,
+        __m256i, _mm_cvtsi128_si32, _mm_loadu_si128, _mm256_add_epi32, _mm256_castsi128_si256,
+        _mm256_castsi256_si128, _mm256_extracti128_si256, _mm256_inserti128_si256,
+        _mm256_loadu_si256, _mm256_mullo_epi32, _mm256_set1_epi32, _mm256_setr_epi8,
+        _mm256_shuffle_epi8, _mm256_srli_epi32,
     };
 
     let n = out.len();
@@ -155,8 +155,8 @@ unsafe fn luma_avx2(src: &[u8], c: usize, out: &mut [u8]) -> usize {
 #[allow(unsafe_code, unused_unsafe)]
 unsafe fn luma_neon(src: &[u8], c: usize, out: &mut [u8]) -> usize {
     use core::arch::aarch64::{
-        uint8x16x3_t, uint8x16x4_t, vaddq_u32, vcombine_u16, vcombine_u8, vdupq_n_u32,
-        vget_high_u16, vget_high_u8, vget_low_u16, vget_low_u8, vld3q_u8, vld4q_u8, vmlal_n_u16,
+        uint8x16x3_t, uint8x16x4_t, vaddq_u32, vcombine_u8, vcombine_u16, vdupq_n_u32,
+        vget_high_u8, vget_high_u16, vget_low_u8, vget_low_u16, vld3q_u8, vld4q_u8, vmlal_n_u16,
         vmovl_u8, vmovn_u16, vmull_n_u16, vshrn_n_u32, vst1q_u8,
     };
 
@@ -331,43 +331,78 @@ impl Coeffs {
     }
 }
 
-fn compute_coeffs(in_size: usize, out_size: usize, filter: ResamplingFilter) -> Coeffs {
+/// Normalised `f64` weights of one axis (`precompute_coeffs`): per output
+/// pixel the first source index, the tap count and `ksize` weights summing
+/// to 1. `[lo, hi)` is the source interval being resampled (Pillow's `box`),
+/// `[0, in_size)` for a plain resize.
+struct Weights {
+    ksize: usize,
+    bounds: Vec<(usize, usize)>,
+    w: Vec<f64>,
+}
+
+fn weights_f64(
+    in_size: usize,
+    out_size: usize,
+    filter: ResamplingFilter,
+    lo: f64,
+    hi: f64,
+) -> Weights {
     let (fsupport, f) = kernel(filter);
-    let scale = in_size as f64 / out_size as f64;
+    let scale = (hi - lo) / out_size as f64;
     let filterscale = scale.max(1.0);
     let support = fsupport * filterscale;
     let ksize = support.ceil() as usize * 2 + 1;
     let ss = 1.0 / filterscale;
 
     let mut bounds = Vec::with_capacity(out_size);
-    let mut kk = vec![0i32; out_size * ksize];
-    let mut tmp = vec![0.0f64; ksize];
+    let mut w = vec![0.0f64; out_size * ksize];
     for xx in 0..out_size {
-        let center = (xx as f64 + 0.5) * scale;
+        let center = lo + (xx as f64 + 0.5) * scale;
         // C `(int)(x + 0.5)` truncates toward zero; the clamp below makes
         // the negative case irrelevant.
         let xmin = ((center - support + 0.5) as i64).max(0) as usize;
         let xmax = (((center + support + 0.5) as i64).max(0) as usize).min(in_size);
         let taps = xmax.saturating_sub(xmin);
+        let row = &mut w[xx * ksize..(xx + 1) * ksize];
         let mut ww = 0.0f64;
-        for (x, slot) in tmp.iter_mut().enumerate().take(taps) {
-            let w = f((x as f64 + xmin as f64 - center + 0.5) * ss);
-            *slot = w;
-            ww += w;
+        for (x, slot) in row.iter_mut().enumerate().take(taps) {
+            let v = f((x as f64 + xmin as f64 - center + 0.5) * ss);
+            *slot = v;
+            ww += v;
         }
-        let row = &mut kk[xx * ksize..(xx + 1) * ksize];
-        for x in 0..taps {
-            let w = if ww != 0.0 { tmp[x] / ww } else { tmp[x] };
-            // `(int)(±0.5 + w·2^22)`: truncation toward zero.
-            let scaled = w * f64::from(1u32 << PRECISION_BITS);
-            row[x] = if w < 0.0 {
-                (-0.5 + scaled) as i32
-            } else {
-                (0.5 + scaled) as i32
-            };
+        if ww != 0.0 {
+            for slot in row.iter_mut().take(taps) {
+                *slot /= ww;
+            }
         }
         bounds.push((xmin, taps));
     }
+    Weights { ksize, bounds, w }
+}
+
+/// `normalize_coeffs_8bpc`: quantises [`Weights`] to `PRECISION_BITS`
+/// fixed point.
+fn compute_coeffs(
+    in_size: usize,
+    out_size: usize,
+    filter: ResamplingFilter,
+    lo: f64,
+    hi: f64,
+) -> Coeffs {
+    let Weights { ksize, bounds, w } = weights_f64(in_size, out_size, filter, lo, hi);
+    let kk = w
+        .iter()
+        .map(|&w| {
+            // `(int)(±0.5 + w·2^22)`: truncation toward zero.
+            let scaled = w * f64::from(1u32 << PRECISION_BITS);
+            if w < 0.0 {
+                (-0.5 + scaled) as i32
+            } else {
+                (0.5 + scaled) as i32
+            }
+        })
+        .collect();
     Coeffs {
         ksize,
         bounds,
@@ -389,14 +424,28 @@ thread_local! {
     static COEFF_CACHE: RefCell<Vec<(CacheKey, Rc<Coeffs>)>> = const { RefCell::new(Vec::new()) };
 }
 
-fn precompute(in_size: usize, out_size: usize, filter: ResamplingFilter) -> Rc<Coeffs> {
+/// Coefficients for resampling `[lo, hi)` of an `in_size` axis. Only the
+/// whole-axis tables (the case every perceptual hash hits) are cached.
+fn precompute(
+    in_size: usize,
+    out_size: usize,
+    filter: ResamplingFilter,
+    lo: f64,
+    hi: f64,
+) -> Rc<Coeffs> {
+    if lo != 0.0 || hi != in_size as f64 {
+        return Rc::new(compute_coeffs(in_size, out_size, filter, lo, hi));
+    }
     let key = (in_size, out_size, filter);
     if let Some(hit) = COEFF_CACHE.with(|c| {
-        c.borrow().iter().find(|(k, _)| *k == key).map(|(_, v)| Rc::clone(v))
+        c.borrow()
+            .iter()
+            .find(|(k, _)| *k == key)
+            .map(|(_, v)| Rc::clone(v))
     }) {
         return hit;
     }
-    let coeffs = Rc::new(compute_coeffs(in_size, out_size, filter));
+    let coeffs = Rc::new(compute_coeffs(in_size, out_size, filter, lo, hi));
     if coeffs.kk.len() <= CACHE_MAX_TAPS {
         COEFF_CACHE.with(|c| {
             let mut c = c.borrow_mut();
@@ -417,10 +466,11 @@ fn clip8(acc: i32) -> u8 {
 /// Resizes an interleaved 8-bit raster (`c` channels per pixel) with
 /// Pillow's separable fixed-point convolution.
 ///
-/// Mirrors `Image.resize(size, resample=filter)` for modes `L`, `RGB`
-/// (and, channel-wise and without premultiplication, `RGBA`). `Nearest`
-/// follows Pillow's affine nearest-neighbour path
-/// (`src = ⌊(x + ½)·in/out⌋` with the centre accumulated by addition).
+/// Mirrors `Image.resize(size, resample=filter)` for modes `L`, `RGB` and
+/// the premultiplied `La` / `RGBa` (the caller premultiplies; see
+/// `resample::resize`). `Nearest` follows Pillow's affine
+/// nearest-neighbour path (`src = ⌊(x + ½)·in/out⌋` with the centre
+/// accumulated by addition).
 pub fn resize_u8(
     src: &[u8],
     in_w: usize,
@@ -430,56 +480,67 @@ pub fn resize_u8(
     out_h: usize,
     filter: ResamplingFilter,
 ) -> Vec<u8> {
-    if in_w == out_w && in_h == out_h {
+    let full = [0.0, 0.0, in_w as f64, in_h as f64];
+    resize_u8_box(src, in_w, in_h, c, out_w, out_h, filter, full)
+}
+
+/// Pillow parses `box` into C `float`s (`"(ffff)"` in `_imaging.c`), so a
+/// fractional box such as the `22.333333333333332` that `reducing_gap`
+/// produces reaches the coefficient code as the nearest `f32`.
+fn box_as_c_floats(bx: [f64; 4]) -> [f64; 4] {
+    bx.map(|v| f64::from(v as f32))
+}
+
+/// [`resize_u8`] over the source rectangle `bx = [x0, y0, x1, y1]` (Pillow's
+/// `box`, fractional coordinates allowed). `Nearest` ignores the box.
+#[allow(clippy::too_many_arguments)]
+pub fn resize_u8_box(
+    src: &[u8],
+    in_w: usize,
+    in_h: usize,
+    c: usize,
+    out_w: usize,
+    out_h: usize,
+    filter: ResamplingFilter,
+    bx: [f64; 4],
+) -> Vec<u8> {
+    let bx = box_as_c_floats(bx);
+    let whole = bx == [0.0, 0.0, in_w as f64, in_h as f64];
+    if whole && in_w == out_w && in_h == out_h {
         return src.to_vec();
     }
     if filter == ResamplingFilter::Nearest {
-        return nearest(src, in_w, in_h, c, out_w, out_h);
+        return nearest(src, in_w, in_h, c, out_w, out_h, false);
     }
-    let need_h = in_w != out_w;
-    let need_v = in_h != out_h;
+    let need_h = in_w != out_w || bx[0] != 0.0 || bx[2] != in_w as f64;
+    let need_v = in_h != out_h || bx[1] != 0.0 || bx[3] != in_h as f64;
 
-    // Pillow runs the vertical pass first when the height shrinks by more
-    // than twice the width's shrink (`ImagingResampleInner`).
-    let dh = in_h as i64 - out_h as i64;
-    let dw = in_w as i64 - out_w as i64;
-    let horizontal_first = !(dh > 0 && dh > dw * 2);
+    let hc = need_h.then(|| precompute(in_w, out_w, filter, bx[0], bx[2]));
+    let vc = need_v.then(|| precompute(in_h, out_h, filter, bx[1], bx[3]));
 
-    let hc = need_h.then(|| precompute(in_w, out_w, filter));
-    let vc = need_v.then(|| precompute(in_h, out_h, filter));
-
-    if horizontal_first {
-        // Rows of `src` the vertical pass reads.
-        let (ybox_first, ybox_last) = match &vc {
-            Some(vc) => {
-                let (first, _) = vc.bounds[0];
-                let (lm, ln) = vc.bounds[out_h - 1];
-                (first, lm + ln)
-            }
-            None => (0, in_h),
-        };
-        let mid = match &hc {
-            Some(hc) => horizontal(
-                &src[ybox_first * in_w * c..ybox_last * in_w * c],
-                in_w,
-                c,
-                hc,
-            ),
-            None => src[ybox_first * in_w * c..ybox_last * in_w * c].to_vec(),
-        };
-        match &vc {
-            Some(vc) => vertical(&mid, out_w * c, ybox_first, vc),
-            None => mid,
+    // Pillow (12.3, checked against its output) always filters horizontally
+    // first, whatever the shrink ratios; there is no vertical-first mode.
+    // Rows of `src` the vertical pass reads.
+    let (ybox_first, ybox_last) = match &vc {
+        Some(vc) => {
+            let (first, _) = vc.bounds[0];
+            let (lm, ln) = vc.bounds[out_h - 1];
+            (first, lm + ln)
         }
-    } else {
-        let mid = match &vc {
-            Some(vc) => vertical(src, in_w * c, 0, vc),
-            None => src.to_vec(),
-        };
-        match &hc {
-            Some(hc) => horizontal(&mid, in_w, c, hc),
-            None => mid,
-        }
+        None => (0, in_h),
+    };
+    let mid = match &hc {
+        Some(hc) => horizontal(
+            &src[ybox_first * in_w * c..ybox_last * in_w * c],
+            in_w,
+            c,
+            hc,
+        ),
+        None => src[ybox_first * in_w * c..ybox_last * in_w * c].to_vec(),
+    };
+    match &vc {
+        Some(vc) => vertical(&mid, out_w * c, ybox_first, vc),
+        None => mid,
     }
 }
 
@@ -517,8 +578,8 @@ unsafe fn horizontal_avx2(src: &[u8], in_w: usize, c: usize, hc: &Coeffs) -> Vec
 #[allow(unsafe_code, unused_unsafe)]
 unsafe fn horizontal_gray_avx2(src: &[u8], in_w: usize, hc: &Coeffs) -> Vec<u8> {
     use core::arch::x86_64::{
-        __m256i, _mm256_add_epi32, _mm256_cvtepu8_epi16, _mm256_loadu_si256, _mm256_madd_epi16,
-        _mm256_setzero_si256, _mm256_storeu_si256, _mm_loadu_si128,
+        __m256i, _mm_loadu_si128, _mm256_add_epi32, _mm256_cvtepu8_epi16, _mm256_loadu_si256,
+        _mm256_madd_epi16, _mm256_setzero_si256, _mm256_storeu_si256,
     };
 
     let out_w = hc.bounds.len();
@@ -655,23 +716,38 @@ fn vertical_impl(src: &[u8], width: usize, first: usize, vc: &Coeffs) -> Vec<u8>
 /// Source index table of Pillow's `ImagingScaleAffine`: the sample centre
 /// starts at `scale / 2` and is advanced by repeated *addition* (not
 /// multiplication), so exact `.0` boundaries round the way Pillow's
-/// accumulated `f64` does.
-fn nearest_table(in_size: usize, out_size: usize) -> Vec<usize> {
+/// accumulated `f64` does. Pillow's `I;16` goes through a different
+/// transform that evaluates `scale * (i + 0.5)` per sample instead
+/// (`product`); the two disagree when the centre lands on an integer.
+fn nearest_table(in_size: usize, out_size: usize, product: bool) -> Vec<usize> {
     let scale = in_size as f64 / out_size as f64;
     let mut pos = scale * 0.5;
     (0..out_size)
-        .map(|_| {
-            let i = (pos as usize).min(in_size - 1);
+        .map(|i| {
+            let centre = if product {
+                scale * (i as f64 + 0.5)
+            } else {
+                pos
+            };
+            let idx = (centre as usize).min(in_size - 1);
             pos += scale;
-            i
+            idx
         })
         .collect()
 }
 
-fn nearest(src: &[u8], in_w: usize, in_h: usize, c: usize, out_w: usize, out_h: usize) -> Vec<u8> {
-    let xtab = nearest_table(in_w, out_w);
-    let ytab = nearest_table(in_h, out_h);
-    let mut out = vec![0u8; out_w * out_h * c];
+pub(crate) fn nearest<T: Copy + Default>(
+    src: &[T],
+    in_w: usize,
+    in_h: usize,
+    c: usize,
+    out_w: usize,
+    out_h: usize,
+    product: bool,
+) -> Vec<T> {
+    let xtab = nearest_table(in_w, out_w, product);
+    let ytab = nearest_table(in_h, out_h, product);
+    let mut out = vec![T::default(); out_w * out_h * c];
     for (y, &sy) in ytab.iter().enumerate() {
         let srow = &src[sy * in_w * c..(sy + 1) * in_w * c];
         let drow = &mut out[y * out_w * c..(y + 1) * out_w * c];
@@ -680,4 +756,120 @@ fn nearest(src: &[u8], in_w: usize, in_h: usize, c: usize, out_w: usize, out_h: 
         }
     }
     out
+}
+
+/// How Pillow stores the value between and after the two passes of a
+/// resize in a wide (non-8-bit) mode.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum Quant {
+    /// `I;16`: round half away from zero and clamp to `0..=65535` after
+    /// *each* pass (`ROUND_UP` + `clip16`).
+    U16,
+    /// `F`: the accumulator is `f64`, every stored sample is an `f32`.
+    F32,
+}
+
+impl Quant {
+    #[inline]
+    fn store(self, acc: f64) -> f64 {
+        match self {
+            Quant::U16 => {
+                let r = if acc >= 0.0 { acc + 0.5 } else { acc - 0.5 };
+                f64::from((r as i64).clamp(0, 65_535) as u16)
+            }
+            Quant::F32 => f64::from(acc as f32),
+        }
+    }
+}
+
+/// Pillow's resize for the wide modes (`I;16`, `F`): unquantised `f64`
+/// coefficients, an `f64` accumulator, the stored intermediate rounded as
+/// described by [`Quant`]. Samples are read through `get`; the result holds
+/// the stored values as `f64`. Same pass order and `box` semantics as
+/// [`resize_u8_box`].
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn resize_wide<T: Copy + Default>(
+    src: &[T],
+    get: impl Fn(T) -> f64,
+    in_w: usize,
+    in_h: usize,
+    c: usize,
+    out_w: usize,
+    out_h: usize,
+    filter: ResamplingFilter,
+    bx: [f64; 4],
+    quant: Quant,
+) -> Vec<f64> {
+    let bx = box_as_c_floats(bx);
+    let whole = bx == [0.0, 0.0, in_w as f64, in_h as f64];
+    if whole && in_w == out_w && in_h == out_h {
+        return src.iter().map(|&v| get(v)).collect();
+    }
+    if filter == ResamplingFilter::Nearest {
+        let picked = nearest(src, in_w, in_h, c, out_w, out_h, quant == Quant::U16);
+        return picked.into_iter().map(get).collect();
+    }
+    let need_h = in_w != out_w || bx[0] != 0.0 || bx[2] != in_w as f64;
+    let need_v = in_h != out_h || bx[1] != 0.0 || bx[3] != in_h as f64;
+
+    let hw = need_h.then(|| weights_f64(in_w, out_w, filter, bx[0], bx[2]));
+    let vw = need_v.then(|| weights_f64(in_h, out_h, filter, bx[1], bx[3]));
+
+    // Horizontal pass: `buf` holds whole rows of `in_w` pixels.
+    let h_pass = |buf: &[f64], hw: &Weights| -> Vec<f64> {
+        let mut out = Vec::with_capacity(buf.len() / in_w * hw.bounds.len());
+        for row in buf.chunks_exact(in_w * c) {
+            for (xx, &(xmin, taps)) in hw.bounds.iter().enumerate() {
+                let k = &hw.w[xx * hw.ksize..xx * hw.ksize + taps];
+                for ch in 0..c {
+                    let acc: f64 = k
+                        .iter()
+                        .enumerate()
+                        .map(|(t, &wt)| row[(xmin + t) * c + ch] * wt)
+                        .sum();
+                    out.push(quant.store(acc));
+                }
+            }
+        }
+        out
+    };
+    // Vertical pass: `buf` holds rows of `width` samples starting at
+    // source row `first`; `vw.bounds` index absolute source rows.
+    let v_pass = |buf: &[f64], width: usize, first: usize, vw: &Weights| -> Vec<f64> {
+        let mut out = vec![0.0f64; vw.bounds.len() * width];
+        for (yy, &(ymin, taps)) in vw.bounds.iter().enumerate() {
+            let k = &vw.w[yy * vw.ksize..yy * vw.ksize + taps];
+            for x in 0..width {
+                let acc: f64 = k
+                    .iter()
+                    .enumerate()
+                    .map(|(t, &wt)| buf[(ymin - first + t) * width + x] * wt)
+                    .sum();
+                out[yy * width + x] = quant.store(acc);
+            }
+        }
+        out
+    };
+
+    // Only the source rows the vertical pass reads are filtered.
+    let (first, last) = match &vw {
+        Some(vw) => {
+            let (first, _) = vw.bounds[0];
+            let (lm, ln) = vw.bounds[out_h - 1];
+            (first, lm + ln)
+        }
+        None => (0, in_h),
+    };
+    let rows: Vec<f64> = src[first * in_w * c..last * in_w * c]
+        .iter()
+        .map(|&v| get(v))
+        .collect();
+    let mid = match &hw {
+        Some(hw) => h_pass(&rows, hw),
+        None => rows,
+    };
+    match &vw {
+        Some(vw) => v_pass(&mid, out_w * c, first, vw),
+        None => mid,
+    }
 }

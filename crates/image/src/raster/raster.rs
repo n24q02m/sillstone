@@ -45,6 +45,8 @@ mod sealed {
 pub trait Layout: sealed::Sealed + Copy {
     /// Samples per pixel.
     const CHANNELS: usize;
+    /// Index of the alpha sample within a pixel, if the layout has one.
+    const ALPHA: Option<usize> = None;
 }
 
 /// Single-channel (luma) layout: one sample per pixel.
@@ -77,9 +79,11 @@ impl Layout for Rgb {
 }
 impl Layout for Rgba {
     const CHANNELS: usize = 4;
+    const ALPHA: Option<usize> = Some(3);
 }
 impl Layout for La {
     const CHANNELS: usize = 2;
+    const ALPHA: Option<usize> = Some(1);
 }
 impl Layout for Cmyk {
     const CHANNELS: usize = 4;

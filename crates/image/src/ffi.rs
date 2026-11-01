@@ -656,7 +656,9 @@ pub unsafe extern "C" fn sillstone_image_adjust(
     PITH_OK
 }
 
-/// Converts between color spaces (e.g. RGB to Gray, RGBA to RGB, etc.).
+/// Converts between color spaces: RGB/RGBA to Gray (Pillow's integer luma),
+/// RGBA to RGB, and RGB/Gray to RGBA/RGB, each byte-identical to Pillow's
+/// `Image.convert`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sillstone_image_color_convert(
     data: *const u8,
@@ -678,25 +680,24 @@ pub unsafe extern "C" fn sillstone_image_color_convert(
         if out_len < total_pixels {
             return PITH_E_INVALID;
         }
-        let img = match Image::<Rgb, u8>::from_vec(in_w, in_h, src.to_vec()) {
-            Ok(im) => im,
-            Err(_) => return PITH_E_REJECTED,
-        };
-        let gray = img.to_gray();
+        // Pillow's `convert("L")` luma (19595/38470/7471 >> 16), not the
+        // BT.601 /1000 form that pHash uses: this entry point is the
+        // Pillow-compatible conversion.
+        if src.len() != total_pixels * 3 {
+            return PITH_E_REJECTED;
+        }
         let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_pixels) };
-        dst.copy_from_slice(gray.as_slice());
+        dst.copy_from_slice(&crate::raster::rgb_plane_to_l(src, 3, total_pixels));
         PITH_OK
     } else if from_layout == PITH_LAYOUT_RGBA8 && to_layout == PITH_LAYOUT_GRAY8 {
         if out_len < total_pixels {
             return PITH_E_INVALID;
         }
-        let img = match Image::<Rgba, u8>::from_vec(in_w, in_h, src.to_vec()) {
-            Ok(im) => im,
-            Err(_) => return PITH_E_REJECTED,
-        };
-        let gray = img.to_gray();
+        if src.len() != total_pixels * 4 {
+            return PITH_E_REJECTED;
+        }
         let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_pixels) };
-        dst.copy_from_slice(gray.as_slice());
+        dst.copy_from_slice(&crate::raster::rgb_plane_to_l(src, 4, total_pixels));
         PITH_OK
     } else if from_layout == PITH_LAYOUT_RGBA8 && to_layout == PITH_LAYOUT_RGB8 {
         if out_len < total_pixels * 3 {
@@ -715,6 +716,30 @@ pub unsafe extern "C" fn sillstone_image_color_convert(
             return PITH_E_INVALID;
         }
         let img = match Image::<Rgb, u8>::from_vec(in_w, in_h, src.to_vec()) {
+            Ok(im) => im,
+            Err(_) => return PITH_E_REJECTED,
+        };
+        let rgba = img.to_rgba();
+        let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_pixels * 4) };
+        dst.copy_from_slice(rgba.as_slice());
+        PITH_OK
+    } else if from_layout == PITH_LAYOUT_GRAY8 && to_layout == PITH_LAYOUT_RGB8 {
+        if out_len < total_pixels * 3 {
+            return PITH_E_INVALID;
+        }
+        let img = match Image::<Gray, u8>::from_vec(in_w, in_h, src.to_vec()) {
+            Ok(im) => im,
+            Err(_) => return PITH_E_REJECTED,
+        };
+        let rgb = img.to_rgb();
+        let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_pixels * 3) };
+        dst.copy_from_slice(rgb.as_slice());
+        PITH_OK
+    } else if from_layout == PITH_LAYOUT_GRAY8 && to_layout == PITH_LAYOUT_RGBA8 {
+        if out_len < total_pixels * 4 {
+            return PITH_E_INVALID;
+        }
+        let img = match Image::<Gray, u8>::from_vec(in_w, in_h, src.to_vec()) {
             Ok(im) => im,
             Err(_) => return PITH_E_REJECTED,
         };
