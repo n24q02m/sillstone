@@ -452,6 +452,9 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1imag
     }
 }
 
+/// Length in bytes of the ASCII TLSH digest the text C ABI writes and reads.
+const TLSH_DIGEST_LEN: usize = 72;
+
 #[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1text_1tlsh(
     env: *mut JNIEnv,
@@ -459,7 +462,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1text
     data: JArray,
 ) -> JArray {
     let bytes = unsafe { get_input_bytes(env, data) };
-    let mut out = [0u8; 72];
+    let mut out = [0u8; TLSH_DIGEST_LEN];
     let status = unsafe {
         sillstone_text::ffi::sillstone_text_tlsh(
             bytes.as_ptr(),
@@ -483,6 +486,11 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1text
 ) -> jint {
     let bytes_a = unsafe { get_input_bytes(env, a) };
     let bytes_b = unsafe { get_input_bytes(env, b) };
+    // The C ABI reads exactly TLSH_DIGEST_LEN bytes from each pointer and takes no length,
+    // so a shorter Java array would be read past its end.
+    if bytes_a.len() != TLSH_DIGEST_LEN || bytes_b.len() != TLSH_DIGEST_LEN {
+        return -1;
+    }
     let mut dist = 0u32;
     let status = unsafe {
         sillstone_text::ffi::sillstone_text_tlsh_distance(
@@ -883,3 +891,6 @@ unsafe fn create_output_int_array(env: *mut JNIEnv, data: &[jint]) -> JArray {
         arr
     }
 }
+
+#[cfg(test)]
+mod tests;
