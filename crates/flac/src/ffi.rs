@@ -47,6 +47,14 @@
 //! `PITH_ERR_*` kind codes — the stable names `reference.json`
 //! `error_vectors` record ("bad-value", "invalid-magic", ...) as
 //! numbers, so an SDK test can assert the exact refusal kind.
+//!
+//! # Test builds
+//!
+//! Every export is `#[cfg_attr(not(test), unsafe(no_mangle))]`: the unmangled symbols exist only
+//! in the cdylib and in non-test builds of the crate, and the in-module unit-test binary keeps the
+//! functions under their Rust names. Observed on CI (not explained): with the symbols unmangled
+//! in the test binary, `cargo llvm-cov` reported lines of these functions as never run although
+//! the tests execute them.
 
 #![allow(unsafe_code)]
 
@@ -141,7 +149,7 @@ unsafe fn refuse(out: *mut *mut u8, out_len: *mut usize, err: *mut i32, kind: i3
 /// one writable pointer/`usize` each; `err` to one writable `i32`. All
 /// must stay valid for the duration of the call; the function retains
 /// nothing.
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "C" fn sillstone_flac_decode(
     data: *const u8,
     len: usize,
@@ -176,7 +184,7 @@ pub unsafe extern "C" fn sillstone_flac_decode(
 /// `out_len` value that came back with it, and must not have been
 /// released (or otherwise freed) before. Null is accepted and
 /// ignored, so callers can free unconditionally on the error path.
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "C" fn sillstone_flac_free(ptr: *mut u8, len: usize) {
     if ptr.is_null() {
         return;
