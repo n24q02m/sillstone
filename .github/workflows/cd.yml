@@ -275,6 +275,14 @@ jobs:
         with:
           distribution: "temurin"
           java-version: "25"
+          # Central Portal publishing: `server-id` must match
+          # publishingServerId in the `release` profile of sdk/java/pom.xml.
+          # An empty gpg-private-key (secret not configured) skips the import.
+          server-id: central
+          server-username: CENTRAL_PORTAL_USERNAME
+          server-password: CENTRAL_PORTAL_PASSWORD
+          gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
       - name: Publish Crates to crates.io
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
@@ -360,23 +368,25 @@ jobs:
           fi
       - name: Publish Java package to Maven Central
         env:
-          OSSRH_JIRA_USERNAME: ${{ secrets.OSSRH_USERNAME }}
-          OSSRH_JIRA_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+          CENTRAL_PORTAL_USERNAME: ${{ secrets.CENTRAL_PORTAL_USERNAME }}
+          CENTRAL_PORTAL_PASSWORD: ${{ secrets.CENTRAL_PORTAL_PASSWORD }}
+          MAVEN_GPG_PRIVATE_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
         run: |
-          if [ -z "$OSSRH_JIRA_USERNAME" ] || [ -z "$OSSRH_JIRA_PASSWORD" ]; then
+          if [ -z "$CENTRAL_PORTAL_USERNAME" ] || [ -z "$CENTRAL_PORTAL_PASSWORD" ] || [ -z "$MAVEN_GPG_PRIVATE_KEY" ]; then
             # Never report a publish that did not happen: a stable release
             # fails hard, a beta records an explicit SKIPPED notice instead of
             # a green step that only ran `mvn package`.
             if [[ "${{ inputs.expected_version }}" != *-* ]]; then
-              echo "::error title=Maven Central::OSSRH_USERNAME/OSSRH_PASSWORD are not configured; refusing to release a stable version without the Java package."
+              echo "::error title=Maven Central::CENTRAL_PORTAL_USERNAME/CENTRAL_PORTAL_PASSWORD/MAVEN_GPG_PRIVATE_KEY are not configured; refusing to release a stable version without the Java package."
               exit 1
             fi
-            echo "::warning title=Maven Central SKIPPED::OSSRH credentials are not configured; sillstone-java ${{ inputs.expected_version }} was NOT published."
-            echo "### Maven Central: SKIPPED (no OSSRH credentials), nothing was published" >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning title=Maven Central SKIPPED::Central Portal token or GPG key is not configured; sillstone-java ${{ inputs.expected_version }} was NOT published."
+            echo "### Maven Central: SKIPPED (no Central Portal token or GPG key), nothing was published" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          echo "Deploying to Maven Central..."
-          cd sdk/java && mvn deploy -DskipTests
+          echo "Deploying to Maven Central via the Central Portal..."
+          cd sdk/java && mvn -B -Prelease deploy -DskipTests
 
   release-gate:
     name: Release Gate & Registry Readback

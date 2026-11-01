@@ -55,7 +55,7 @@ def generate_notice(repo_name: str) -> str:
   - Python: `pip install sillstone`
   - Node.js: `npm install sillstone`
   - Go: `go get github.com/n24q02m/sillstone/sdk/go/sillstone`
-  - Java: `io.github.sillstone:sillstone`
+  - Java: `io.github.n24q02m:sillstone`
 
 This repository is archived and maintained for provenance and reference only.
 """

@@ -17,6 +17,6 @@ Active development, security fixes, and new releases have transitioned to the un
   - **Python**: Use `pip install sillstone` (replacing standalone wheels).
   - **Node.js**: Use `npm install sillstone` (pure N-API, no dynamic loader dependency).
   - **Go**: Use `go get github.com/n24q02m/sillstone/sdk/go/sillstone`.
-  - **Java**: Maven coordinates `io.github.sillstone:sillstone`.
+  - **Java**: Maven coordinates `io.github.n24q02m:sillstone`.
 
 Please refer to the comprehensive [Migration Guide](https://github.com/n24q02m/sillstone/blob/main/docs/MIGRATION.md) for full details.
