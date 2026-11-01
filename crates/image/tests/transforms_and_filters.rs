@@ -75,3 +75,38 @@ fn test_adjust_brightness_and_invert() {
     let inverted = invert(&im).unwrap();
     assert_eq!(inverted.as_slice(), &[245, 205, 155, 55]);
 }
+
+#[test]
+fn test_crop_output_larger_than_u16_geometry_matches_row_model() {
+    // 70_000 x 61 = 4.27M pixels: both dimensions and their product exceed
+    // what a 16-bit intermediate would hold; the output size is computed in usize.
+    let (w, h) = (70_000u32, 61u32);
+    let im: Image<Rgb> = Image::from_vec(
+        w,
+        h,
+        (0..w as usize * h as usize * 3)
+            .map(|i| (i % 251) as u8)
+            .collect(),
+    )
+    .unwrap();
+    let (x0, y0, x1, y1) = (3u32, 2u32, 69_999u32, 61u32);
+    let cropped = crop(&im, x0, y0, x1, y1).unwrap();
+    assert_eq!((cropped.width(), cropped.height()), (x1 - x0, y1 - y0));
+    assert_eq!(
+        cropped.sample_count(),
+        (x1 - x0) as usize * (y1 - y0) as usize * 3
+    );
+    for (y, x) in [
+        (0u32, 0u32),
+        (0, x1 - x0 - 1),
+        (y1 - y0 - 1, 0),
+        (y1 - y0 - 1, x1 - x0 - 1),
+        (17, 40_000),
+    ] {
+        assert_eq!(
+            cropped.pixel(x, y).unwrap(),
+            im.pixel(x + x0, y + y0).unwrap(),
+            "pixel ({x}, {y})"
+        );
+    }
+}
