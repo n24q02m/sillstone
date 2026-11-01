@@ -287,8 +287,11 @@ jobs:
             local out
             if out=$(cargo publish --manifest-path "$1/Cargo.toml" 2>&1); then
               echo "$out"
-            elif echo "$out" | grep -q "already exists"; then
-              echo "$1: already published, skipping"
+            elif echo "$out" | grep -Eq "already (exists|uploaded)"; then
+              # Re-dispatch after a partial run: the version is already on
+              # crates.io (index says "already exists", the upload API says
+              # "already uploaded"). The release gate reads every version back.
+              echo "::notice title=crates.io::$1 is already published, skipping"
             else
               echo "$out"
               return 1
@@ -337,8 +340,19 @@ jobs:
         run: |
           cd sdk/node
           TGZ=$(ls *.tgz | tail -1)
-          if [ -n "$(npm view "sillstone@${{ inputs.expected_version }}" version 2>/dev/null)" ]; then
-            echo "sillstone@${{ inputs.expected_version }} already on npm, skipping"
+          # Distinguish "version not on the registry" (E404) from a registry or
+          # network failure: only E404 may fall through to a real publish.
+          if view=$(npm view "sillstone@${{ inputs.expected_version }}" version 2>&1); then
+            present=$view
+          elif echo "$view" | grep -q "E404"; then
+            present=""
+          else
+            echo "$view"
+            echo "::error title=npm::cannot determine whether sillstone@${{ inputs.expected_version }} is on npm"
+            exit 1
+          fi
+          if [ -n "$present" ]; then
+            echo "::notice title=npm::sillstone@${{ inputs.expected_version }} is already on npm, skipping"
           elif [[ "${{ inputs.expected_version }}" == *-* ]]; then
             npm publish "$TGZ" --access public --tag beta --provenance
           else
