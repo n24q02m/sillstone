@@ -233,6 +233,69 @@ fn pax_path_and_size_overrides_apply_to_the_next_entry_only() {
     assert_eq!(e[1].name, "after");
 }
 
+/// An entry whose ustar size field is `header_size` but whose data occupies `payload`.
+fn entry_with_header_size(name: &str, header_size: usize, payload: &[u8]) -> Vec<u8> {
+    let mut out = header(name, &octal(header_size), b'0', |_| {}).to_vec();
+    out.extend_from_slice(payload);
+    out.resize(out.len().next_multiple_of(512), 0);
+    out
+}
+
+#[test]
+fn pax_global_size_applies_to_every_following_entry_and_local_size_wins() {
+    // POSIX.1-2001 pax: a `g` record is a default for all later entries, an `x` record
+    // overrides it for the next entry only. Sizes in the ustar fields are deliberately wrong.
+    let mut a = entry("PaxHeader/g", pax_record("size", "7").as_bytes(), b'g');
+    a.extend_from_slice(&entry_with_header_size("first", 0, b"payload"));
+    a.extend_from_slice(&entry_with_header_size("second", 0, b"PAYLOAD"));
+    a.extend_from_slice(&entry(
+        "PaxHeader/x",
+        pax_record("size", "3").as_bytes(),
+        b'x',
+    ));
+    a.extend_from_slice(&entry_with_header_size("local", 0, b"abc"));
+    a.extend_from_slice(&entry_with_header_size("third", 0, b"payload"));
+    // A later `g` replaces the earlier default.
+    a.extend_from_slice(&entry(
+        "PaxHeader/g",
+        pax_record("size", "2").as_bytes(),
+        b'g',
+    ));
+    a.extend_from_slice(&entry_with_header_size("fourth", 0, b"hi"));
+    let a = finish(a);
+    let e = tar_entries(&a, false).unwrap();
+    let got: Vec<_> = e.iter().map(|x| (x.name.as_str(), x.size)).collect();
+    assert_eq!(
+        got,
+        [
+            ("first", 7),
+            ("second", 7),
+            ("local", 3),
+            ("third", 7),
+            ("fourth", 2)
+        ]
+    );
+    assert_eq!(tar_read(&a, &e[0]).unwrap(), b"payload");
+    assert_eq!(tar_read(&a, &e[1]).unwrap(), b"PAYLOAD");
+    assert_eq!(tar_read(&a, &e[2]).unwrap(), b"abc");
+    assert_eq!(tar_read(&a, &e[3]).unwrap(), b"payload");
+    assert_eq!(tar_read(&a, &e[4]).unwrap(), b"hi");
+}
+
+#[test]
+fn entries_before_a_pax_global_header_keep_their_own_size() {
+    let mut a = entry("before", b"xyz", b'0');
+    a.extend_from_slice(&entry(
+        "PaxHeader/g",
+        pax_record("size", "1").as_bytes(),
+        b'g',
+    ));
+    a.extend_from_slice(&entry_with_header_size("after", 9, b"z"));
+    let e = tar_entries(&finish(a), false).unwrap();
+    assert_eq!((e[0].name.as_str(), e[0].size), ("before", 3));
+    assert_eq!((e[1].name.as_str(), e[1].size), ("after", 1));
+}
+
 #[test]
 fn pax_values_may_contain_newlines_and_malformed_records_are_ignored() {
     // The length prefix, not the line structure, delimits a record.
