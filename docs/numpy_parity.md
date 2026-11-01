@@ -7,7 +7,7 @@
 1. **Zero Third-Party Dependencies**: Pure Rust (`core` + `alloc` only in kernel compute paths).
 2. **Strided Memory Layout**: Complete support for `shape`, `strides`, and `offset`. Views (such as slicing and transposing) do not allocate or copy data buffers.
 3. **NumPy-Compatible Broadcasting**: Multi-dimensional broadcasting rules following standard NumPy semantics (trailing dimensions aligned, dimensions equal or 1, stride-0 dimension expansion).
-4. **Vectorized Math & Axis Reductions**: Vectorized elementwise arithmetic (`add`, `sub`, `mul`, `div`, `neg`, `abs`, `eq`, `ne`) and reductions (`sum`, `mean`, `max`, `min`, `argmax`, `argmin`) across arbitrary axes.
+4. **Vectorized Math & Axis Reductions**: Vectorized elementwise arithmetic (`add`, `sub`, `mul`, `div`, `neg`, `abs`, `eq`, `ne`) and reductions (`sum`, `mean`, `max`, `min`, `argmax`, `argmin`) across arbitrary axes. The Rust kernel provides `add`/`sub`/`mul`/`div`/`neg`/`eq`/`ne` and `sum`/`min`/`max`/`argmin`/`argmax` (plus `mean` for floats); `abs`, `pow` and `std` are implemented by the language SDKs. NaN propagates through `min`/`max`/`argmin`/`argmax`.
 5. **High-Performance GEMM Matmul**: Cache-blocked matrix multiplication with 32x32 L1-friendly cache tiling.
 6. **Zero-Copy Image-Tensor Bridge**: Bidirectional conversion between `Image` and `Tensor`/`Array` without buffer reallocation.
 7. **Python Buffer Protocol**: Implements `__array_interface__` (v3) allowing direct, zero-copy consumption by external scientific tools when desired.
