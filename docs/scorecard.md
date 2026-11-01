@@ -8,7 +8,7 @@
 | `sillstone-digest` | T1 Core | Yes (std only) | 14 KAT suites | NIST CAVP (SHA256, SHA3), RFC 7693 (BLAKE2b), BLAKE3 KAT | Full (Py, Node, Go, Java) | 88.33% (below target) |
 | `sillstone-math` | T1 Core | Yes (std only) | 18 mathematical tests | DST-I/II/III inversion, Gauss-Legendre quadrature, RK45 adaptive ODE | Full (Py, Node, Go, Java) | 93.37% (below target) |
 | `sillstone-unicode` | T1 Core | Yes (std only) | 68 GraphemeBreak tests | Unicode 15.1.0 UAX #29 GraphemeBreakTest.txt, UnicodeData.txt | Full (Py, Node, Go, Java) | 95.39% (met target) |
-| `sillstone-inflate` | T1 Core | Yes (std only) | 3 RFC test suites | RFC 1951 Deflate, RFC 7932 Brotli, RFC 8878 Zstandard golden | Core | 85.64% (below target) |
+| `sillstone-inflate` | T1 Core | Yes (std only) | 3 RFC test suites | RFC 1951 Deflate (full); RFC 7932 Brotli and RFC 8878 Zstandard framing only (compressed payloads refused) | Core | 85.64% (below target) |
 | `sillstone-image` | T2 Codecs | Yes (std only) | 24 image tests | PngSuite, JPEG Annex K, Neal Krawetz aHash/dHash/pHash/wHash | Full (Py, Node, Go, Java) | 79.00% (below target) |
 | `sillstone-audio` | T2 Codecs | Yes (std only) | 16 audio tests | RIFF/WAV, FLAC Vorbis comment, MP3 ID3v2/Xing, Chromaprint | Full (Py, Node, Go, Java) | 97.17% (met target) |
 | `sillstone-video` | T2 Codecs | Yes (std only) | 14 video tests | ISO/IEC 14496-10 AVC bitstreams, MP4 fragmented moof/traf, scene-cut | Full (Py, Node, Go, Java) | 96.88% (met target) |

@@ -1,11 +1,17 @@
-//! Pure Rust Zstandard (RFC 8878) frame decompressor.
+//! Pure Rust Zstandard (RFC 8878) frame decoder, frame and block framing only.
 //!
-//! Conforms to RFC 8878 (Zstandard Compression and Decompression).
-//! Supports standard frames, skippable frames, raw blocks, RLE blocks,
-//! and compressed blocks with literals and sequences.
+//! Implemented: standard and skippable frames, raw blocks, RLE blocks, raw
+//! and RLE literal sections of compressed blocks, and the frame content
+//! checksum (low 32 bits of XXH64), all capped by [`Limits`].
+//!
+//! Not implemented: Huffman-compressed literals, sequence execution (FSE
+//! tables, match copies) and dictionaries. A frame that needs any of them is
+//! refused with [`Error::Unsupported`]; the decoder never guesses and never
+//! returns bytes it did not decode. Tracked as an open item until the full
+//! decoder lands.
 
 use alloc::vec::Vec;
-use sillstone_digest::{Error, Result};
+use sillstone_digest::{xxh64, Error, Result};
 use crate::Limits;
 
 /// Standard Zstandard magic number: `0xFD2FB528` (little-endian: 0x28, 0xB5, 0x2F, 0xFD).
@@ -27,6 +33,7 @@ pub fn decompress(input: &[u8], limits: Limits) -> Result<Vec<u8>> {
     let mut out = Vec::new();
 
     while pos < input.len() {
+        let frame_start_out = out.len();
         if pos + 4 > input.len() {
             return Err(Error::truncated("zstd magic", 4, input.len() - pos));
         }
@@ -79,6 +86,9 @@ pub fn decompress(input: &[u8], limits: Limits) -> Result<Vec<u8>> {
             pos += 1;
         }
 
+        if dict_flag != 0 {
+            return Err(Error::Unsupported("zstd dictionary"));
+        }
         let dict_bytes = match dict_flag {
             0 => 0,
             1 => 1,
@@ -179,6 +189,11 @@ pub fn decompress(input: &[u8], limits: Limits) -> Result<Vec<u8>> {
         if checksum_flag == 1 {
             if pos + 4 > input.len() {
                 return Err(Error::truncated("zstd checksum", 4, input.len() - pos));
+            }
+            let stored = u32::from_le_bytes([input[pos], input[pos + 1], input[pos + 2], input[pos + 3]]);
+            let computed = xxh64(&out[frame_start_out..], 0) as u32;
+            if stored != computed {
+                return Err(Error::BadValue("zstd content checksum mismatch"));
             }
             pos += 4;
         }
@@ -317,8 +332,8 @@ fn decode_compressed_block(
             if bpos + comp_size > block.len() {
                 return Err(Error::truncated("zstd huff stream", comp_size, block.len() - bpos));
             }
-            literals.resize(reg_size, 0);
-            bpos += comp_size;
+            let _ = (reg_size, comp_size);
+            return Err(Error::Unsupported("zstd huffman-compressed literals"));
         }
         _ => return Err(Error::BadValue("zstd invalid lit type")),
     }
@@ -360,9 +375,5 @@ fn decode_compressed_block(
     }
 
     let _ = repeat_offsets;
-    if out.len() + literals.len() > limits.max_output {
-        return Err(Error::too_large("zstd output", limits.max_output));
-    }
-    out.extend_from_slice(&literals);
-    Ok(())
+    Err(Error::Unsupported("zstd sequences"))
 }

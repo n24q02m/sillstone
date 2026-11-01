@@ -1,13 +1,20 @@
-//! Pure Rust Brotli (RFC 7932) stream decompressor.
+//! Pure Rust Brotli (RFC 7932) stream decoder, meta-block framing only.
 //!
-//! Conforms to RFC 7932 (Brotli Compressed Data Format).
-//! Pure zero-dependency Rust, memory-bounded, denial-of-service resistant.
+//! Implemented: the stream header (WBITS), meta-block framing, empty and
+//! metadata meta-blocks, and uncompressed meta-blocks, all bounds-checked and
+//! capped by [`Limits`].
+//!
+//! Not implemented: compressed meta-blocks (prefix codes, context modelling,
+//! the static dictionary). A stream that contains one is refused with
+//! [`Error::Unsupported`]; the decoder never guesses and never returns bytes
+//! it did not decode. Tracked as an open item until the full decoder lands.
 
 use alloc::vec::Vec;
 use sillstone_digest::{Error, Result};
 use crate::Limits;
 
-/// Decompresses a Brotli stream according to RFC 7932.
+/// Decompresses a Brotli stream according to RFC 7932, refusing compressed
+/// meta-blocks with [`Error::Unsupported`].
 pub fn decompress(input: &[u8], limits: Limits) -> Result<Vec<u8>> {
     if input.len() > limits.max_input {
         return Err(Error::too_large("brotli input", limits.max_input));
@@ -19,104 +26,80 @@ pub fn decompress(input: &[u8], limits: Limits) -> Result<Vec<u8>> {
     let mut br = BitReader::new(input);
     let mut out = Vec::new();
 
-    // 9.1 Stream Header: Window bits (WBITS)
-    let wbits = if br.read_bits(1)? == 0 {
-        16
-    } else {
+    // RFC 7932 section 9.1: WBITS. The window size only bounds back-references,
+    // which exist only in compressed meta-blocks, so it is validated, not used.
+    if br.read_bits(1)? == 1 {
         let n = br.read_bits(3)?;
-        if n != 0 {
-            17 + n
-        } else {
+        if n == 0 {
             let m = br.read_bits(3)?;
-            if m != 0 { 8 + m } else { 17 }
+            if m == 1 {
+                return Err(Error::Unsupported("brotli large-window stream"));
+            }
         }
-    };
-    let _ = wbits;
+    }
 
-    // Meta-block loop
     loop {
         let is_last = br.read_bits(1)? == 1;
-        if is_last {
-            let is_empty = br.read_bits(1)? == 1;
-            if is_empty {
-                break;
-            }
+        if is_last && br.read_bits(1)? == 1 {
+            // ISLASTEMPTY: the stream ends here.
+            break;
         }
 
-        // Meta-block length (RFC 7932 §9.2)
-        let mnibbles = br.read_bits(2)?;
-        let mlen = if mnibbles == 0 {
-            // Metadata meta-block
-            let reserved = br.read_bits(1)?;
-            if reserved != 0 {
+        // RFC 7932 section 9.2: MNIBBLES is 4, 5, 6 or (value 3) 0 = metadata.
+        let mnibbles = match br.read_bits(2)? {
+            0 => 4usize,
+            1 => 5,
+            2 => 6,
+            _ => 0,
+        };
+
+        if mnibbles == 0 {
+            if is_last {
+                return Err(Error::BadValue("brotli last meta-block cannot be metadata"));
+            }
+            if br.read_bits(1)? != 0 {
                 return Err(Error::BadValue("brotli reserved bit nonzero"));
             }
-            let nsize = br.read_bits(2)?;
-            let mut size = 0usize;
-            for i in 0..nsize {
+            let skip_bytes = br.read_bits(2)? as usize;
+            let mut skip_len = 0usize;
+            for i in 0..skip_bytes {
                 let byte = br.read_bits(8)? as usize;
-                size |= byte << (i * 8);
+                if i + 1 == skip_bytes && skip_bytes > 1 && byte == 0 {
+                    return Err(Error::BadValue("brotli metadata length not minimal"));
+                }
+                skip_len |= byte << (i * 8);
             }
-            br.skip_to_byte_boundary();
-            br.skip_bytes(size)?;
+            if skip_bytes > 0 {
+                skip_len += 1;
+            }
+            br.align_to_byte()?;
+            br.read_exact_bytes(skip_len)?;
             continue;
-        } else {
-            let nbits = (mnibbles + 4) as usize;
-            let mut len = 0usize;
-            for i in 0..nbits {
-                let bit = br.read_bits(4)? as usize;
-                len |= bit << (i * 4);
+        }
+
+        let mut mlen = 0usize;
+        for i in 0..mnibbles {
+            let nibble = br.read_bits(4)? as usize;
+            if i + 1 == mnibbles && mnibbles > 4 && nibble == 0 {
+                return Err(Error::BadValue("brotli meta-block length not minimal"));
             }
-            len + 1
-        };
+            mlen |= nibble << (i * 4);
+        }
+        mlen += 1;
+
+        let is_uncompressed = !is_last && br.read_bits(1)? == 1;
+        if !is_uncompressed {
+            return Err(Error::Unsupported("brotli compressed meta-block"));
+        }
 
         if out.len() + mlen > limits.max_output {
             return Err(Error::too_large("brotli output", limits.max_output));
         }
-
-        let is_uncompressed = if !is_last {
-            br.read_bits(1)? == 1
-        } else {
-            false
-        };
-
-        if is_uncompressed {
-            br.skip_to_byte_boundary();
-            let raw_bytes = br.read_exact_bytes(mlen)?;
-            out.extend_from_slice(raw_bytes);
-        } else {
-            // Compressed meta-block: decode commands & literals
-            decode_compressed_metablock(&mut br, mlen, &mut out, limits)?;
-        }
-
-        if is_last {
-            break;
-        }
+        br.align_to_byte()?;
+        out.extend_from_slice(br.read_exact_bytes(mlen)?);
     }
 
     Ok(out)
-}
-
-fn decode_compressed_metablock(
-    br: &mut BitReader<'_>,
-    mlen: usize,
-    out: &mut Vec<u8>,
-    limits: Limits,
-) -> Result<()> {
-    let start_len = out.len();
-    while out.len() - start_len < mlen {
-        if out.len() >= limits.max_output {
-            return Err(Error::too_large("brotli output", limits.max_output));
-        }
-        let bit = br.read_bits(1).unwrap_or(0);
-        if bit == 0 {
-            out.push(0);
-        } else {
-            let val = br.read_bits(7).unwrap_or(0) as u8;
-            out.push(val);
-        }
-    }
-    Ok(())
 }
 
 /// Helper bit-reader reading bits LSB-first.
@@ -162,21 +145,18 @@ impl<'a> BitReader<'a> {
         Ok(val)
     }
 
-    fn skip_to_byte_boundary(&mut self) {
+    /// Discards the bits up to the next byte boundary; they must be zero.
+    fn align_to_byte(&mut self) -> Result<()> {
         let remainder = self.bits_in_buf % 8;
+        if self.bit_buf & ((1u64 << remainder) - 1) != 0 {
+            return Err(Error::BadValue("brotli padding bits nonzero"));
+        }
         self.bit_buf >>= remainder;
         self.bits_in_buf -= remainder;
-    }
-
-    fn skip_bytes(&mut self, count: usize) -> Result<()> {
-        for _ in 0..count {
-            self.read_bits(8)?;
-        }
         Ok(())
     }
 
     fn read_exact_bytes(&mut self, count: usize) -> Result<&'a [u8]> {
-        self.skip_to_byte_boundary();
         let bytes_in_buf = (self.bits_in_buf / 8) as usize;
         let start = self.byte_idx - bytes_in_buf;
         let end = start + count;
