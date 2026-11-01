@@ -53,7 +53,11 @@ CHANNELS = {
 
 
 class Resampling:
-    """Resampling filter identifiers matching Pillow."""
+    """Resampling filters, bit-exact with the Pillow filter of the same name.
+
+    The numeric ids are Sillstone's own and differ from Pillow's enum
+    (Pillow: LANCZOS = 1, BOX = 4); map by name, not by value.
+    """
     NEAREST = 0
     BOX = 1
     BILINEAR = 2

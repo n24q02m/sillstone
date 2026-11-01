@@ -65,28 +65,29 @@ pub fn ycbcr_to_rgb(y: u8, cb: u8, cr: u8) -> (u8, u8, u8) {
     )
 }
 
-/// Converts RGB to CMYK.
+/// Converts RGB to CMYK exactly as Pillow's `Image.convert("CMYK")` does
+/// (`rgb2cmyk` in `libImaging/Convert.c`): the naive complement with no
+/// black generation, so `K` is always 0.
 #[inline]
 pub fn rgb_to_cmyk(r: u8, g: u8, b: u8) -> (u8, u8, u8, u8) {
-    if r == 0 && g == 0 && b == 0 {
-        return (0, 0, 0, 255);
-    }
-    let max_val = r.max(g).max(b) as u32;
-    let k = 255 - max_val;
-    let c = ((max_val - r as u32) * 255) / max_val;
-    let m = ((max_val - g as u32) * 255) / max_val;
-    let y = ((max_val - b as u32) * 255) / max_val;
-    (c as u8, m as u8, y as u8, k as u8)
+    (255 - r, 255 - g, 255 - b, 0)
 }
 
-/// Converts CMYK to RGB.
+/// `round(a * b / 255)` with Pillow's `MULDIV255` integer trick.
+#[inline]
+fn muldiv255(a: u32, b: u32) -> u32 {
+    let t = a * b + 128;
+    ((t >> 8) + t) >> 8
+}
+
+/// Converts CMYK to RGB exactly as Pillow's `Image.convert("RGB")` does
+/// (`cmyk2rgb` in `libImaging/Convert.c`): each channel is
+/// `(255 - k) - round(ch * (255 - k) / 255)`.
 #[inline]
 pub fn cmyk_to_rgb(c: u8, m: u8, y: u8, k: u8) -> (u8, u8, u8) {
-    let k_inv = 255 - k as u32;
-    let r = (k_inv * (255 - c as u32)) / 255;
-    let g = (k_inv * (255 - m as u32)) / 255;
-    let b = (k_inv * (255 - y as u32)) / 255;
-    (r as u8, g as u8, b as u8)
+    let nk = 255 - u32::from(k);
+    let channel = |v: u8| (nk - muldiv255(u32::from(v), nk)) as u8;
+    (channel(c), channel(m), channel(y))
 }
 
 /// Converts single YUV420p / Rec.601 pixel to RGB.

@@ -111,27 +111,67 @@ class ImagehashParity(unittest.TestCase):
 
 @unittest.skipIf(imagehash is None, "Pillow oracle not installed")
 class PillowResizeParity(unittest.TestCase):
+    """Bit-exact `Image.resize` / `Image.convert` against the installed Pillow."""
+
+    FILTERS = [
+        ("LANCZOS", "LANCZOS"),
+        ("BICUBIC", "BICUBIC"),
+        ("BILINEAR", "BILINEAR"),
+        ("BOX", "BOX"),
+        ("NEAREST", "NEAREST"),
+    ]
+
+    @staticmethod
+    def _filters():
+        R = sillstone.Resampling
+        return [(getattr(PILImage.Resampling, pil), getattr(R, ours), ours) for pil, ours in PillowResizeParity.FILTERS]
+
+    def _check_resize(self, im, mode, w, h, ow, oh):
+        ours_in = sillstone.Image.frombytes(mode, (w, h), im.tobytes())
+        for pil_filter, our_filter, name in self._filters():
+            expected = im.resize((ow, oh), pil_filter).tobytes()
+            got = ours_in.resize((ow, oh), our_filter).tobytes()
+            self.assertEqual(got, expected, f"{mode} {w}x{h}->{ow}x{oh} {name}")
+
     def test_resize_is_pillow_exact(self):
         rng = np.random.default_rng(11)
         pick = random.Random(11)
-        R = sillstone.Resampling
-        filters = [
-            (PILImage.LANCZOS, R.LANCZOS),
-            (PILImage.BICUBIC, R.BICUBIC),
-            (PILImage.BILINEAR, R.BILINEAR),
-            (PILImage.NEAREST, R.NEAREST),
-        ]
         for _ in range(60):
             w, h = pick.randint(1, 160), pick.randint(1, 160)
             ow, oh = pick.randint(1, 160), pick.randint(1, 160)
-            mode = pick.choice(["L", "RGB"])
-            shape = (h, w) if mode == "L" else (h, w, 3)
+            mode = pick.choice(["L", "RGB", "RGBA"])
+            ch = {"L": 1, "RGB": 3, "RGBA": 4}[mode]
+            shape = (h, w) if ch == 1 else (h, w, ch)
             im = PILImage.fromarray(rng.integers(0, 256, shape, dtype="uint8"), mode)
-            ours_in = sillstone.Image.frombytes(mode, (w, h), im.tobytes())
-            for pil_filter, our_filter in filters:
-                expected = im.resize((ow, oh), pil_filter).tobytes()
-                got = ours_in.resize((ow, oh), our_filter).tobytes()
-                self.assertEqual(got, expected, f"{mode} {w}x{h}->{ow}x{oh} filter {our_filter}")
+            self._check_resize(im, mode, w, h, ow, oh)
+
+    def test_resize_skewed_shapes_are_pillow_exact(self):
+        # Tall / wide extremes: Pillow filters horizontally first whatever the
+        # shrink ratios, so a vertical-first heuristic shows up here.
+        rng = np.random.default_rng(5)
+        for mode, ch in (("L", 1), ("RGB", 3), ("RGBA", 4)):
+            for w, h, ow, oh in [(6, 40, 3, 10), (3, 400, 2, 20), (2, 305, 5, 9), (90, 7, 4, 3), (1, 50, 1, 7)]:
+                shape = (h, w) if ch == 1 else (h, w, ch)
+                im = PILImage.fromarray(rng.integers(0, 256, shape, dtype="uint8"), mode)
+                self._check_resize(im, mode, w, h, ow, oh)
+
+    def test_rgba_resize_premultiplies_alpha(self):
+        # Opaque, transparent and translucent pixels side by side: a straight
+        # (non-premultiplied) filter bleeds the colour of transparent pixels.
+        w, h = 12, 9
+        raw = bytearray()
+        for i in range(w * h):
+            raw += bytes([(i * 37) % 256, (i * 91) % 256, (i * 5) % 256, (0, 255, 128, 17)[i % 4]])
+        im = PILImage.frombytes("RGBA", (w, h), bytes(raw))
+        self._check_resize(im, "RGBA", w, h, 5, 4)
+        self._check_resize(im, "RGBA", w, h, 31, 22)
+
+    def test_convert_l_is_pillow_exact(self):
+        rng = np.random.default_rng(3)
+        for mode, ch in (("RGB", 3), ("RGBA", 4)):
+            im = PILImage.fromarray(rng.integers(0, 256, (64, 64, ch), dtype="uint8"), mode)
+            ours = sillstone.Image.frombytes(mode, (64, 64), im.tobytes())
+            self.assertEqual(ours.convert("L").tobytes(), im.convert("L").tobytes(), mode)
 
 
 if __name__ == "__main__":
