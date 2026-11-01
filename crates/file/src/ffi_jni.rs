@@ -37,6 +37,9 @@
 //! the tests execute them.
 
 #![allow(unsafe_code)]
+// JNI resolves `Java_<package>_<class>_<method>` names verbatim; rustc exempts `no_mangle` functions from
+// the snake-case lint, and the test build no longer carries that attribute.
+#![allow(non_snake_case)]
 
 use alloc::ffi::CString;
 use alloc::vec::Vec;
