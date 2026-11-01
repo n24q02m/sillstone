@@ -51,6 +51,40 @@ CHANNELS = {
     "RGBA": 4,
 }
 
+# Same cap as ``sillstone_image::raster::MAX_BUFFER_BYTES`` (crates/image/src/raster/raster.rs):
+# no decoded raster may exceed 1 GiB.
+MAX_BUFFER_BYTES = 1 << 30
+
+_BMP_FILE_HEADER = 14
+_BMP_MIN_INFO_HEADER = 40
+
+
+def _bmp_geometry(
+    content: bytes, w: int, h: int, offset: int, src_row_bytes: int, src_stride: int, out_channels: int
+) -> Tuple[int, int]:
+    """Validates BMP header fields against the real file length and returns ``(width, height)``.
+
+    Every check uses Python integers and runs before any pixel buffer is allocated, so a forged
+    header cannot trigger a large allocation or a late ``IndexError``.
+    ``src_row_bytes`` is the pixel bytes of one row, ``src_stride`` the distance between rows
+    (the last row may omit its padding), ``out_channels`` the channels of the decoded raster.
+    """
+    w_abs, h_abs = abs(w), abs(h)
+    if w_abs == 0 or h_abs == 0:
+        raise ValueError(f"BMP has an empty image size ({w_abs}x{h_abs})")
+    header_size = int.from_bytes(content[14:18], "little")
+    if header_size < _BMP_MIN_INFO_HEADER:
+        raise ValueError(f"unsupported BMP info header size {header_size}")
+    first_pixel = _BMP_FILE_HEADER + header_size
+    if offset < first_pixel or offset > len(content):
+        raise ValueError(f"BMP pixel data offset {offset} is outside the file ({first_pixel}..{len(content)})")
+    if w_abs * h_abs * out_channels > MAX_BUFFER_BYTES:
+        raise ValueError(f"BMP image {w_abs}x{h_abs} exceeds the {MAX_BUFFER_BYTES} byte raster limit")
+    needed = src_stride * (h_abs - 1) + src_row_bytes
+    if needed > len(content) - offset:
+        raise ValueError(f"truncated BMP pixel data: {needed} bytes needed, {len(content) - offset} present")
+    return w_abs, h_abs
+
 
 class Resampling:
     """Resampling filters, bit-exact with the Pillow filter of the same name.
@@ -179,16 +213,17 @@ class Image:
 
         elif content.startswith(b"BM"):
             # BMP decoding: parse 14-byte file header + 40-byte info header
+            if len(content) < _BMP_FILE_HEADER + _BMP_MIN_INFO_HEADER:
+                raise ValueError("truncated BMP header")
             w = int.from_bytes(content[18:22], "little", signed=True)
             h = int.from_bytes(content[22:26], "little", signed=True)
             bpp = int.from_bytes(content[28:30], "little")
-            w_abs = abs(w)
-            h_abs = abs(h)
             offset = int.from_bytes(content[10:14], "little")
 
             if bpp == 24:
                 # 24-bit BGR with row padding to 4 bytes
-                stride = (w_abs * 3 + 3) & ~3
+                stride = (abs(w) * 3 + 3) & ~3
+                w_abs, h_abs = _bmp_geometry(content, w, h, offset, abs(w) * 3, stride, 3)
                 pixels = bytearray(w_abs * h_abs * 3)
                 for y in range(h_abs):
                     src_y = (h_abs - 1 - y) if h > 0 else y
@@ -238,11 +273,9 @@ class Image:
         if shifts[0] is None or shifts[1] is None or shifts[2] is None:
             raise ValueError("32-bit BMP is missing a colour channel mask")
 
-        w_abs, h_abs = abs(w), abs(h)
         has_alpha = shifts[3] is not None
         ch = 4 if has_alpha else 3
-        if len(content) < offset + w_abs * h_abs * 4:
-            raise ValueError("truncated 32-bit BMP pixel data")
+        w_abs, h_abs = _bmp_geometry(content, w, h, offset, abs(w) * 4, abs(w) * 4, ch)
         pixels = bytearray(w_abs * h_abs * ch)
         for y in range(h_abs):
             src_y = (h_abs - 1 - y) if h > 0 else y
