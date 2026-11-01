@@ -615,33 +615,50 @@ pub fn encode_bmp_rgb(img: &Image<crate::raster::Rgb, u8>) -> Result<alloc::vec:
     Ok(out)
 }
 
-/// Encodes an RGBA [`Image`] into a standard 32-bit uncompressed BMP file (BGRA).
+/// Encodes an RGBA [`Image`] into a 32-bit uncompressed BMP file (BGRA) that keeps alpha.
+///
+/// A plain `BI_RGB` 32-bit file has no alpha channel (the fourth byte is padding to every
+/// conformant reader, this crate's [`decode`] included), so the file carries a
+/// `BITMAPV4HEADER` with `BI_BITFIELDS` and explicit R/G/B/A masks. Pillow and GDI+ read
+/// that form back as RGBA.
 pub fn encode_bmp_rgba(img: &Image<crate::raster::Rgba, u8>) -> Result<alloc::vec::Vec<u8>> {
+    const HEADER_V4: usize = 108;
+    const BI_BITFIELDS_CODE: u32 = 3;
+    const LCS_SRGB: u32 = 0x7352_4742; // "sRGB"
+
     let w = img.width() as usize;
     let h = img.height() as usize;
     let row_stride = w * 4;
     let image_size = row_stride * h;
-    let file_size = 14 + 40 + image_size;
+    let pixel_offset = 14 + HEADER_V4;
+    let file_size = pixel_offset + image_size;
 
     let mut out = alloc::vec::Vec::with_capacity(file_size);
     // BITMAPFILEHEADER
     out.extend_from_slice(b"BM");
     out.extend_from_slice(&(file_size as u32).to_le_bytes());
     out.extend_from_slice(&0u32.to_le_bytes());
-    out.extend_from_slice(&54u32.to_le_bytes());
+    out.extend_from_slice(&(pixel_offset as u32).to_le_bytes());
 
-    // BITMAPINFOHEADER
-    out.extend_from_slice(&40u32.to_le_bytes());
+    // BITMAPV4HEADER
+    out.extend_from_slice(&(HEADER_V4 as u32).to_le_bytes());
     out.extend_from_slice(&(w as i32).to_le_bytes());
-    out.extend_from_slice(&(h as i32).to_le_bytes());
+    out.extend_from_slice(&(h as i32).to_le_bytes()); // positive: bottom-up
     out.extend_from_slice(&1u16.to_le_bytes());
     out.extend_from_slice(&32u16.to_le_bytes());
-    out.extend_from_slice(&0u32.to_le_bytes()); // BI_RGB
+    out.extend_from_slice(&BI_BITFIELDS_CODE.to_le_bytes());
     out.extend_from_slice(&(image_size as u32).to_le_bytes());
     out.extend_from_slice(&2835u32.to_le_bytes());
     out.extend_from_slice(&2835u32.to_le_bytes());
-    out.extend_from_slice(&0u32.to_le_bytes());
-    out.extend_from_slice(&0u32.to_le_bytes());
+    out.extend_from_slice(&0u32.to_le_bytes()); // biClrUsed
+    out.extend_from_slice(&0u32.to_le_bytes()); // biClrImportant
+    out.extend_from_slice(&0x00FF_0000u32.to_le_bytes()); // red mask
+    out.extend_from_slice(&0x0000_FF00u32.to_le_bytes()); // green mask
+    out.extend_from_slice(&0x0000_00FFu32.to_le_bytes()); // blue mask
+    out.extend_from_slice(&0xFF00_0000u32.to_le_bytes()); // alpha mask
+    out.extend_from_slice(&LCS_SRGB.to_le_bytes()); // bV4CSType
+    out.extend_from_slice(&[0u8; 36]); // bV4Endpoints (unused for sRGB)
+    out.extend_from_slice(&[0u8; 12]); // bV4GammaRed/Green/Blue
 
     let src = img.as_slice();
     for y in (0..h).rev() {

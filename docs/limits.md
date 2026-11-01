@@ -66,7 +66,7 @@ This document specifies the algorithmic guarantees, operational limits, input bo
 |---|---|---|---|---|
 | **PNG** | `sillstone-image` | Grayscale, RGB, RGBA, Palette, 16-bit, Adam7 interlacing | Baseline RGBA, compression level 0..9 | Max dimension $65535 \times 65535$ |
 | **JPEG** | `sillstone-image` | Baseline SOF0, Progressive SOF2, 4:4:4, 4:2:2, 4:2:0 | Baseline 4:4:4 and 4:2:0 Annex K quant | Strict dimension and component checks |
-| **BMP** | `sillstone-image` | 24-bit RGB, 32-bit RGBA, bottom-up & top-down | 24-bit RGB uncompressed | Header bounds check |
+| **BMP** | `sillstone-image` | 24-bit RGB, 32-bit RGBA, bottom-up & top-down | 24-bit RGB uncompressed; 32-bit RGBA as V4 header with BITFIELDS masks (alpha preserved) | Header bounds check; FFI geometry checked against buffer length |
 | **WAV** | `sillstone-audio` | PCM 16-bit, 24-bit, 32-bit float, mono/stereo | 16-bit PCM mono/stereo | RIFF size sanity verification |
 | **FLAC** | `sillstone-audio` | Native lossless FLAC, Vorbis comment, seektable | Vorbis comment write | Frame sync header check |
 | **MP3** | `sillstone-audio` | MPEG-1/2 Audio Layer III, ID3v1, ID3v2.3/v2.4, Xing header | Header stripping & frame sync | Layer III only (rejects Layer I/II) |
