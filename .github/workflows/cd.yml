@@ -137,12 +137,14 @@ jobs:
           python -m build --wheel sdk/python
           if [ "${{ runner.os }}" == "Linux" ]; then
             python -m pip install auditwheel
-            auditwheel repair sdk/python/dist/*.whl -w sdk/python/dist/repaired/ || true
-            if ls sdk/python/dist/repaired/*.whl 1> /dev/null 2>&1; then
-              rm -f sdk/python/dist/*.whl
-              mv sdk/python/dist/repaired/*.whl sdk/python/dist/
-              rm -rf sdk/python/dist/repaired
-            fi
+            # A failed repair must fail the job: the publish step deletes every
+            # non-manylinux linux wheel, so a swallowed error would silently drop
+            # the Linux wheel from the release.
+            auditwheel repair sdk/python/dist/*.whl -w sdk/python/dist/repaired/
+            ls sdk/python/dist/repaired/*.whl
+            rm -f sdk/python/dist/*.whl
+            mv sdk/python/dist/repaired/*.whl sdk/python/dist/
+            rm -rf sdk/python/dist/repaired
           fi
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v4

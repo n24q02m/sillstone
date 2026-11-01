@@ -96,3 +96,51 @@ jobs:
 
       - name: Verify Clean Identity Separation
         run: python scripts/ci/check-forbidden-traces.py
+
+  coverage:
+    name: Coverage (measured)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+
+      - name: Rust line coverage (workspace)
+        run: cargo llvm-cov --workspace --lib --tests --json --summary-only --output-path rust-cov.json
+
+      - name: Report Rust coverage
+        run: python scripts/ci/coverage_report.py llvm rust-cov.json --target 95
+
+      - name: Build FFI Dynamic Library
+        run: cargo build -p sillstone-ffi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.15"
+
+      - name: Install Python test dependencies
+        run: python -m pip install pillow numpy imagehash pytest pytest-cov
+
+      - name: Python binding coverage
+        run: python -m pytest sdk/python/tests --cov=sillstone --cov-report=json:py-cov.json --cov-report=term-missing
+
+      - name: Report Python coverage
+        run: python scripts/ci/coverage_report.py py py-cov.json --target 95
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            rust-cov.json
+            py-cov.json
