@@ -335,23 +335,28 @@ fn fixture_bytes() -> Vec<u8> {
 }
 
 fn main() -> ExitCode {
-    run(std::env::args().nth(1).unwrap_or_default().as_str())
+    let mut args = std::env::args().skip(1);
+    let mode = args.next().unwrap_or_default();
+    let path = args.next().map(PathBuf::from);
+    run(&mode, path.as_deref())
 }
 
 /// One CLI invocation, split out of [`main`] so the mode dispatch is
-/// unit-testable.
-fn run(mode: &str) -> ExitCode {
+/// unit-testable. `path` overrides the repository-root `reference.json`,
+/// which lets tests exercise `gen` without rewriting the committed file.
+fn run(mode: &str, path: Option<&std::path::Path>) -> ExitCode {
+    let path = path
+        .map(PathBuf::from)
+        .unwrap_or_else(|| repo_root().join(REFERENCE_PATH));
     match mode {
         "gen" => {
             let json = reference_json(&fixture_bytes());
-            let path = repo_root().join(REFERENCE_PATH);
             fs::write(&path, &json).unwrap_or_else(|e| panic!("cannot write {path:?}: {e}"));
             println!("wrote {} ({} bytes)", path.display(), json.len());
             ExitCode::SUCCESS
         }
         "verify" => {
             let json = reference_json(&fixture_bytes());
-            let path = repo_root().join(REFERENCE_PATH);
             let committed = match fs::read(&path) {
                 Ok(b) => b,
                 Err(e) => {
@@ -460,16 +465,25 @@ mod tests {
     }
 
     #[test]
-    fn gen_rewrites_the_committed_file() {
-        assert_eq!(run("gen"), ExitCode::SUCCESS);
+    fn gen_writes_a_file_that_verify_accepts() {
+        // Written to a scratch path: rewriting the committed file here
+        // would race the tests that read it in parallel.
+        let path = std::env::temp_dir().join(format!(
+            "sillstone-flac-genref-{}.json",
+            std::process::id()
+        ));
+        assert_eq!(run("gen", Some(&path)), ExitCode::SUCCESS);
         // Determinism: the regenerated copy must equal what gen produced
         // a moment before, so verify mode stays green.
-        assert_eq!(run("verify"), ExitCode::SUCCESS);
+        assert_eq!(run("verify", Some(&path)), ExitCode::SUCCESS);
+        // The committed file is still current.
+        assert_eq!(run("verify", None), ExitCode::SUCCESS);
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]
     fn unknown_mode_exits_two() {
-        assert_eq!(run("bogus"), ExitCode::from(2));
-        assert_eq!(run(""), ExitCode::from(2));
+        assert_eq!(run("bogus", None), ExitCode::from(2));
+        assert_eq!(run("", None), ExitCode::from(2));
     }
 }
