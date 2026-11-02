@@ -7,6 +7,7 @@
 //! glue and the execution pass the coverage gate needs: exports that
 //! are never called do not count as covered lines.
 
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 
@@ -16,7 +17,8 @@ use sillstone_math::ffi_jni::{
     Java_sillstone_math_PithMath_complexMul, Java_sillstone_math_PithMath_complexPowi,
     Java_sillstone_math_PithMath_complexSqrt, Java_sillstone_math_PithMath_conv,
     Java_sillstone_math_PithMath_corr, Java_sillstone_math_PithMath_covariance, Java_sillstone_math_PithMath_dct2,
-    Java_sillstone_math_PithMath_dct3, Java_sillstone_math_PithMath_dct22d, Java_sillstone_math_PithMath_dct32d,
+    Java_sillstone_math_PithMath_dct3, Java_sillstone_math_PithMath_dct22d, Java_sillstone_math_PithMath_dst1,
+    Java_sillstone_math_PithMath_dst2, Java_sillstone_math_PithMath_dst3, Java_sillstone_math_PithMath_dct32d,
     Java_sillstone_math_PithMath_det3, Java_sillstone_math_PithMath_dtw, Java_sillstone_math_PithMath_fft,
     Java_sillstone_math_PithMath_fftN, Java_sillstone_math_PithMath_fftReal, Java_sillstone_math_PithMath_idct2,
     Java_sillstone_math_PithMath_ifft, Java_sillstone_math_PithMath_ifftN, Java_sillstone_math_PithMath_inverse3,
@@ -48,7 +50,17 @@ unsafe extern "system" fn stub_len(_env: Env, arr: Arr, _copy: *mut u8) -> i32 {
     with_maps(|m| m.get(&(arr as usize)).map_or(0, |v| v.len() as i32))
 }
 
+thread_local! {
+    /// When set, `NewDoubleArray` on this thread reports allocation failure (NULL).
+    static FAIL_NEW: Cell<bool> = const { Cell::new(false) };
+    /// Count of `SetDoubleArrayRegion` calls on this thread that named no live array.
+    static SET_ON_DEAD_ARRAY: Cell<usize> = const { Cell::new(0) };
+}
+
 unsafe extern "system" fn stub_new(_env: Env, len: i32) -> Arr {
+    if FAIL_NEW.get() {
+        return core::ptr::null_mut();
+    }
     with_maps(|m| {
         let handle = (0x5000_0000usize + m.len() * 8 + 8) | 1;
         m.insert(handle, vec![0.0; len.max(0) as usize]);
@@ -77,6 +89,8 @@ unsafe extern "system" fn stub_set_region(
         if let Some(v) = m.get_mut(&(arr as usize)) {
             let s = start.max(0) as usize;
             v[s..s + src.len()].copy_from_slice(src);
+        } else {
+            SET_ON_DEAD_ARRAY.set(SET_ON_DEAD_ARRAY.get() + 1);
         }
     })
 }
@@ -428,4 +442,112 @@ fn refusal_conventions_hold_across_the_surface() {
     let lv = read(lg);
     assert_eq!(lv.len(), 2);
     assert!((lv[0] - 1.0).abs() < 1e-15 && lv[1].abs() < 1e-15);
+}
+
+/// Orthonormal DST-I/II/III of one fixed signal, from `scipy.fft.dst(x, type=t,
+/// norm="ortho")` (scipy 1.18.1), printed with `repr` so every digit is kept.
+#[test]
+fn dst_surfaces_match_the_scipy_orthonormal_vectors() {
+    let e = env();
+    let x = arr(&[0.5, -1.25, 2.0, 3.75, -0.125, 1.5, -2.5, 0.75]);
+    let want: [[f64; 8]; 3] = [
+        [
+            2.1769878720901037,
+            1.3334400693938764,
+            -2.500520779091161,
+            -1.2928228670647344,
+            0.8544684946372053,
+            0.9695896898516747,
+            2.964087672417664,
+            -2.0138905007628165,
+        ],
+        [
+            2.312982406608636,
+            1.5020083121091012,
+            -2.6573716138889445,
+            -1.193242693252299,
+            -0.5555290394487742,
+            1.3396836493572537,
+            2.790643022449363,
+            -1.7235727791422097,
+        ],
+        [
+            1.371117124075703,
+            2.3430445985967543,
+            -2.155303440030729,
+            -1.51439128275975,
+            0.7601242242691456,
+            1.6948914677156566,
+            1.9505988192238548,
+            -2.7183283995743284,
+        ],
+    ];
+    let got = [
+        read(unsafe { Java_sillstone_math_PithMath_dst1(e, NULL, x) }),
+        read(unsafe { Java_sillstone_math_PithMath_dst2(e, NULL, x) }),
+        read(unsafe { Java_sillstone_math_PithMath_dst3(e, NULL, x) }),
+    ];
+    for (t, (g, w)) in got.iter().zip(want).enumerate() {
+        assert_eq!(g.len(), 8, "dst{} length", t + 1);
+        for (i, (a, b)) in g.iter().zip(w).enumerate() {
+            assert!((a - b).abs() < 1e-12, "dst{} [{i}]: {a} vs {b}", t + 1);
+        }
+    }
+
+    // Same refusal convention as the rest of the surface: NULL and empty give NULL.
+    assert!(unsafe { Java_sillstone_math_PithMath_dst1(e, NULL, NULL) }.is_null());
+    assert!(unsafe { Java_sillstone_math_PithMath_dst2(e, NULL, arr(&[])) }.is_null());
+    assert!(unsafe { Java_sillstone_math_PithMath_dst3(e, NULL, NULL) }.is_null());
+}
+
+/// Clears the allocation-failure switch even when an assertion unwinds.
+struct FailNewGuard;
+
+impl FailNewGuard {
+    fn arm() -> Self {
+        FAIL_NEW.set(true);
+        Self
+    }
+}
+
+impl Drop for FailNewGuard {
+    fn drop(&mut self) {
+        FAIL_NEW.set(false);
+    }
+}
+
+#[test]
+fn a_failed_jvm_array_allocation_surfaces_as_null() {
+    let e = env();
+    let x = arr(&[1.0, 2.0, 3.0, 4.0]);
+
+    // Baseline: the same call succeeds while allocation works.
+    assert_eq!(read(unsafe { Java_sillstone_math_PithMath_dct2(e, NULL, x) }).len(), 4);
+
+    // `NewDoubleArray` returning NULL (the JVM has already thrown OutOfMemoryError)
+    // must come back as a NULL result, never a write through a null array.
+    let _armed = FailNewGuard::arm();
+    assert!(unsafe { Java_sillstone_math_PithMath_dct2(e, NULL, x) }.is_null());
+    assert!(unsafe { Java_sillstone_math_PithMath_dst2(e, NULL, x) }.is_null());
+    assert_eq!(
+        SET_ON_DEAD_ARRAY.get(),
+        0,
+        "the result was copied into a NULL array"
+    );
+}
+
+#[test]
+fn complex_div_by_a_zero_denominator_is_null_not_nan() {
+    let e = env();
+    assert!(
+        unsafe {
+            Java_sillstone_math_PithMath_complexDiv(e, NULL, arr(&[5.0, 1.0]), arr(&[0.0, 0.0]))
+        }
+        .is_null()
+    );
+    // (5 + 1j) / 2j = 0.5 - 2.5j (numpy), exact in binary.
+    let got = read(unsafe {
+        Java_sillstone_math_PithMath_complexDiv(e, NULL, arr(&[5.0, 1.0]), arr(&[0.0, 2.0]))
+    });
+    assert_eq!(got, vec![0.5, -2.5]);
 }
