@@ -19,6 +19,14 @@
 //! Extraction uses the crate's conservative defaults: [`Document::open`]
 //! with [`sillstone_inflate::Limits::default`] — a hashing pipeline never
 //! wants an unbounded decode, and the FFI surface is no exception.
+//!
+//! # Test builds
+//!
+//! Every export is `#[cfg_attr(not(test), unsafe(no_mangle))]`: the unmangled symbols exist only
+//! in the cdylib and in non-test builds of the crate, and the in-module unit-test binary keeps the
+//! functions under their Rust names. Observed on CI (not explained): with the symbols unmangled
+//! in the test binary, `cargo llvm-cov` reported lines of these functions as never run although
+//! the tests execute them.
 
 #![allow(unsafe_code)]
 
@@ -57,7 +65,7 @@ pub const PITH_E_UNSUPPORTED: i32 = -3;
 /// `data` must point to `len` readable bytes; `out` to one writable
 /// pointer; `out_len` to one writable `usize`. All must stay valid for
 /// the duration of the call; the function retains nothing.
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "C" fn sillstone_pdf_extract_canonical(
     data: *const u8,
     len: usize,
@@ -92,7 +100,7 @@ pub unsafe extern "C" fn sillstone_pdf_extract_canonical(
 /// with the `out_len` value that came back with it, and must not have
 /// been released (or otherwise freed) before. Null is accepted and
 /// ignored, so callers can free unconditionally on the error path.
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "C" fn sillstone_pdf_free(ptr: *mut u8, len: usize) {
     if ptr.is_null() {
         return;
