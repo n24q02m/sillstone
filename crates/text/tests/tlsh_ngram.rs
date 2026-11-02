@@ -1,6 +1,6 @@
 //! Conformance tests for TLSH (Trend Micro Locality Sensitive Hash) and N-gram utilities.
 
-use sillstone_text::ffi::{PITH_E_INVALID, PITH_E_REJECTED, PITH_OK, sillstone_text_tlsh, sillstone_text_tlsh_distance};
+use sillstone_text::ffi::{PITH_E_INVALID, PITH_E_REJECTED, PITH_OK, sillstone_text_tlsh, sillstone_text_tlsh_distance, sillstone_text_tlsh_distance_checked};
 use sillstone_text::{ngram_jaccard, ngrams, tlsh, Tlsh};
 
 #[test]
@@ -107,4 +107,69 @@ fn test_tlsh_ffi() {
     };
     assert_eq!(dist_status, PITH_OK);
     assert_eq!(dist, 190);
+}
+
+#[test]
+fn test_tlsh_distance_checked_ffi() {
+    let a_txt = include_bytes!("fixtures/021106_yossivassa.txt");
+    let b_txt = include_bytes!("fixtures/website_course_descriptors06-07.txt");
+    let mut a = [0u8; 72];
+    let mut b = [0u8; 72];
+    assert_eq!(unsafe { sillstone_text_tlsh(a_txt.as_ptr(), a_txt.len(), a.as_mut_ptr()) }, PITH_OK);
+    assert_eq!(unsafe { sillstone_text_tlsh(b_txt.as_ptr(), b_txt.len(), b.as_mut_ptr()) }, PITH_OK);
+
+    // Same result as the unchecked function for 72-byte digests.
+    let mut dist = 0u32;
+    let status = unsafe {
+        sillstone_text_tlsh_distance_checked(b.as_ptr(), 72, a.as_ptr(), 72, &mut dist)
+    };
+    assert_eq!(status, PITH_OK);
+    assert_eq!(dist, 190);
+    let mut unchecked = 0u32;
+    assert_eq!(
+        unsafe { sillstone_text_tlsh_distance(b.as_ptr(), a.as_ptr(), &mut unchecked) },
+        PITH_OK
+    );
+    assert_eq!(dist, unchecked);
+
+    // Every length other than 72 is refused and `out` is left untouched. The memory behind
+    // the pointer holds a valid digest twice (144 bytes), so only the length argument can
+    // make these calls fail: an implementation that ignored it would return PITH_OK.
+    let twice = [a, a].concat();
+    for len in [0usize, 1, 71, 73, 144] {
+        let mut out = 7u32;
+        let ptr = twice.as_ptr();
+        assert_eq!(
+            unsafe { sillstone_text_tlsh_distance_checked(ptr, len, a.as_ptr(), 72, &mut out) },
+            PITH_E_INVALID,
+            "len_a = {len}"
+        );
+        assert_eq!(
+            unsafe { sillstone_text_tlsh_distance_checked(a.as_ptr(), 72, ptr, len, &mut out) },
+            PITH_E_INVALID,
+            "len_b = {len}"
+        );
+        assert_eq!(out, 7, "out must not be written on error, len = {len}");
+    }
+
+    // Null pointers and a null out are refused.
+    let mut out = 7u32;
+    for (pa, pb, po) in [
+        (core::ptr::null(), a.as_ptr(), &mut out as *mut u32),
+        (a.as_ptr(), core::ptr::null(), &mut out as *mut u32),
+        (a.as_ptr(), b.as_ptr(), core::ptr::null_mut()),
+    ] {
+        assert_eq!(
+            unsafe { sillstone_text_tlsh_distance_checked(pa, 72, pb, 72, po) },
+            PITH_E_INVALID
+        );
+    }
+
+    // Right length but not a TLSH digest.
+    let junk = [b'0'; 72];
+    assert_eq!(
+        unsafe { sillstone_text_tlsh_distance_checked(junk.as_ptr(), 72, a.as_ptr(), 72, &mut out) },
+        PITH_E_INVALID
+    );
+    assert_eq!(out, 7);
 }

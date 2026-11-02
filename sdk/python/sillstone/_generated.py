@@ -108,6 +108,8 @@ sillstone_text_tlsh_raw = _bind('sillstone_text_tlsh', ctypes.c_int32, [ctypes.c
 
 sillstone_text_tlsh_distance_raw = _bind('sillstone_text_tlsh_distance', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint32)])
 
+sillstone_text_tlsh_distance_checked_raw = _bind('sillstone_text_tlsh_distance_checked', ctypes.c_int32, [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_uint32)])
+
 sillstone_tensor_matmul_f64_raw = _bind('sillstone_tensor_matmul_f64', ctypes.c_int32, [ctypes.POINTER(ctypes.c_double), ctypes.c_size_t, ctypes.c_size_t, ctypes.POINTER(ctypes.c_double), ctypes.c_size_t, ctypes.c_size_t, ctypes.POINTER(ctypes.c_double)])
 
 sillstone_tensor_add_f64_raw = _bind('sillstone_tensor_add_f64', ctypes.c_int32, [ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double), ctypes.c_size_t, ctypes.POINTER(ctypes.c_double)])
