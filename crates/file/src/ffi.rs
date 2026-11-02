@@ -24,6 +24,14 @@
 //! signatures are computed inside the cdylib), and text extraction
 //! speaks one format wire code ([`PITH_FILE_FORMAT_PDF`], the single
 //! lane the suite's file slice routes to `sillstone_pdf`).
+//!
+//! # Test builds
+//!
+//! Every export is `#[cfg_attr(not(test), unsafe(no_mangle))]`: the unmangled symbols exist only
+//! in the cdylib and in non-test builds of the crate, and the in-module unit-test binary keeps the
+//! functions under their Rust names. Observed on CI (not explained): with the symbols unmangled
+//! in the test binary, `cargo llvm-cov` reported lines of these functions as never run although
+//! the tests execute them.
 
 #![allow(unsafe_code)]
 
@@ -66,7 +74,7 @@ pub const PITH_FILE_FORMAT_PDF: u32 = 0;
 /// `data` must point to `len` readable bytes; `out` to one writable
 /// pointer; `out_len` to one writable `usize`. All must stay valid for
 /// the duration of the call; the function retains nothing.
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "C" fn sillstone_file_binary_signature(
     data: *const u8,
     len: usize,
@@ -107,7 +115,7 @@ pub unsafe extern "C" fn sillstone_file_binary_signature(
 /// `a` must point to `a_len` readable bytes, `b` to `b_len` readable
 /// bytes, and `out_bits` to one writable `u64`; all must stay valid
 /// for the duration of the call. The function retains nothing.
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "C" fn sillstone_file_jaccard(
     a: *const u8,
     a_len: usize,
@@ -145,7 +153,7 @@ pub unsafe extern "C" fn sillstone_file_jaccard(
 /// `data` must point to `len` readable bytes; `out` to one writable
 /// pointer; `out_len` to one writable `usize`. All must stay valid for
 /// the duration of the call; the function retains nothing.
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "C" fn sillstone_file_text_content(
     data: *const u8,
     len: usize,
@@ -183,7 +191,7 @@ pub unsafe extern "C" fn sillstone_file_text_content(
 /// `out_len` value that came back with it, and must not have been
 /// released (or otherwise freed) before. Null is accepted and ignored,
 /// so callers can free unconditionally on the error path.
-#[unsafe(no_mangle)]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "C" fn sillstone_file_free(ptr: *mut u8, len: usize) {
     if ptr.is_null() {
         return;
