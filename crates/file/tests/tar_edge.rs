@@ -296,6 +296,61 @@ fn entries_before_a_pax_global_header_keep_their_own_size() {
     assert_eq!((e[1].name.as_str(), e[1].size), ("after", 1));
 }
 
+/// A `g` size applies to directories and symlinks too, so their header block is followed by
+/// that many bytes of "data" that the archive does not carry: the reader skips the next
+/// 512-byte block, which here is the symlink header. This pins what the reader does today
+/// (GNU tar 1.35 also gives `dir/` and the symlink size 7 and then loses the header
+/// alignment, bsdtar 3.8.9 ignores the `g` size, Python `tarfile` 3.13 gives size 7 to all
+/// three but does not skip any data for the directory and the symlink); it does not claim
+/// that this is the right reading of such an archive.
+#[test]
+fn pax_global_size_also_sizes_directories_and_symlinks() {
+    let mut a = entry("PaxHeader/g", pax_record("size", "7").as_bytes(), b'g');
+    a.extend_from_slice(&header("dir/", &octal(0), b'5', |_| {}));
+    a.extend_from_slice(&header("lnk", &octal(0), b'2', |h| {
+        h[157..163].copy_from_slice(b"target")
+    }));
+    a.extend_from_slice(&entry_with_header_size("file", 0, b"payload"));
+    let a = finish(a);
+    let e = tar_entries(&a, false).unwrap();
+    let got: Vec<_> = e
+        .iter()
+        .map(|x| (x.name.as_str(), x.typeflag, x.size))
+        .collect();
+    // `lnk` is consumed as the 7 bytes of data of `dir/`; `file` is read correctly.
+    assert_eq!(got, [("dir/", b'5', 7), ("file", b'0', 7)]);
+    assert_eq!(tar_read(&a, &e[1]).unwrap(), b"payload");
+
+    // A local `x` size of 0 before the directory and before the symlink overrides the
+    // `g` default for that entry only, so nothing is swallowed.
+    let mut b = entry("PaxHeader/g", pax_record("size", "7").as_bytes(), b'g');
+    b.extend_from_slice(&entry(
+        "PaxHeader/x",
+        pax_record("size", "0").as_bytes(),
+        b'x',
+    ));
+    b.extend_from_slice(&header("dir/", &octal(0), b'5', |_| {}));
+    b.extend_from_slice(&entry(
+        "PaxHeader/x",
+        pax_record("size", "0").as_bytes(),
+        b'x',
+    ));
+    b.extend_from_slice(&header("lnk", &octal(0), b'2', |h| {
+        h[157..163].copy_from_slice(b"target")
+    }));
+    b.extend_from_slice(&entry_with_header_size("file", 0, b"payload"));
+    let b = finish(b);
+    let e = tar_entries(&b, false).unwrap();
+    let got: Vec<_> = e
+        .iter()
+        .map(|x| (x.name.as_str(), x.typeflag, x.size))
+        .collect();
+    assert_eq!(
+        got,
+        [("dir/", b'5', 0), ("lnk", b'2', 0), ("file", b'0', 7)]
+    );
+}
+
 #[test]
 fn pax_values_may_contain_newlines_and_malformed_records_are_ignored() {
     // The length prefix, not the line structure, delimits a record.
