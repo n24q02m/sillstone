@@ -87,6 +87,8 @@ int32_t sillstone_text_tlsh(const uint8_t *data, size_t len, uint8_t *out);
 
 int32_t sillstone_text_tlsh_distance(const uint8_t *hash_a, const uint8_t *hash_b, uint32_t *out);
 
+int32_t sillstone_text_tlsh_distance_checked(const uint8_t *hash_a, size_t len_a, const uint8_t *hash_b, size_t len_b, uint32_t *out);
+
 int32_t sillstone_tensor_matmul_f64(const double *a, size_t m, size_t k1, const double *b, size_t k2, size_t n, double *out);
 
 int32_t sillstone_tensor_add_f64(const double *a, const double *b, size_t len, double *out);

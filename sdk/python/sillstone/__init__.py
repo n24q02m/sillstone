@@ -29,7 +29,7 @@ from ._generated import (
     sillstone_image_whash_raw,
     sillstone_image_colorhash_raw,
     sillstone_text_tlsh_raw,
-    sillstone_text_tlsh_distance_raw,
+    sillstone_text_tlsh_distance_checked_raw,
     sillstone_curator_detect_raw,
     sillstone_curator_content_hash_raw,
     sillstone_curator_signature_raw,
@@ -366,7 +366,7 @@ def colorhash(data: bytes, width: int, height: int, layout: int = 0, bins: int =
 
 
 def tlsh(data: bytes) -> str:
-    """Computes 70-hex-char TrendMicro Locality Sensitive Hash string."""
+    """Computes the 72-character TrendMicro Locality Sensitive Hash string (``T1`` plus 70 hex digits)."""
     out = ctypes.create_string_buffer(72)
     rc = sillstone_text_tlsh_raw(data, len(data), out)
     if rc != 0:
@@ -375,11 +375,17 @@ def tlsh(data: bytes) -> str:
 
 
 def tlsh_distance(hash_a: str | bytes, hash_b: str | bytes) -> int:
-    """Computes TLSH distance between two 70-hex-char hashes."""
+    """Computes TLSH distance between two 72-character digests.
+
+    Raises ``ValueError`` when either digest is not exactly 72 bytes, and ``FfiError`` when a
+    72-byte value is not a well-formed TLSH digest.
+    """
     a_bytes = hash_a.encode("ascii") if isinstance(hash_a, str) else hash_a
     b_bytes = hash_b.encode("ascii") if isinstance(hash_b, str) else hash_b
+    if len(a_bytes) != 72 or len(b_bytes) != 72:
+        raise ValueError(f"tlsh digests must be 72 bytes, got {len(a_bytes)} and {len(b_bytes)}")
     out = ctypes.c_uint32()
-    rc = sillstone_text_tlsh_distance_raw(a_bytes, b_bytes, ctypes.byref(out))
+    rc = sillstone_text_tlsh_distance_checked_raw(a_bytes, len(a_bytes), b_bytes, len(b_bytes), ctypes.byref(out))
     if rc != 0:
         raise FfiError("tlsh_distance", rc)
     return out.value

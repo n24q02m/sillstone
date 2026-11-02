@@ -78,6 +78,7 @@ pub fn _touch_deps() {
     let _ = sillstone_image::ffi::sillstone_image_free_bytes as *const () as usize;
     let _ = sillstone_text::ffi::sillstone_text_tlsh as *const () as usize;
     let _ = sillstone_text::ffi::sillstone_text_tlsh_distance as *const () as usize;
+    let _ = sillstone_text::ffi::sillstone_text_tlsh_distance_checked as *const () as usize;
     let _ = sillstone_tensor::ffi::sillstone_tensor_matmul_f64 as *const () as usize;
     let _ = sillstone_tensor::ffi::sillstone_tensor_add_f64 as *const () as usize;
     let _ = sillstone_tensor::ffi::sillstone_tensor_sum_f64 as *const () as usize;

@@ -256,23 +256,8 @@ pub unsafe extern "C" fn sillstone_text_tlsh(
     }
 }
 
-/// Computes the distance score between two 72-byte TLSH hashes.
-///
-/// # Safety
-///
-/// `hash_a` and `hash_b` must point to 72 readable ASCII bytes. `out` must point to a writable `u32`.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn sillstone_text_tlsh_distance(
-    hash_a: *const u8,
-    hash_b: *const u8,
-    out: *mut u32,
-) -> i32 {
-    if hash_a.is_null() || hash_b.is_null() || out.is_null() {
-        return PITH_E_INVALID;
-    }
-    let slice_a = unsafe { core::slice::from_raw_parts(hash_a, 72) };
-    let slice_b = unsafe { core::slice::from_raw_parts(hash_b, 72) };
-
+/// Distance between two 72-byte TLSH digests already bounded to 72 bytes each.
+fn tlsh_distance_72(slice_a: &[u8], slice_b: &[u8], out: *mut u32) -> i32 {
     let Ok(str_a) = core::str::from_utf8(slice_a) else {
         return PITH_E_INVALID;
     };
@@ -292,6 +277,57 @@ pub unsafe extern "C" fn sillstone_text_tlsh_distance(
         *out = dist;
     }
     PITH_OK
+}
+
+/// Computes the distance score between two 72-byte TLSH hashes.
+///
+/// Deprecated: this function takes no lengths, so it cannot tell a short buffer from a
+/// 72-byte one and always reads 72 bytes from each pointer. Use
+/// [`sillstone_text_tlsh_distance_checked`], which validates the lengths and refuses
+/// anything other than 72 bytes with [`PITH_E_INVALID`]. This function stays exported
+/// with an unchanged signature for existing callers.
+///
+/// # Safety
+///
+/// `hash_a` and `hash_b` must point to 72 readable ASCII bytes. `out` must point to a writable `u32`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_text_tlsh_distance(
+    hash_a: *const u8,
+    hash_b: *const u8,
+    out: *mut u32,
+) -> i32 {
+    if hash_a.is_null() || hash_b.is_null() || out.is_null() {
+        return PITH_E_INVALID;
+    }
+    let slice_a = unsafe { core::slice::from_raw_parts(hash_a, 72) };
+    let slice_b = unsafe { core::slice::from_raw_parts(hash_b, 72) };
+    tlsh_distance_72(slice_a, slice_b, out)
+}
+
+/// Computes the distance score between two TLSH digests, checking their lengths.
+///
+/// Returns [`PITH_E_INVALID`] when a pointer is null, when either length is not exactly
+/// 72, or when a digest is not a well-formed TLSH string; `out` is left untouched in
+/// every error case. No byte beyond `len_a` / `len_b` is read.
+///
+/// # Safety
+///
+/// `hash_a` must point to `len_a` readable bytes and `hash_b` to `len_b` readable bytes.
+/// `out` must point to a writable `u32`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sillstone_text_tlsh_distance_checked(
+    hash_a: *const u8,
+    len_a: usize,
+    hash_b: *const u8,
+    len_b: usize,
+    out: *mut u32,
+) -> i32 {
+    if hash_a.is_null() || hash_b.is_null() || out.is_null() || len_a != 72 || len_b != 72 {
+        return PITH_E_INVALID;
+    }
+    let slice_a = unsafe { core::slice::from_raw_parts(hash_a, 72) };
+    let slice_b = unsafe { core::slice::from_raw_parts(hash_b, 72) };
+    tlsh_distance_72(slice_a, slice_b, out)
 }
 
 #[cfg(test)]

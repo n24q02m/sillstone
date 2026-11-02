@@ -296,6 +296,6 @@ module.exports = {
   whash: imageHash("sillstone_image_whash"),
   colorhash: imageHash("sillstone_image_colorhash"),
   tlsh: (data) => native.sillstone_text_tlsh(data),
-  tlshDistance: (a, b) => native.sillstone_text_tlsh_distance(a, b),
+  tlshDistance: (a, b) => native.sillstone_text_tlsh_distance_checked(a, b),
   tensor: (shape, data) => new arrayModule.Tensor(shape, data),
 };
