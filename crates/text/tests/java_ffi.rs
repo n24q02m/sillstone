@@ -513,3 +513,54 @@ fn jni_null_environment_short_circuits() {
     assert!(stream.is_null());
     assert_eq!(value, 0.0);
 }
+
+#[test]
+fn jni_jaccard_null_second_operand_is_invalid() {
+    let ((value, status), _produced, _recorded) = with_fake_env(|env| unsafe {
+        let arr_a = long_array(vec![1, 2, 3]);
+        let slot = status_slot();
+        let value = Java_hash_sillstone_text_PithText_jaccardNative(
+            env,
+            std::ptr::null_mut(),
+            arr_a,
+            std::ptr::null_mut(),
+            slot,
+        );
+        (value, read_status(slot))
+    });
+    assert_eq!(status, PITH_E_INVALID, "status");
+    assert_eq!(value, 0.0);
+}
+
+/// An array handle the environment reports a negative length for is
+/// refused as an invalid argument, for both the `byte[]` and the
+/// `long[]` readers.
+#[test]
+fn jni_array_with_a_negative_length_is_invalid() {
+    // A non-null handle the fake registry does not know: its length is -1.
+    let unknown: JArray = 0x4000 as JArray;
+
+    let ((stream, status), _produced, _recorded) = with_fake_env(|env| unsafe {
+        let slot = status_slot();
+        let stream =
+            Java_hash_sillstone_text_PithText_fingerprintNative(env, std::ptr::null_mut(), unknown, slot);
+        (stream, read_status(slot))
+    });
+    assert_eq!(status, PITH_E_INVALID, "byte[] status");
+    assert!(stream.is_null(), "no stream on refusal");
+
+    let ((value, status), _produced, _recorded) = with_fake_env(|env| unsafe {
+        let arr_b = long_array(vec![1, 2, 3]);
+        let slot = status_slot();
+        let value = Java_hash_sillstone_text_PithText_jaccardNative(
+            env,
+            std::ptr::null_mut(),
+            unknown,
+            arr_b,
+            slot,
+        );
+        (value, read_status(slot))
+    });
+    assert_eq!(status, PITH_E_INVALID, "long[] status");
+    assert_eq!(value, 0.0);
+}
