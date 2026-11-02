@@ -641,3 +641,75 @@ fn jni_index_free_null_environment_is_a_noop() {
         );
     });
 }
+
+#[test]
+fn jni_signature_wav_null_data_is_invalid() {
+    let ((stream, status), _produced, _recorded) = with_fake_env(|env| unsafe {
+        let slot = status_slot();
+        let stream = Java_hash_sillstone_audio_PithAudio_signatureWavNative(
+            env,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            slot,
+        );
+        (stream, read_status(slot))
+    });
+    assert_eq!(status, -1, "status");
+    assert!(stream.is_null());
+}
+
+#[test]
+fn jni_signature_pcm_null_data_is_invalid() {
+    let ((stream, status), _produced, _recorded) = with_fake_env(|env| unsafe {
+        let slot = status_slot();
+        let stream = Java_hash_sillstone_audio_PithAudio_signaturePcmNative(
+            env,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            1,
+            slot,
+        );
+        (stream, read_status(slot))
+    });
+    assert_eq!(status, -1, "status");
+    assert!(stream.is_null());
+}
+
+#[test]
+fn jni_index_add_null_data_is_invalid() {
+    let ((status,), _produced, _recorded) = with_fake_env(|env| unsafe {
+        let idx = Java_hash_sillstone_audio_PithAudio_indexNewNative(env, std::ptr::null_mut());
+        let slot = status_slot();
+        Java_hash_sillstone_audio_PithAudio_indexAddNative(
+            env,
+            std::ptr::null_mut(),
+            idx,
+            std::ptr::null_mut(),
+            1,
+            slot,
+        );
+        Java_hash_sillstone_audio_PithAudio_indexFreeNative(env, std::ptr::null_mut(), idx);
+        (read_status(slot),)
+    });
+    assert_eq!(status, -1, "status");
+}
+
+#[test]
+fn jni_match_null_data_is_invalid() {
+    let ((stream, status), _produced, _recorded) = with_fake_env(|env| unsafe {
+        let idx = Java_hash_sillstone_audio_PithAudio_indexNewNative(env, std::ptr::null_mut());
+        let slot = status_slot();
+        let stream = Java_hash_sillstone_audio_PithAudio_matchNative(
+            env,
+            std::ptr::null_mut(),
+            idx,
+            std::ptr::null_mut(),
+            1,
+            slot,
+        );
+        Java_hash_sillstone_audio_PithAudio_indexFreeNative(env, std::ptr::null_mut(), idx);
+        (stream, read_status(slot))
+    });
+    assert_eq!(status, -1, "status");
+    assert!(stream.is_null());
+}
