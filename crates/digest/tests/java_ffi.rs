@@ -927,3 +927,360 @@ fn jni_stale_array_handle_is_invalid() {
     assert_eq!(status, -1, "status");
     assert!(digest.is_null());
 }
+// ---------------------------------------------------------------------
+// Refusal paths: null / stale Java arrays, an environment that cannot
+// allocate the result, and null environment / status slots. Every
+// refusal pairs with a control call on the same export that succeeds.
+// ---------------------------------------------------------------------
+
+type DataFn = unsafe extern "system" fn(*mut JNIEnv, JClass, JArray, JIntArray) -> JArray;
+type KeyDataFn =
+    unsafe extern "system" fn(*mut JNIEnv, JClass, JArray, JArray, JIntArray) -> JArray;
+type SumFn = unsafe extern "system" fn(*mut JNIEnv, JClass, JArray, JIntArray) -> jint;
+type HashFn = unsafe extern "system" fn(*mut JNIEnv, JClass, JArray, JIntArray) -> jlong;
+type SeededFn = unsafe extern "system" fn(*mut JNIEnv, JClass, JArray, jlong, JIntArray) -> jlong;
+type FillFn = unsafe extern "system" fn(*mut JNIEnv, JClass, jlong, jint, JIntArray) -> JArray;
+
+/// How a Java array argument is presented to the glue.
+#[derive(Clone)]
+enum Arg {
+    /// A null reference.
+    Null,
+    /// A live `byte[]` with these contents.
+    Live(Vec<u8>),
+    /// A handle the environment no longer knows (length reports -1).
+    Stale,
+}
+
+fn make_arg(arg: &Arg) -> JArray {
+    match arg {
+        Arg::Null => std::ptr::null_mut(),
+        Arg::Live(bytes) => byte_array(bytes.clone()),
+        Arg::Stale => {
+            let handle = byte_array(vec![1]);
+            with_state(|state| state.byte_arrays.remove(&(handle as usize)));
+            handle
+        }
+    }
+}
+
+/// Outcome of one native call: whether the returned reference was null,
+/// the status the glue wrote (`i32::MIN` if it never touched the slot)
+/// and the bytes it published through `SetByteArrayRegion`.
+struct Outcome {
+    returned_null: bool,
+    status: i32,
+    written: Vec<u8>,
+}
+
+fn call_data(f: DataFn, data: &Arg, fail_new_array: bool) -> Outcome {
+    let ((array, status), written, _ints, _longs) = with_fake_env(|env| unsafe {
+        let data = make_arg(data);
+        let slot = status_slot();
+        with_state(|state| state.fail_new_array = fail_new_array);
+        let array = f(env, std::ptr::null_mut(), data, slot);
+        (array, read_status(slot))
+    });
+    Outcome {
+        returned_null: array.is_null(),
+        status,
+        written,
+    }
+}
+
+fn call_key_data(f: KeyDataFn, key: &Arg, data: &Arg, fail_new_array: bool) -> Outcome {
+    let ((array, status), written, _ints, _longs) = with_fake_env(|env| unsafe {
+        let key = make_arg(key);
+        let data = make_arg(data);
+        let slot = status_slot();
+        with_state(|state| state.fail_new_array = fail_new_array);
+        let array = f(env, std::ptr::null_mut(), key, data, slot);
+        (array, read_status(slot))
+    });
+    Outcome {
+        returned_null: array.is_null(),
+        status,
+        written,
+    }
+}
+
+fn live(bytes: &[u8]) -> Arg {
+    Arg::Live(bytes.to_vec())
+}
+
+#[test]
+fn jni_hmac_exports_refuse_unusable_arrays() {
+    let exports: [(&str, KeyDataFn, usize); 3] = [
+        (
+            "hmac_sha1",
+            Java_hash_sillstone_digest_PithDigest_hmacSha1Native,
+            20,
+        ),
+        (
+            "hmac_sha256",
+            Java_hash_sillstone_digest_PithDigest_hmacSha256Native,
+            32,
+        ),
+        (
+            "hmac_sha512",
+            Java_hash_sillstone_digest_PithDigest_hmacSha512Native,
+            64,
+        ),
+    ];
+    for (name, f, mac_len) in exports {
+        // Control: live key and data produce a MAC of the right width.
+        let ok = call_key_data(f, &live(b"key"), &live(b"data"), false);
+        assert_eq!(ok.status, 0, "{name} control");
+        assert!(!ok.returned_null, "{name} control returns an array");
+        assert_eq!(ok.written.len(), mac_len, "{name} control width");
+
+        // A null or stale key / data array is an invalid argument; no
+        // result array is built.
+        for (label, key, data) in [
+            ("null key", Arg::Null, live(b"data")),
+            ("stale key", Arg::Stale, live(b"data")),
+            ("null data", live(b"key"), Arg::Null),
+            ("stale data", live(b"key"), Arg::Stale),
+        ] {
+            let refused = call_key_data(f, &key, &data, false);
+            assert_eq!(refused.status, -1, "{name} {label}");
+            assert!(refused.returned_null, "{name} {label} returns null");
+            assert!(refused.written.is_empty(), "{name} {label} writes nothing");
+        }
+
+        // The environment refusing the result array surfaces as a
+        // rejection, never as a panic.
+        let refused = call_key_data(f, &live(b"key"), &live(b"data"), true);
+        assert_eq!(refused.status, -2, "{name} allocation refused");
+        assert!(
+            refused.returned_null,
+            "{name} allocation refused returns null"
+        );
+        assert!(
+            refused.written.is_empty(),
+            "{name} allocation refused writes nothing"
+        );
+    }
+}
+
+#[test]
+fn jni_digest_exports_refuse_an_environment_that_cannot_allocate() {
+    let exports: [(&str, DataFn, usize); 5] = [
+        ("sha1", Java_hash_sillstone_digest_PithDigest_sha1Native, 20),
+        (
+            "sha512",
+            Java_hash_sillstone_digest_PithDigest_sha512Native,
+            64,
+        ),
+        (
+            "base64_encode",
+            Java_hash_sillstone_digest_PithDigest_base64EncodeNative,
+            4,
+        ),
+        (
+            "base64_decode",
+            Java_hash_sillstone_digest_PithDigest_base64DecodeNative,
+            3,
+        ),
+        (
+            "sha256",
+            Java_hash_sillstone_digest_PithDigest_sha256Native,
+            32,
+        ),
+    ];
+    for (name, f, width) in exports {
+        // "abc" -> 3 bytes; the base64 encode of it is "YWJj" (4) and the
+        // decode input below is the same text, which decodes to 3.
+        let input = if name == "base64_decode" {
+            live(b"YWJj")
+        } else {
+            live(b"abc")
+        };
+        let ok = call_data(f, &input, false);
+        assert_eq!(ok.status, 0, "{name} control");
+        assert_eq!(ok.written.len(), width, "{name} control width");
+
+        let refused = call_data(f, &input, true);
+        assert_eq!(refused.status, -2, "{name} allocation refused");
+        assert!(
+            refused.returned_null,
+            "{name} allocation refused returns null"
+        );
+        assert!(
+            refused.written.is_empty(),
+            "{name} allocation refused writes nothing"
+        );
+    }
+}
+
+#[test]
+fn jni_base64_exports_refuse_unusable_arrays_and_handles() {
+    let exports: [(&str, DataFn, &[u8]); 2] = [
+        (
+            "base64_encode",
+            Java_hash_sillstone_digest_PithDigest_base64EncodeNative,
+            b"foo",
+        ),
+        (
+            "base64_decode",
+            Java_hash_sillstone_digest_PithDigest_base64DecodeNative,
+            b"Zm9v",
+        ),
+    ];
+    for (name, f, good) in exports {
+        // Control: a live array goes through.
+        let ok = call_data(f, &live(good), false);
+        assert_eq!(ok.status, 0, "{name} control");
+        assert!(!ok.returned_null, "{name} control returns an array");
+
+        // A null or stale data array is an invalid argument.
+        for (label, data) in [("null data", Arg::Null), ("stale data", Arg::Stale)] {
+            let refused = call_data(f, &data, false);
+            assert_eq!(refused.status, -1, "{name} {label}");
+            assert!(refused.returned_null, "{name} {label} returns null");
+            assert!(refused.written.is_empty(), "{name} {label} writes nothing");
+        }
+
+        // A null environment or a null status slot short-circuits to a
+        // null result without touching the live status slot.
+        let ((no_env, no_status, status), written, ints, _longs) = with_fake_env(|env| unsafe {
+            let data = byte_array(good.to_vec());
+            let slot = status_slot();
+            let no_env = f(std::ptr::null_mut(), std::ptr::null_mut(), data, slot);
+            let no_status = f(env, std::ptr::null_mut(), data, std::ptr::null_mut());
+            (no_env, no_status, read_status(slot))
+        });
+        assert!(no_env.is_null(), "{name} null environment");
+        assert!(no_status.is_null(), "{name} null status");
+        assert_eq!(status, i32::MIN, "{name} status slot untouched");
+        assert!(
+            written.is_empty() && ints.is_empty(),
+            "{name} wrote nothing"
+        );
+    }
+}
+
+#[test]
+fn jni_checksum_exports_refuse_unusable_arrays() {
+    let sums: [(&str, SumFn); 3] = [
+        ("crc32", Java_hash_sillstone_digest_PithDigest_crc32Native),
+        (
+            "adler32",
+            Java_hash_sillstone_digest_PithDigest_adler32Native,
+        ),
+        ("crc32c", Java_hash_sillstone_digest_PithDigest_crc32cNative),
+    ];
+    for (name, f) in sums {
+        for (label, data) in [("null data", Arg::Null), ("stale data", Arg::Stale)] {
+            let ((value, status), _written, _ints, _longs) = with_fake_env(|env| unsafe {
+                let data = make_arg(&data);
+                let slot = status_slot();
+                let value = f(env, std::ptr::null_mut(), data, slot);
+                (value, read_status(slot))
+            });
+            assert_eq!(status, -1, "{name} {label}");
+            assert_eq!(value, 0, "{name} {label} returns zero");
+        }
+        // Control: live data returns a non-zero checksum, status untouched.
+        let ((value, status), _written, _ints, _longs) = with_fake_env(|env| unsafe {
+            let data = byte_array(b"123456789".to_vec());
+            let slot = status_slot();
+            let value = f(env, std::ptr::null_mut(), data, slot);
+            (value, read_status(slot))
+        });
+        assert_eq!(status, i32::MIN, "{name} control leaves the slot alone");
+        assert_ne!(value, 0, "{name} control returns the checksum");
+    }
+}
+
+#[test]
+fn jni_hash64_exports_refuse_unusable_arrays() {
+    let fnv: HashFn = Java_hash_sillstone_digest_PithDigest_fnv1a64Native;
+    let xxh: SeededFn = Java_hash_sillstone_digest_PithDigest_xxh64Native;
+    for (label, data) in [("null data", Arg::Null), ("stale data", Arg::Stale)] {
+        let ((fnv_value, fnv_status, xxh_value, xxh_status), _w, _i, _l) =
+            with_fake_env(|env| unsafe {
+                let fnv_data = make_arg(&data);
+                let fnv_slot = status_slot();
+                let fnv_value = fnv(env, std::ptr::null_mut(), fnv_data, fnv_slot);
+                let xxh_data = make_arg(&data);
+                let xxh_slot = status_slot();
+                let xxh_value = xxh(env, std::ptr::null_mut(), xxh_data, 7, xxh_slot);
+                (
+                    fnv_value,
+                    read_status(fnv_slot),
+                    xxh_value,
+                    read_status(xxh_slot),
+                )
+            });
+        assert_eq!(fnv_status, -1, "fnv1a64 {label}");
+        assert_eq!(fnv_value, 0, "fnv1a64 {label} returns zero");
+        assert_eq!(xxh_status, -1, "xxh64 {label}");
+        assert_eq!(xxh_value, 0, "xxh64 {label} returns zero");
+    }
+    // Control: live data hashes to the published values, status untouched.
+    let ((fnv_value, fnv_status, xxh_value, xxh_status), _w, _i, _l) =
+        with_fake_env(|env| unsafe {
+            let fnv_slot = status_slot();
+            let fnv_value = fnv(
+                env,
+                std::ptr::null_mut(),
+                byte_array(b"foobar".to_vec()),
+                fnv_slot,
+            );
+            let xxh_slot = status_slot();
+            let xxh_value = xxh(
+                env,
+                std::ptr::null_mut(),
+                byte_array(b"foobar".to_vec()),
+                7,
+                xxh_slot,
+            );
+            (
+                fnv_value,
+                read_status(fnv_slot),
+                xxh_value,
+                read_status(xxh_slot),
+            )
+        });
+    assert_eq!(fnv_status, i32::MIN);
+    assert_eq!(xxh_status, i32::MIN);
+    // FNV-1a 64 of "foobar" (draft-eastlake-fnv test vector).
+    assert_eq!(fnv_value as u64, 0x8594_4171_f739_67e8);
+    assert_eq!(xxh_value as u64, xxh64(b"foobar", 7));
+}
+
+#[test]
+fn jni_fill_exports_refuse_an_environment_that_cannot_allocate() {
+    let fills: [(&str, FillFn); 2] = [
+        (
+            "splitmix64",
+            Java_hash_sillstone_digest_PithDigest_splitmix64FillNative,
+        ),
+        (
+            "xoshiro256",
+            Java_hash_sillstone_digest_PithDigest_xoshiro256FillNative,
+        ),
+    ];
+    for (name, f) in fills {
+        let ((array, status), _written, _ints, longs) = with_fake_env(|env| unsafe {
+            let slot = status_slot();
+            with_state(|state| state.fail_new_array = true);
+            let array = f(env, std::ptr::null_mut(), 5, 4, slot);
+            (array, read_status(slot))
+        });
+        assert_eq!(status, -2, "{name} allocation refused");
+        assert!(array.is_null(), "{name} allocation refused returns null");
+        assert!(longs.is_empty(), "{name} allocation refused writes nothing");
+
+        // Control: the same call with an allocating environment fills 4.
+        let ((array, status), _written, _ints, longs) = with_fake_env(|env| unsafe {
+            let slot = status_slot();
+            let array = f(env, std::ptr::null_mut(), 5, 4, slot);
+            (array, read_status(slot))
+        });
+        assert_eq!(status, 0, "{name} control");
+        assert!(!array.is_null(), "{name} control returns an array");
+        assert_eq!(longs.len(), 4, "{name} control fills four values");
+    }
+}
