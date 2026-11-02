@@ -160,3 +160,29 @@ fn catalog_without_acroform_is_none() {
     let pdf = build_pdf("", &[]);
     assert_eq!(acroform_of(&pdf), None);
 }
+
+#[test]
+fn direct_field_dictionary_and_untitled_field_are_tolerated() {
+    // The standard wants indirect references here (pypdf rejects this file); the reader is
+    // lenient and accepts a direct dictionary. A `/T` that is neither string nor name gives
+    // an empty name rather than dropping the field.
+    let pdf = build_pdf(
+        "/AcroForm << /Fields [<< /FT /Tx /T (inline) /V (z) >> 4 0 R] >>",
+        &[(4, "<< /FT /Tx /T 5 /V (untitled) >>")],
+    );
+    let form = acroform_of(&pdf).expect("acroform present");
+    assert_eq!(
+        form.fields,
+        vec![
+            field("inline", FieldType::Text, Some("z")),
+            field("", FieldType::Text, Some("untitled")),
+        ]
+    );
+}
+
+#[test]
+fn fields_that_is_not_an_array_gives_an_empty_form() {
+    let pdf = build_pdf("/AcroForm 4 0 R", &[(4, "<< /Fields 5 0 R >>"), (5, "42")]);
+    let form = acroform_of(&pdf).expect("acroform present");
+    assert!(form.fields.is_empty());
+}
