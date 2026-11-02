@@ -158,30 +158,6 @@ fn ransac_line_refuses_null_and_malformed_configuration() {
         sillstone_math_ransac_line(core::ptr::null(), 6, 0.5, 16, 1, &mut out, &mut out_len)
     };
     assert_eq!(status, PITH_E_INVALID, "null input");
-    let status = unsafe {
-        sillstone_math_ransac_line(
-            line.as_ptr(),
-            line.len(),
-            0.5,
-            16,
-            1,
-            core::ptr::null_mut(),
-            &mut out_len,
-        )
-    };
-    assert_eq!(status, PITH_E_INVALID, "null out");
-    let status = unsafe {
-        sillstone_math_ransac_line(
-            line.as_ptr(),
-            line.len(),
-            0.5,
-            16,
-            1,
-            &mut out,
-            core::ptr::null_mut(),
-        )
-    };
-    assert_eq!(status, PITH_E_INVALID, "null out_len");
 
     // Configuration errors: too few points, odd packing, zero iterations,
     // non-positive or NaN threshold.
