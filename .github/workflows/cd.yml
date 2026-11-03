@@ -345,6 +345,8 @@ jobs:
           packages-dir: sdk/python/dist/
           skip-existing: true
       - name: Publish npm package via Trusted Publisher
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           cd sdk/node
           TGZ=$(ls *.tgz | tail -1)
@@ -366,7 +368,34 @@ jobs:
           else
             npm publish "$TGZ" --access public --provenance
           fi
-      - name: Publish Java package to Maven Central
+
+  publish-java:
+    name: Publish Java package to Maven Central
+    needs: [package-sdks]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download packaged SDK artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: packaged-sdks
+          path: artifacts
+      - name: Organize downloaded SDK artifacts
+        shell: bash
+        run: |
+          mkdir -p sdk/java/target
+          find artifacts -name "*.jar" -exec cp {} sdk/java/target/ \;
+      - name: Set up JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: "temurin"
+          java-version: "25"
+          server-id: central
+          server-username: CENTRAL_PORTAL_USERNAME
+          server-password: CENTRAL_PORTAL_PASSWORD
+          gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+      - name: Deploy to Maven Central
         env:
           CENTRAL_PORTAL_USERNAME: ${{ secrets.CENTRAL_PORTAL_USERNAME }}
           CENTRAL_PORTAL_PASSWORD: ${{ secrets.CENTRAL_PORTAL_PASSWORD }}
@@ -374,9 +403,6 @@ jobs:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
         run: |
           if [ -z "$CENTRAL_PORTAL_USERNAME" ] || [ -z "$CENTRAL_PORTAL_PASSWORD" ] || [ -z "$MAVEN_GPG_PRIVATE_KEY" ]; then
-            # Never report a publish that did not happen: a stable release
-            # fails hard, a beta records an explicit SKIPPED notice instead of
-            # a green step that only ran `mvn package`.
             if [[ "${{ inputs.expected_version }}" != *-* ]]; then
               echo "::error title=Maven Central::CENTRAL_PORTAL_USERNAME/CENTRAL_PORTAL_PASSWORD/MAVEN_GPG_PRIVATE_KEY are not configured; refusing to release a stable version without the Java package."
               exit 1
@@ -388,9 +414,30 @@ jobs:
           echo "Deploying to Maven Central via the Central Portal..."
           cd sdk/java && mvn -B -Prelease deploy -DskipTests
 
+  publish-go:
+    name: Publish Go SDK & Module Tag
+    needs: [package-sdks]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Push Go module tag and index on proxy.golang.org
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="${{ inputs.expected_version }}"
+          TAG="sdk/go/v$V"
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "$TAG already exists"
+          else
+            git tag "$TAG" && git push origin "refs/tags/$TAG"
+          fi
+          echo "Triggering proxy.golang.org indexing for $TAG..."
+          curl -s "https://proxy.golang.org/github.com/n24q02m/sillstone/sdk/go/@v/v$V.info" || true
   release-gate:
     name: Release Gate & Registry Readback
-    needs: [publish]
+    needs: [publish, publish-java, publish-go]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
