@@ -1,7 +1,7 @@
-# pith calibrate — R5-N1 receipt (image lane)
+# sillstone calibrate — R5-N1 receipt (image lane)
 
 The default `dedup` profile ships because it reproduces, bit-for-bit, on
-the committed dataset below. `pith-hash-cli/tests/calibrate_receipt.rs`
+the committed dataset below. `crates/cli/tests/calibrate_receipt.rs`
 re-runs this receipt on every CI build: it regenerates the 16 BMPs with
 the documented fixture recipe, diffs the rebuilt `pairs.csv` against the
 committed one, and diffs both profile runs against the pinned
@@ -26,11 +26,11 @@ committed one, and diffs both profile runs against the pinned
 
 ```text
 cd lab/calibrate-receipt
-pith calibrate --profile dedup pairs.csv
-pith calibrate --profile search pairs.csv
+sillstone calibrate --profile dedup pairs.csv
+sillstone calibrate --profile search pairs.csv
 ```
 
-Pinned output (pith 0.1.0, Windows x86_64, debug profile — the receipt
+Pinned output (sillstone 0.1.0, Windows x86_64, debug profile — the receipt
 is integer math, so the build profile does not move it):
 
 ```receipt profile=dedup
@@ -41,7 +41,7 @@ score (f-beta): 0.972222
 precision: 1.000000
 recall: 0.875000
 counts: tp=14 fp=0 fn=2 tn=6
-# receipt: measured on pairs.csv with pith 0.1.0
+# receipt: measured on pairs.csv with sillstone 0.1.0
 ```
 
 ```receipt profile=search
@@ -52,7 +52,7 @@ score (f-beta): 0.987654
 precision: 0.941176
 recall: 1.000000
 counts: tp=16 fp=1 fn=0 tn=5
-# receipt: measured on pairs.csv with pith 0.1.0
+# receipt: measured on pairs.csv with sillstone 0.1.0
 ```
 
 ## Provenance

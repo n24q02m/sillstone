@@ -1,4 +1,4 @@
-//! Process-level tests of the `pith` binary: every subcommand, the
+//! Process-level tests of the `sillstone` binary: every subcommand, the
 //! `--json` shapes, the exit-code contract (0 answer · 1 refusal or
 //! non-match · 2 usage/io) and the error paths of the argument
 //! parser, driven through real fixture files in a temp directory.
@@ -13,7 +13,7 @@ use std::process::Command;
 use sillstone_cli::fixture;
 
 fn bin() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_pith"))
+    Command::new(env!("CARGO_BIN_EXE_sillstone"))
 }
 
 /// A private directory with deterministic fixtures written once per test.
@@ -25,7 +25,7 @@ struct TempDir(PathBuf);
 
 impl TempDir {
     fn new(tag: &str) -> Self {
-        let dir = std::env::temp_dir().join(format!("pith-cli-{tag}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("sillstone-cli-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("temp dir");
         Self(dir)
@@ -60,13 +60,13 @@ fn help_and_version_answer_zero() {
         let out = bin().args(&args).output().expect("spawn");
         assert!(out.status.success(), "{args:?}: {:?}", out.status);
         let text = String::from_utf8_lossy(&out.stdout);
-        assert!(text.contains("usage: pith"), "{args:?}: {text}");
+        assert!(text.contains("usage: sillstone"), "{args:?}: {text}");
         assert!(text.contains("describe"), "{args:?}: {text}");
     }
     let out = bin().arg("--version").output().expect("spawn");
     assert!(out.status.success());
     let text = String::from_utf8_lossy(&out.stdout);
-    assert!(text.starts_with("pith "), "{text}");
+    assert!(text.starts_with("sillstone "), "{text}");
 }
 
 #[test]
@@ -146,7 +146,7 @@ fn describe_json_and_per_command_help() {
         assert!(out.status.success(), "{cmd}: {out:?}");
         let text = String::from_utf8_lossy(&out.stdout);
         assert!(
-            text.contains(&format!("usage: pith {cmd}")),
+            text.contains(&format!("usage: sillstone {cmd}")),
             "{cmd}: {text}"
         );
     }
@@ -545,7 +545,7 @@ fn help_pos_arg_works_for_every_command() {
         assert!(out.status.success(), "{cmd} help: {out:?}");
         let text = String::from_utf8_lossy(&out.stdout);
         assert!(
-            text.contains(&format!("usage: pith {cmd}")),
+            text.contains(&format!("usage: sillstone {cmd}")),
             "{cmd}: {text}"
         );
     }

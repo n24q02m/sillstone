@@ -1,4 +1,4 @@
-//! Library core of the `pith` command line interface.
+//! Library core of the `sillstone` command line interface.
 //!
 //! The binary (`src/main.rs`) is a thin argument parser over this
 //! surface; every observable behavior lives here so tests can drive it
@@ -77,7 +77,7 @@ pub fn distance(a: &Signature, b: &Signature) -> Result<u32, sillstone_curator::
 }
 
 /// One line naming the score for a [`MatchOutcome`] — the
-/// `score: …` row of `pith match`.
+/// `score: …` row of `sillstone match`.
 #[must_use]
 pub fn score_line(outcome: &MatchOutcome) -> String {
     match outcome {
@@ -305,7 +305,7 @@ impl fmt::Display for Input {
 /// platform, always.
 pub mod fixture {
     /// SplitMix64: a counter-based PRNG — the suite's deterministic seed
-    /// expansion (`pith-primitives` uses the same recurrence).
+    /// expansion (`sillstone-primitives` uses the same recurrence).
     pub struct SplitMix64 {
         state: u64,
     }

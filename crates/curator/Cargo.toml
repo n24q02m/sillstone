@@ -4,7 +4,7 @@ path = "tools/gen-reference/main.rs"
 
 [package]
 name = "sillstone-curator"
-description = "The sillstone suite curator: detect, tier-1 content hash, tier-2 signatures, match, calibrate and the pith CLI."
+description = "The sillstone suite curator: detect, tier-1 content hash, tier-2 signatures, match, calibrate and the sillstone CLI."
 readme = "README.md"
 license = "Apache-2.0"
 categories = [ "algorithms", "cryptography",]

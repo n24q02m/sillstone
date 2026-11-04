@@ -1,4 +1,4 @@
-//! The R5-N1 calibrate receipt: `pith calibrate` must reproduce, from
+//! The R5-N1 calibrate receipt: `sillstone calibrate` must reproduce, from
 //! the committed dataset (`lab/calibrate-receipt/pairs.csv` + the
 //! regenerated BMPs), the exact threshold/receipt lines recorded in
 //! `lab/calibrate-receipt/README.md`.
@@ -99,12 +99,12 @@ fn dataset(write_out: bool, dir: &Path) -> (Vec<(String, Vec<u8>)>, String) {
 }
 
 fn run_calibrate(csv: &Path, profile: &str) -> String {
-    let out = Command::new(env!("CARGO_BIN_EXE_pith"))
+    let out = Command::new(env!("CARGO_BIN_EXE_sillstone"))
         .args(["calibrate", "--profile", profile])
         .arg("pairs.csv")
         .current_dir(csv.parent().expect("csv has a parent"))
         .output()
-        .expect("spawn pith");
+        .expect("spawn sillstone");
     assert!(
         out.status.success(),
         "{profile}: {:?}\n{}",
@@ -114,7 +114,7 @@ fn run_calibrate(csv: &Path, profile: &str) -> String {
     String::from_utf8_lossy(&out.stdout).trim().to_string()
 }
 
-const VERSION_MARK: &str = "with pith ";
+const VERSION_MARK: &str = "with sillstone ";
 
 /// Drops the version the receipt names, so the comparison covers the measured
 /// numbers; the version changes with every release and is checked on its own.
@@ -168,7 +168,7 @@ fn receipt_output_matches_pinned() {
         );
         assert!(
             live.ends_with(&format!("{VERSION_MARK}{}", env!("CARGO_PKG_VERSION"))),
-            "profile {profile}: receipt does not name the running pith version:\n{live}"
+            "profile {profile}: receipt does not name the running sillstone version:\n{live}"
         );
     }
 }

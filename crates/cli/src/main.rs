@@ -1,14 +1,14 @@
-//! The `pith` command line interface (design spec §4.5, phase P18).
+//! The `sillstone` command line interface (design spec §4.5, phase P18).
 //!
 //! Thin argument parsing over `sillstone_cli`'s library surface:
 //!
 //! ```text
-//! pith describe <file> [--json]
-//! pith hash <file> [--json]
-//! pith match <a> <b> [--json]
-//! pith dedup <dir> [--all] [--threshold N] [--json]
-//! pith bench [--iters N] [--json]
-//! pith calibrate <pairs.csv> --profile dedup|search [--json]
+//! sillstone describe <file> [--json]
+//! sillstone hash <file> [--json]
+//! sillstone match <a> <b> [--json]
+//! sillstone dedup <dir> [--all] [--threshold N] [--json]
+//! sillstone bench [--iters N] [--json]
+//! sillstone calibrate <pairs.csv> --profile dedup|search [--json]
 //! ```
 //!
 //! Exit codes (documented in `--help`): `0` ok · `1` pipeline refusal
@@ -45,7 +45,7 @@ fn main() -> ExitCode {
             OK
         }
         "version" | "--version" => {
-            println!("pith {}", env!("CARGO_PKG_VERSION"));
+            println!("sillstone {}", env!("CARGO_PKG_VERSION"));
             OK
         }
         "describe" => cmd_describe(&rest),
@@ -57,7 +57,7 @@ fn main() -> ExitCode {
         "digest" => cmd_digest(&rest),
         "image" => cmd_image(&rest),
         other => {
-            eprintln!("pith: unknown command `{other}`\n");
+            eprintln!("sillstone: unknown command `{other}`\n");
             eprint!("{USAGE_TEXT}");
             USAGE
         }
@@ -131,14 +131,14 @@ impl Opts {
 /// Reads `path` or explains the failure as a `USAGE` exit.
 fn must_read(path: &str) -> Result<Vec<u8>, u8> {
     std::fs::read(path).map_err(|e| {
-        eprintln!("pith: {path}: {e}");
+        eprintln!("sillstone: {path}: {e}");
         USAGE
     })
 }
 
 /// Prints a pipeline refusal to stderr in the modality-first spelling.
 fn refuse(cmd: &str, path: &str, e: &sillstone_curator::Error) -> u8 {
-    eprintln!("pith {cmd}: {path}: {e}");
+    eprintln!("sillstone {cmd}: {path}: {e}");
     FAILED
 }
 
@@ -147,7 +147,7 @@ fn refuse(cmd: &str, path: &str, e: &sillstone_curator::Error) -> u8 {
 // ---------------------------------------------------------------------
 
 const DESCRIBE_HELP: &str = "\
-usage: pith describe <file> [--json]
+usage: sillstone describe <file> [--json]
 
 Prints the three tiers for one input:
   tier1  SHA-256 over normalized content
@@ -162,7 +162,7 @@ exit: 0 ok | 1 refused | 2 usage/io
 
 fn cmd_describe(args: &[String]) -> u8 {
     let Ok(o) = Opts::parse(args).map_err(|e| {
-        eprintln!("pith describe: {e}");
+        eprintln!("sillstone describe: {e}");
     }) else {
         return USAGE;
     };
@@ -288,7 +288,7 @@ fn describe_json(path: &str, d: &sillstone_curator::Description) -> String {
 // ---------------------------------------------------------------------
 
 const HASH_HELP: &str = "\
-usage: pith hash <file> [--json]
+usage: sillstone hash <file> [--json]
 
 Prints the tier-1 canonical hash: SHA-256 over the normalized content
 (decoded pixels / downmixed PCM / canonical text / raw bytes).
@@ -298,7 +298,7 @@ exit: 0 ok | 1 refused | 2 usage/io
 
 fn cmd_hash(args: &[String]) -> u8 {
     let Ok(o) = Opts::parse(args).map_err(|e| {
-        eprintln!("pith hash: {e}");
+        eprintln!("sillstone hash: {e}");
     }) else {
         return USAGE;
     };
@@ -332,7 +332,7 @@ fn cmd_hash(args: &[String]) -> u8 {
 
 // ---------------------------------------------------------------------
 const DIGEST_HELP: &str = "\
-usage: pith digest <file> [--alg sha256|sha3-256|sha3-512|blake2b|blake3] [--json]
+usage: sillstone digest <file> [--alg sha256|sha3-256|sha3-512|blake2b|blake3] [--json]
 
 Computes cryptographic digest of raw file bytes using the specified algorithm (default sha256).
 
@@ -341,7 +341,7 @@ exit: 0 ok | 1 refused | 2 usage/io
 
 fn cmd_digest(args: &[String]) -> u8 {
     let Ok(o) = Opts::parse(args).map_err(|e| {
-        eprintln!("pith digest: {e}");
+        eprintln!("sillstone digest: {e}");
     }) else {
         return USAGE;
     };
@@ -366,7 +366,7 @@ fn cmd_digest(args: &[String]) -> u8 {
         }
         "blake3" => sillstone_digest::blake3(&bytes).map(|d| d.to_string()),
         other => {
-            eprintln!("pith digest: unknown algorithm `{other}`");
+            eprintln!("sillstone digest: unknown algorithm `{other}`");
             return USAGE;
         }
     };
@@ -386,14 +386,14 @@ fn cmd_digest(args: &[String]) -> u8 {
             OK
         }
         Err(e) => {
-            eprintln!("pith digest: {path}: {e}");
+            eprintln!("sillstone digest: {path}: {e}");
             FAILED
         }
     }
 }
 
 const IMAGE_HELP: &str = "\
-usage: pith image <file> [--alg phash|ahash|dhash|whash|colorhash] [--json]
+usage: sillstone image <file> [--alg phash|ahash|dhash|whash|colorhash] [--json]
 
 Computes perceptual image hash using the specified algorithm (default phash).
 
@@ -402,7 +402,7 @@ exit: 0 ok | 1 refused | 2 usage/io
 
 fn cmd_image(args: &[String]) -> u8 {
     let Ok(o) = Opts::parse(args).map_err(|e| {
-        eprintln!("pith image: {e}");
+        eprintln!("sillstone image: {e}");
     }) else {
         return USAGE;
     };
@@ -431,7 +431,7 @@ fn cmd_image(args: &[String]) -> u8 {
         "whash" => sillstone_image::image_whash(&img, 0),
         "colorhash" | "color-hash" => sillstone_image::image_colorhash(&img, 3),
         other => {
-            eprintln!("pith image: unknown algorithm `{other}`");
+            eprintln!("sillstone image: unknown algorithm `{other}`");
             return USAGE;
         }
     };
@@ -452,7 +452,7 @@ fn cmd_image(args: &[String]) -> u8 {
             OK
         }
         Err(e) => {
-            eprintln!("pith image: {path}: {e}");
+            eprintln!("sillstone image: {path}: {e}");
             FAILED
         }
     }
@@ -462,7 +462,7 @@ fn cmd_image(args: &[String]) -> u8 {
 // ---------------------------------------------------------------------
 
 const MATCH_HELP: &str = "\
-usage: pith match <a> <b> [--json]
+usage: sillstone match <a> <b> [--json]
 
 Scores two inputs' tier-2 signatures and prints the verdict decided by
 the modality's advisory bound.
@@ -472,7 +472,7 @@ exit: 0 matched | 1 not matched or refused | 2 usage/io
 
 fn cmd_match(args: &[String]) -> u8 {
     let Ok(o) = Opts::parse(args).map_err(|e| {
-        eprintln!("pith match: {e}");
+        eprintln!("sillstone match: {e}");
     }) else {
         return USAGE;
     };
@@ -530,7 +530,7 @@ fn cmd_match(args: &[String]) -> u8 {
 // ---------------------------------------------------------------------
 
 const DEDUP_HELP: &str = "\
-usage: pith dedup <dir> [--all] [--threshold N] [--json]
+usage: sillstone dedup <dir> [--all] [--threshold N] [--json]
 
 Clusters the regular files in <dir> (top level, sorted by name) by
 tier-2 signature. Groups of >= 2 print as `group N (exact)` — `exact`
@@ -544,7 +544,7 @@ exit: 0 ok (groups found or not) | 2 usage/io
 
 fn cmd_dedup(args: &[String]) -> u8 {
     let Ok(o) = Opts::parse(args).map_err(|e| {
-        eprintln!("pith dedup: {e}");
+        eprintln!("sillstone dedup: {e}");
     }) else {
         return USAGE;
     };
@@ -559,7 +559,7 @@ fn cmd_dedup(args: &[String]) -> u8 {
     let rd = match std::fs::read_dir(dir) {
         Ok(rd) => rd,
         Err(e) => {
-            eprintln!("pith dedup: {dir}: {e}");
+            eprintln!("sillstone dedup: {dir}: {e}");
             return USAGE;
         }
     };
@@ -579,7 +579,7 @@ fn cmd_dedup(args: &[String]) -> u8 {
                 bytes,
             }),
             Err(e) => {
-                eprintln!("pith dedup: {}: {e}", p.display());
+                eprintln!("sillstone dedup: {}: {e}", p.display());
             }
         }
     }
@@ -657,7 +657,7 @@ fn print_dedup(report: &DedupReport, inputs: &[Input], all: bool, json: bool) {
 // ---------------------------------------------------------------------
 
 const BENCH_HELP: &str = "\
-usage: pith bench [--iters N] [--json]
+usage: sillstone bench [--iters N] [--json]
 
 Measures tier-2 signature throughput per modality on deterministic
 generated fixtures (no corpus download). Numbers are wall-clock —
@@ -697,7 +697,7 @@ fn bench_cases() -> Vec<BenchCase> {
 
 fn cmd_bench(args: &[String]) -> u8 {
     let Ok(o) = Opts::parse(args).map_err(|e| {
-        eprintln!("pith bench: {e}");
+        eprintln!("sillstone bench: {e}");
     }) else {
         return USAGE;
     };
@@ -712,7 +712,7 @@ fn cmd_bench(args: &[String]) -> u8 {
         // Warm-up pass also validates the fixture: a refused input is a
         // bench bug, not a data point.
         if let Err(e) = sillstone_curator::signature(&case.bytes) {
-            eprintln!("pith bench: {} fixture refused: {e}", case.name);
+            eprintln!("sillstone bench: {} fixture refused: {e}", case.name);
             return FAILED;
         }
         let start = Instant::now();
@@ -763,7 +763,7 @@ fn cmd_bench(args: &[String]) -> u8 {
 // ---------------------------------------------------------------------
 
 const CALIBRATE_HELP: &str = "\
-usage: pith calibrate <pairs.csv> --profile dedup|search [--json]
+usage: sillstone calibrate <pairs.csv> --profile dedup|search [--json]
 
 pairs.csv: one labelled pair per line, `#` comments allowed:
     <path-a>,<path-b>,<label>       label in 1|0|true|false
@@ -791,7 +791,7 @@ fn parse_label(s: &str) -> Option<bool> {
 
 fn cmd_calibrate(args: &[String]) -> u8 {
     let Ok(o) = Opts::parse(args).map_err(|e| {
-        eprintln!("pith calibrate: {e}");
+        eprintln!("sillstone calibrate: {e}");
     }) else {
         return USAGE;
     };
@@ -807,12 +807,12 @@ fn cmd_calibrate(args: &[String]) -> u8 {
         "dedup" => sillstone_curator::Profile::Dedup,
         "search" => sillstone_curator::Profile::Search,
         other => {
-            eprintln!("pith calibrate: unknown --profile `{other}` (dedup|search)");
+            eprintln!("sillstone calibrate: unknown --profile `{other}` (dedup|search)");
             return USAGE;
         }
     };
     let Ok(text) = std::fs::read_to_string(file) else {
-        eprintln!("pith calibrate: {file}: unreadable");
+        eprintln!("sillstone calibrate: {file}: unreadable");
         return USAGE;
     };
     let mut seen_modality: Option<sillstone_curator::Modality> = None;
@@ -825,11 +825,11 @@ fn cmd_calibrate(args: &[String]) -> u8 {
         }
         let mut cells = line.split(',');
         let (Some(pa), Some(pb), Some(lab)) = (cells.next(), cells.next(), cells.next()) else {
-            eprintln!("pith calibrate: {file}:{}: expected 3 cells", ln + 1);
+            eprintln!("sillstone calibrate: {file}:{}: expected 3 cells", ln + 1);
             return USAGE;
         };
         let Some(label) = parse_label(lab) else {
-            eprintln!("pith calibrate: {file}:{}: bad label `{lab}`", ln + 1);
+            eprintln!("sillstone calibrate: {file}:{}: bad label `{lab}`", ln + 1);
             return USAGE;
         };
         let (Ok(a), Ok(b)) = (must_read(pa.trim()), must_read(pb.trim())) else {
@@ -845,7 +845,7 @@ fn cmd_calibrate(args: &[String]) -> u8 {
         };
         if sa.modality() != sb.modality() {
             eprintln!(
-                "pith calibrate: {file}:{}: modality mismatch ({} vs {})",
+                "sillstone calibrate: {file}:{}: modality mismatch ({} vs {})",
                 ln + 1,
                 sa.modality(),
                 sb.modality()
@@ -858,7 +858,7 @@ fn cmd_calibrate(args: &[String]) -> u8 {
             None => seen_modality = Some(sa.modality()),
             Some(m) if m != sa.modality() => {
                 eprintln!(
-                    "pith calibrate: {file}:{}: pair is {} but the set is {m} — one modality per dataset",
+                    "sillstone calibrate: {file}:{}: pair is {} but the set is {m} — one modality per dataset",
                     ln + 1,
                     sa.modality()
                 );
@@ -920,14 +920,14 @@ fn cmd_calibrate(args: &[String]) -> u8 {
                     cal.true_negatives
                 );
                 println!(
-                    "# receipt: measured on {file} with pith {}",
+                    "# receipt: measured on {file} with sillstone {}",
                     env!("CARGO_PKG_VERSION")
                 );
             }
             OK
         }
         Err(e) => {
-            eprintln!("pith calibrate: {file}: {e}");
+            eprintln!("sillstone calibrate: {file}: {e}");
             FAILED
         }
     }
@@ -938,9 +938,9 @@ fn cmd_calibrate(args: &[String]) -> u8 {
 // ---------------------------------------------------------------------
 
 const USAGE_TEXT: &str = "\
-pith - zero-dependency perceptual and content hashing suite
+sillstone - zero-dependency perceptual and content hashing suite
 
-usage: pith <command> [args] [--json]
+usage: sillstone <command> [args] [--json]
 
 commands:
   describe <file>     print all three tiers for one input
@@ -953,7 +953,7 @@ commands:
 
 options:
   --json        machine-readable output where defined
-  --help        per-command usage (pith <command> --help)
+  --help        per-command usage (sillstone <command> --help)
   --all         dedup: also list singleton files
   --threshold   dedup: scalar distance bound instead of the advisory verdict
   --profile     calibrate: dedup (F0.5) or search (F2)
