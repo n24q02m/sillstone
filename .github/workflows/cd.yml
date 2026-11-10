@@ -450,6 +450,13 @@ jobs:
             echo "### Maven Central: SKIPPED (no Central Portal token or GPG key), nothing was published" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
+          VERSION="${{ inputs.expected_version }}"
+          if [ -n "$VERSION" ] && curl -fsS -o /dev/null \
+            "https://repo1.maven.org/maven2/io/github/n24q02m/sillstone/${VERSION}/sillstone-${VERSION}.pom"; then
+            echo "::notice title=Maven Central::sillstone ${VERSION} is already on Maven Central; skipping the deploy"
+            echo "### Maven Central: already published (${VERSION})" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           echo "Deploying to Maven Central via the Central Portal..."
           cd sdk/java && mvn -B -Prelease deploy -DskipTests
 
