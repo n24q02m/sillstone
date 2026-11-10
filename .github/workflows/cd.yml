@@ -14,7 +14,7 @@ on:
         description: "Expected version to publish (e.g. 0.2.1)"
         required: false
         type: string
-        default: "0.3.1-beta.1"
+        default: "0.3.1-beta.2"
 
 env:
   RELEASE_TYPE: ${{ inputs.release_type }}
@@ -448,6 +448,13 @@ jobs:
             fi
             echo "::warning title=Maven Central SKIPPED::Central Portal token or GPG key is not configured; sillstone-java ${{ inputs.expected_version }} was NOT published."
             echo "### Maven Central: SKIPPED (no Central Portal token or GPG key), nothing was published" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          VERSION="${{ inputs.expected_version }}"
+          if [ -n "$VERSION" ] && curl -fsS -o /dev/null \
+            "https://repo1.maven.org/maven2/io/github/n24q02m/sillstone/${VERSION}/sillstone-${VERSION}.pom"; then
+            echo "::notice title=Maven Central::sillstone ${VERSION} is already on Maven Central; skipping the deploy"
+            echo "### Maven Central: already published (${VERSION})" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           echo "Deploying to Maven Central via the Central Portal..."
