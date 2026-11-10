@@ -1,7 +1,5 @@
 //! C-ABI exports for high-performance Tensor operations.
 
-use crate::tensor::Tensor;
-
 const PITH_OK: i32 = 0;
 const PITH_E_INVALID: i32 = -1;
 const PITH_E_REJECTED: i32 = -2;
@@ -30,32 +28,18 @@ pub unsafe extern "C" fn sillstone_tensor_matmul_f64(
         return PITH_E_REJECTED;
     }
 
-    let (Some(a_len), Some(b_len), Some(out_len)) = (m.checked_mul(k1), k2.checked_mul(n), m.checked_mul(n)) else {
+    let (Some(a_len), Some(b_len), Some(out_len)) =
+        (m.checked_mul(k1), k2.checked_mul(n), m.checked_mul(n))
+    else {
         return PITH_E_INVALID;
     };
     let a_slice = unsafe { core::slice::from_raw_parts(a, a_len) };
     let b_slice = unsafe { core::slice::from_raw_parts(b, b_len) };
     let out_slice = unsafe { core::slice::from_raw_parts_mut(out, out_len) };
 
-    let tensor_a: Tensor<f64> = match Tensor::from_vec(alloc::vec![m, k1], a_slice.to_vec()) {
-        Ok(t) => t,
-        Err(_) => return PITH_E_REJECTED,
-    };
-    let tensor_b: Tensor<f64> = match Tensor::from_vec(alloc::vec![k2, n], b_slice.to_vec()) {
-        Ok(t) => t,
-        Err(_) => return PITH_E_REJECTED,
-    };
-
-    let res = match tensor_a.matmul(&tensor_b) {
-        Ok(t) => t,
-        Err(_) => return PITH_E_REJECTED,
-    };
-
-    if let Some(res_slice) = res.as_slice() {
-        out_slice.copy_from_slice(res_slice);
-        PITH_OK
-    } else {
-        PITH_E_REJECTED
+    match crate::linalg::gemm_into(a_slice, m, k1, b_slice, n, out_slice) {
+        Ok(()) => PITH_OK,
+        Err(_) => PITH_E_REJECTED,
     }
 }
 
@@ -92,11 +76,7 @@ pub unsafe extern "C" fn sillstone_tensor_add_f64(
 /// `a` must be valid for reads of `len` `f64`s and `out` must be valid for a write of
 /// one `f64`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn sillstone_tensor_sum_f64(
-    a: *const f64,
-    len: usize,
-    out: *mut f64,
-) -> i32 {
+pub unsafe extern "C" fn sillstone_tensor_sum_f64(a: *const f64, len: usize, out: *mut f64) -> i32 {
     if a.is_null() || out.is_null() {
         return PITH_E_INVALID;
     }
