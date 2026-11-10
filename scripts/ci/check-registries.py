@@ -49,6 +49,10 @@ def _load_contents_gate():
 pc = _load_contents_gate()
 CONTENT_PLATFORMS = list(pc.PLATFORMS)
 CONTENT_FROM = (0, 2, 0)
+# First release that publishes the Python sdist. 0.3.1-beta.1 is already on
+# PyPI as wheels only and PyPI freezes a release's file set, so the requirement
+# starts with the next release rather than failing a version that cannot change.
+SDIST_FROM = (0, 3, 2)
 # First release whose npm tarball must carry README.md and LICENSE (0.3.0 and
 # earlier were published without them and stay as they are).
 NPM_DOCS_FROM = (0, 3, 1)
@@ -163,6 +167,21 @@ def _wheel_contents(name: str, files: list[dict], get: Fetch) -> list[str]:
         return pc.check_wheels(paths, CONTENT_PLATFORMS, _stem(name))
 
 
+def _sdist_contents(name: str, files: list[dict], get: Fetch) -> list[str]:
+    """A release publishes its sdist beside the wheels: the sdist is the only
+    route on a platform the wheel matrix does not cover, so it has to be on the
+    registry and has to carry the Rust workspace that makes it installable."""
+    sdists = [f for f in files if f.get("packagetype") == "sdist" and not f.get("yanked")]
+    if not sdists:
+        return [f"no sdist is published for {name}; a platform outside the wheel matrix cannot install it"]
+    with tempfile.TemporaryDirectory() as tmp:
+        path = pathlib.Path(tmp) / pathlib.PurePosixPath(sdists[0]["filename"]).name
+        err = _download(get, sdists[0].get("url", ""), path)
+        if err:
+            return [err]
+        return pc.check_sdist(path)
+
+
 def check_pypi(name: str, version: str, get: Fetch, content: bool = False) -> list[str]:
     url = f"https://pypi.org/pypi/{name}/json"
     doc, err = _json(*get(url), url)
@@ -186,6 +205,8 @@ def check_pypi(name: str, version: str, get: Fetch, content: bool = False) -> li
         problems.append(f"current version is {info.get('version')!r}, expected {version}")
     if content:
         problems += _wheel_contents(name, files, get)
+        if _core_version(version) >= SDIST_FROM:
+            problems += _sdist_contents(name, files, get)
     return problems
 
 

@@ -20,5 +20,10 @@ classifiers = [
 Homepage = "https://github.com/n24q02m/sillstone"
 Repository = "https://github.com/n24q02m/sillstone"
 
+[tool.setuptools]
+# Explicit: the sdist stages the Rust workspace as `rust/` beside the package and
+# flat-layout autodiscovery refuses two top-level directories.
+packages = ["sillstone"]
+
 [tool.setuptools.package-data]
 sillstone = ["*.dll", "*.so", "*.dylib"]

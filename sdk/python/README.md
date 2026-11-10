@@ -10,6 +10,33 @@ Sillstone provides verified, zero-dependency implementations of hashing, codecs,
 - **Single ABI definition:** Cross-language interfaces are deterministically generated from machine-readable IDL.
 - **Formally verified & cross-checked:** Implementations are validated against CAVP, RFC, and standard test vectors.
 
+## Installation
+
+```console
+pip install sillstone
+```
+
+Wheels are published for linux-x64, linux-arm64, darwin-arm64, darwin-x64 and
+win32-x64. Each carries the Rust `cdylib` and needs no toolchain.
+
+Every release also publishes a source distribution. Installing it compiles the
+same library from the Rust workspace inside the archive, so that route needs a
+Rust toolchain (`cargo`, <https://rustup.rs>); the workspace has no third-party
+dependencies, so the build itself needs no network:
+
+```console
+pip install --no-binary :all: sillstone
+```
+
+Without a Rust toolchain, force a wheel instead:
+
+```console
+pip install --only-binary :all: sillstone
+```
+
+The sdist carries no prebuilt library — one binary cannot serve five platforms —
+so the platform you install on is the one that gets compiled.
+
 ## Crates
 
 | Layer | Crate | Description |

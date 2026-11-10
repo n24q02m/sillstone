@@ -9,8 +9,10 @@ Run: python -m unittest scripts/ci/test_check_registries.py
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import pathlib
+import tarfile
 import unittest
 from unittest import mock
 
@@ -106,6 +108,72 @@ class PypiTests(unittest.TestCase):
     def test_empty_release_fails(self):
         empty = {"info": {"name": "sillstone", "version": "0.2.0b1"}, "releases": {"0.2.0b1": []}}
         self.assertTrue(cr.check_pypi("sillstone", "0.2.0-beta.1", fake({self.URL: (200, empty)})))
+
+
+class PypiSdistTests(unittest.TestCase):
+    """Content mode must notice a release that published wheels only: the sdist
+    is the only route on a platform outside the matrix, so it cannot be skipped."""
+
+    URL = "https://pypi.org/pypi/sillstone/json"
+    SDIST_URL = "https://files.example/sillstone-0.3.2b1.tar.gz"
+
+    def release(self, files: list[dict]) -> dict:
+        return {"info": {"name": "sillstone", "version": "0.3.2b1"}, "releases": {"0.3.2b1": files}}
+
+    def sdist_bytes(self, entries: list[str]) -> bytes:
+        buffer = io.BytesIO()
+        with tarfile.open(fileobj=buffer, mode="w:gz") as t:
+            for name in entries:
+                info = tarfile.TarInfo(f"sillstone-0.3.2b1/{name}")
+                info.size = 1
+                t.addfile(info, io.BytesIO(b"x"))
+        return buffer.getvalue()
+
+    def served(self, files: list[dict], blobs: dict[str, bytes] | None = None):
+        blobs = blobs or {}
+
+        def get(url: str):
+            if url in blobs:
+                return 200, blobs[url]
+            if url == self.URL:
+                return 200, json.dumps(self.release(files)).encode()
+            return 404, b""
+
+        return get
+
+    def test_wheels_only_release_fails(self):
+        # A yanked wheel keeps the release non-empty while leaving no wheel to
+        # inspect, so the sdist requirement is what answers.
+        files = [{"packagetype": "bdist_wheel", "yanked": True, "filename": "sillstone-0.3.2b1-py3-none-win_amd64.whl"}]
+        problems = cr.check_pypi("sillstone", "0.3.2-beta.1", self.served(files), content=True)
+        self.assertTrue(any("no sdist is published" in p for p in problems))
+
+    def test_sdist_without_the_rust_workspace_fails(self):
+        files = [
+            {
+                "packagetype": "sdist",
+                "yanked": False,
+                "filename": "sillstone-0.3.2b1.tar.gz",
+                "url": self.SDIST_URL,
+            }
+        ]
+        blob = self.sdist_bytes(["pyproject.toml", "setup.py", "sillstone/__init__.py"])
+        problems = cr.check_pypi("sillstone", "0.3.2-beta.1", self.served(files, {self.SDIST_URL: blob}), content=True)
+        self.assertTrue(any("rust/Cargo.toml" in p for p in problems))
+
+    def test_old_releases_are_not_required_to_have_one(self):
+        doc = {"info": {"name": "sillstone", "version": "0.2.0b1"}, "releases": {"0.2.0b1": []}}
+        problems = cr.check_pypi("sillstone", "0.2.0-beta.1", fake({self.URL: (200, doc)}), content=True)
+        self.assertFalse(any("sdist" in p for p in problems))
+
+    def test_the_already_published_0_3_1_release_is_exempt(self):
+        # 0.3.1-beta.1 went out as wheels only and PyPI freezes a release's
+        # files, so failing it here would fail a release that cannot change.
+        doc = {"info": {"name": "sillstone", "version": "0.3.1b1"}, "releases": {"0.3.1b1": [
+            {"packagetype": "bdist_wheel", "yanked": True, "filename": "sillstone-0.3.1b1-py3-none-win_amd64.whl"}
+        ]}}
+        problems = cr.check_pypi("sillstone", "0.3.1-beta.1", fake({self.URL: (200, doc)}), content=True)
+        self.assertFalse(any("no sdist is published" in p for p in problems))
 
 
 class NpmTests(unittest.TestCase):
