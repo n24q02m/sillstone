@@ -1,6 +1,6 @@
 {
   "name": "sillstone",
-  "version": "0.3.1-beta.1",
+  "version": "0.3.1-beta.2",
   "description": "Pure-Rust zero-dependency multimedia, hashing, and array computing suite",
   "main": "index.js",
   "files": [
