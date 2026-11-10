@@ -249,6 +249,176 @@ def main() -> int:
     )
     conv("CMYK", "RGB", len(cmyk_lat) // 4, 1, cmyk_lat, "lattice")
 
+    # ------------------------------------------------- closing the gaps
+    # These cases were added for the Pillow-parity closure pass; every one
+    # pins a behaviour the earlier corpus did not exercise.
+
+    # (a) `F` rasters with `reducing_gap`. Pillow reduces mode `F` through
+    # `ImagingReduceNxN_32bpc`, whose per-block sum is `float` arithmetic
+    # grouped 2x2 with a `double` accumulator and a `1.0/n` multiplier -
+    # not an exact f64 mean. An f64 mean is off by one ULP on about a
+    # tenth of the pixels.
+    for (w, h, ow, oh, gap) in [
+        (23, 41, 8, 5, 1.1),
+        (100, 41, 12, 11, 2.0),
+        (64, 64, 5, 5, 3.0),
+        (40, 13, 9, 30, 2.5),
+        (41, 100, 11, 12, 2.0),
+        (3, 400, 2, 20, 2.0),  # tall: the two-step rule after the reduction
+    ]:
+        af = np.array(
+            [rng.uniform(-1e6, 1e6) for _ in range(w * h)], dtype="<f4"
+        ).tobytes()
+        src = make_image("F", w, h, af)
+        for fname in ("box", "bilinear", "bicubic", "lanczos"):
+            out = src.resize((ow, oh), FILTERS[fname], reducing_gap=gap)
+            cases.append(rec(
+                id=f"resize-gap/F/{fname}/{w}x{h}->{ow}x{oh}/g{gap}", op="resize",
+                mode="F", w=w, h=h, ow=ow, oh=oh, filter=fname, gap=gap,
+                input=af.hex(), expected=to_bytes(out).hex(),
+            ))
+    # `Nearest` ignores the gap (Pillow reduces nothing on that path).
+    af = np.array([rng.uniform(-10, 10) for _ in range(12 * 9)], dtype="<f4").tobytes()
+    out = make_image("F", 12, 9, af).resize((5, 4), R.NEAREST, reducing_gap=3.0)
+    cases.append(rec(
+        id="resize-gap/F/nearest/12x9->5x4/g3.0", op="resize", mode="F", w=12, h=9,
+        ow=5, oh=4, filter="nearest", gap=3.0, input=af.hex(),
+        expected=to_bytes(out).hex(),
+    ))
+
+    # (b) `F` identity and `reduce`-free shapes: Pillow returns a copy for a
+    # same-size resize even with a gap.
+    af = np.array([rng.uniform(-5, 5) for _ in range(9 * 7)], dtype="<f4").tobytes()
+    out = make_image("F", 9, 7, af).resize((9, 7), R.LANCZOS, reducing_gap=4.0)
+    cases.append(rec(
+        id="resize-gap/F/lanczos/9x7->9x7/g4.0", op="resize", mode="F", w=9, h=7,
+        ow=9, oh=7, filter="lanczos", gap=4.0, input=af.hex(),
+        expected=to_bytes(out).hex(),
+    ))
+
+    # (c) `LA` with `reducing_gap`: alpha layouts forward the gap to the
+    # premultiplied inner resize (Pillow 13).
+    for (w, h, ow, oh, gap) in [(67, 53, 9, 7, 2.0), (100, 41, 12, 11, 3.0)]:
+        raw = content(rng, "LA", w, h)
+        src = make_image("LA", w, h, raw)
+        for fname in ("box", "bilinear", "bicubic", "lanczos"):
+            out = src.resize((ow, oh), FILTERS[fname], reducing_gap=gap)
+            cases.append(rec(
+                id=f"resize-gap/LA/{fname}/{w}x{h}->{ow}x{oh}/g{gap}", op="resize",
+                mode="LA", w=w, h=h, ow=ow, oh=oh, filter=fname, gap=gap,
+                input=raw.hex(), expected=to_bytes(out).hex(),
+            ))
+
+    # (d) A gap just above 1.0 leaves the factor at 1 on one axis, so the
+    # `_get_safe_box` rectangle is truncated (`int`) while its far edge is
+    # `ceil`ed. It also exercises the asymmetric (fx != fy) reduction.
+    for gap in (1.1, 1.25, 1.5):
+        raw = noise(rng, 40 * 30)
+        src = make_image("L", 40, 30, raw)
+        for fname in ("bilinear", "lanczos"):
+            out = src.resize((10, 8), FILTERS[fname], reducing_gap=gap)
+            cases.append(rec(
+                id=f"resize-gap/L/{fname}/40x30->10x8/g{gap}", op="resize", mode="L",
+                w=40, h=30, ow=10, oh=8, filter=fname, gap=gap, input=raw.hex(),
+                expected=to_bytes(out).hex(),
+            ))
+
+    # (e) `Box` at exact integer ratios, where the half-open kernel window
+    # (`-0.5 < x <= 0.5`) sits on a block boundary, plus a box upscale.
+    for mode in ("L", "RGB", "RGBA"):
+        for (w, h, ow, oh) in [(64, 64, 8, 8), (15, 15, 5, 5), (100, 99, 10, 9),
+                               (5, 5, 10, 10)]:
+            raw = content(rng, mode, w, h)
+            out = make_image(mode, w, h, raw).resize((ow, oh), R.BOX)
+            cases.append(rec(
+                id=f"resize-box/{mode}/{w}x{h}->{ow}x{oh}", op="resize", mode=mode,
+                w=w, h=h, ow=ow, oh=oh, filter="box", input=raw.hex(),
+                expected=to_bytes(out).hex(),
+            ))
+
+    # (f) Same-size resize is a copy, with and without a gap.
+    raw = noise(rng, 12 * 9)
+    src = make_image("L", 12, 9, raw)
+    for fname, gap in (("lanczos", None), ("box", 2.0)):
+        out = src.resize((12, 9), FILTERS[fname], reducing_gap=gap)
+        cases.append(rec(
+            id=f"resize-identity/L/{fname}/12x9/g{gap}", op="resize", mode="L",
+            w=12, h=9, ow=12, oh=9, filter=fname, gap=gap, input=raw.hex(),
+            expected=to_bytes(out).hex(),
+        ))
+    raw = noise(rng, 12 * 9 * 4)
+    out = make_image("RGBA", 12, 9, raw).resize((12, 9), R.BICUBIC, reducing_gap=2.0)
+    cases.append(rec(
+        id="resize-identity/RGBA/bicubic/12x9/g2.0", op="resize", mode="RGBA",
+        w=12, h=9, ow=12, oh=9, filter="bicubic", gap=2.0, input=raw.hex(),
+        expected=to_bytes(out).hex(),
+    ))
+
+    # (g) Single-row / single-column rasters, where one axis needs no pass.
+    for mode, (w, h, ow, oh), gap in [
+        ("L", (1, 17, 3, 5), None),
+        ("L", (17, 1, 5, 3), None),
+        ("RGB", (1, 9, 2, 4), 2.0),
+        ("RGBA", (9, 1, 4, 2), None),
+        ("I;16", (1, 17, 3, 5), None),
+        ("F", (17, 1, 5, 3), None),
+    ]:
+        if mode == "I;16":
+            raw = np.array(
+                [rng.randrange(65536) for _ in range(w * h)], dtype="<u2"
+            ).tobytes()
+        elif mode == "F":
+            raw = np.array(
+                [rng.uniform(-1e3, 1e3) for _ in range(w * h)], dtype="<f4"
+            ).tobytes()
+        else:
+            raw = content(rng, mode, w, h)
+        src = make_image(mode, w, h, raw)
+        for fname in ("box", "bilinear", "lanczos"):
+            out = (src.resize((ow, oh), FILTERS[fname], reducing_gap=gap) if gap
+                   else src.resize((ow, oh), FILTERS[fname]))
+            cases.append(rec(
+                id=f"resize-thin/{mode}/{fname}/{w}x{h}->{ow}x{oh}", op="resize",
+                mode=mode, w=w, h=h, ow=ow, oh=oh, filter=fname, gap=gap,
+                input=raw.hex(), expected=to_bytes(out).hex(),
+            ))
+
+    # (h) 16-bit resize with a gap of exactly 1.0: no factor exceeds 1, so
+    # Pillow never reaches `Image.reduce` (which refuses `I;16`).
+    raw = noise(rng, 9 * 7 * 2)
+    out = make_image("I;16", 9, 7, raw).resize((8, 6), R.BILINEAR, reducing_gap=1.0)
+    cases.append(rec(
+        id="resize-gap/I;16/bilinear/9x7->8x6/g1.0", op="resize", mode="I;16",
+        w=9, h=7, ow=8, oh=6, filter="bilinear", gap=1.0, input=raw.hex(),
+        expected=to_bytes(out).hex(),
+    ))
+
+    # (i) `reduce` of alpha layouts with transparent corners: premultiply,
+    # the integer average, then unpremultiply.
+    for mode, (w, h, fx, fy) in (("RGBA", (12, 10, 2, 2)), ("LA", (12, 10, 3, 2))):
+        raw = alpha_stress(rng, w, h, mode)
+        out = make_image(mode, w, h, raw).reduce((fx, fy))
+        cases.append(rec(
+            id=f"reduce/{mode}/{w}x{h}/f{fx}x{fy}/alpha-corners", op="reduce",
+            mode=mode, w=w, h=h, ow=fx, oh=fy, input=raw.hex(),
+            expected=to_bytes(out).hex(),
+        ))
+
+    # (j) Premultiply, exhaustively, in the four-channel layout: every
+    # (colour, alpha) pair twice across a row, so `reduce((2, 1))` averages
+    # the pair to itself and the output is `unpremultiply(premultiply(c, a))`
+    # for all three colour channels.
+    raw = bytearray()
+    for c in range(256):
+        for a in range(256):
+            raw += bytes([c, c, c, a, c, c, c, a])
+    raw = bytes(raw)
+    out = make_image("RGBA", 512, 256, raw).reduce((2, 1))
+    cases.append(rec(
+        id="reduce/RGBA/premultiply-exhaustive", op="reduce", mode="RGBA",
+        w=512, h=256, ow=2, oh=1, input=raw.hex(), expected=to_bytes(out).hex(),
+    ))
+
     meta = {
         "_provenance": {
             "generator": "scripts/golden/gen_pillow_golden.py",

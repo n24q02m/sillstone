@@ -4,8 +4,8 @@
 //! truncation.
 
 use sillstone_image::raster::{
-    Cmyk, Gray, Image, La, Rgb, Rgba, cmyk_to_rgb, luma_bt601, rgb_to_cmyk, rgb_to_ycbcr,
-    rgb_to_yuv420p_pixel, ycbcr_to_rgb, yuv420p_to_rgb_pixel,
+    Cmyk, Gray, Image, La, Rgb, Rgba, cmyk_to_rgb, luma_bt601, rgb_to_cmyk, rgb_to_l,
+    rgb_to_ycbcr, rgb_to_yuv420p_pixel, ycbcr_to_rgb, yuv420p_to_rgb_pixel,
 };
 
 #[test]
@@ -129,4 +129,49 @@ fn image_layout_conversions() {
     let cmyk: Image<Cmyk> = Image::from_vec(1, 1, vec![0, 255, 255, 0]).unwrap(); // Red in CMYK (C=0, M=255, Y=255, K=0)
     let cmyk_rgb = cmyk.to_rgb();
     assert_eq!(cmyk_rgb.as_slice(), &[255, 0, 0]);
+}
+
+/// The convert path and the pHash oracle use *different* luma formulas, and
+/// that is deliberate: Pillow's `convert("L")` is the fixed-point form, the
+/// modhash pHash oracle is the exact rational BT.601 form. They disagree by
+/// one on 9040 of the 16 777 216 sRGB triples — `(0, 0, 250)` is the
+/// smallest witness. Both numbers are pinned so that "unifying" the two
+/// formulas cannot silently move `phash` or `convert`.
+#[test]
+fn the_two_luma_formulas_differ_and_are_pinned() {
+    let (r, g, b) = (0u8, 0, 250);
+    assert_eq!(luma_bt601(r, g, b), 29, "rational BT.601 rounds 28.5 up");
+    assert_eq!(rgb_to_l(r, g, b), 28, "Pillow's fixed point truncates");
+    // A triple both agree on, so the test cannot pass by accident.
+    assert_eq!(luma_bt601(255u8, 0, 0), rgb_to_l(255, 0, 0));
+}
+
+/// `Image<Rgb>::to_gray` / `Image<Rgba>::to_gray` of `u8` samples are
+/// Pillow's `convert("L")`, i.e. [`rgb_to_l`], not [`luma_bt601`].
+#[test]
+fn to_gray_uses_the_pillow_luma_for_8_bit() {
+    let triples = [(0u8, 0u8, 250u8), (17, 200, 3), (255, 128, 64)];
+    let mut rgb = Vec::new();
+    for (r, g, b) in triples {
+        rgb.extend_from_slice(&[r, g, b]);
+    }
+    let img: Image<Rgb> = Image::from_vec(triples.len() as u32, 1, rgb).unwrap();
+    let want: Vec<u8> = triples.iter().map(|&(r, g, b)| rgb_to_l(r, g, b)).collect();
+    assert_eq!(img.to_gray().as_slice(), want.as_slice());
+
+    let mut rgba = Vec::new();
+    for (r, g, b) in triples {
+        rgba.extend_from_slice(&[r, g, b, 0]); // alpha is dropped
+    }
+    let img: Image<Rgba> = Image::from_vec(triples.len() as u32, 1, rgba).unwrap();
+    assert_eq!(img.to_gray().as_slice(), want.as_slice());
+}
+
+/// `u16` has no Pillow RGB mode to match (`I;16` is single channel and
+/// `convert("L")` is 8-bit), so the 16-bit `to_gray` keeps the
+/// range-general BT.601 form.
+#[test]
+fn to_gray_u16_keeps_the_range_general_bt601() {
+    let img: Image<Rgb, u16> = Image::from_vec(2, 1, vec![65535, 65535, 65535, 0, 0, 999]).unwrap();
+    assert_eq!(img.to_gray().as_slice(), &[65535, 114]);
 }

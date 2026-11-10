@@ -1,7 +1,8 @@
 //! Resampling: Pillow-compatible convolution resizing and the integer box
 //! average used by the perceptual hashes.
 //!
-//! [`resize`] / [`resize_with_gap`] / [`resize_f32`] / [`reduce`] reproduce
+//! [`resize`] / [`resize_with_gap`] / [`resize_f32`] /
+//! [`resize_f32_with_gap`] / [`reduce`] reproduce
 //! Pillow's `Image.resize`, `Image.resize(reducing_gap=...)` and
 //! `Image.reduce` (see `pillow.rs` for the fixed-point kernels), including
 //! the premultiplied-alpha handling of `RGBA` / `LA`.
@@ -235,6 +236,57 @@ fn resize_box<T: Sample>(
     out.into_iter().map(|v| T::from_u64(v as u64)).collect()
 }
 
+/// Pillow's `reducing_gap` pre-reduction plan for a whole-image resize:
+/// the integer factors `(fx, fy)` and the safe source rectangle
+/// `_get_safe_box` keeps. `None` when the gap does not reduce (factor 1
+/// on both axes, `Nearest`, or no gap).
+///
+/// `Image.resize` computes `int((box[2] - box[0]) / size[0] /
+/// reducing_gap) or 1` per axis, then `_get_safe_box` grows the region by
+/// `_filters_support[f] - 0.5` output-scale supports before the integer
+/// reduction.
+fn gap_plan(
+    in_w: usize,
+    in_h: usize,
+    out_w: usize,
+    out_h: usize,
+    filter: ResamplingFilter,
+    reducing_gap: Option<f64>,
+) -> Option<(usize, usize, [usize; 4])> {
+    let gap = reducing_gap?;
+    if filter == ResamplingFilter::Nearest {
+        return None;
+    }
+    // C `int(x) or 1`: truncation, and a zero factor becomes 1.
+    let fx = ((in_w as f64 / out_w as f64 / gap) as usize).max(1);
+    let fy = ((in_h as f64 / out_h as f64 / gap) as usize).max(1);
+    if fx == 1 && fy == 1 {
+        return None;
+    }
+    let support = safe_box_support(filter);
+    let sx = support * in_w as f64 / out_w as f64;
+    let sy = support * in_h as f64 / out_h as f64;
+    // `_get_safe_box`: `int()` truncates, `math.ceil` rounds up.
+    let rb = [
+        0,
+        0,
+        ((in_w as f64 + sx).ceil() as usize).min(in_w),
+        ((in_h as f64 + sy).ceil() as usize).min(in_h),
+    ];
+    Some((fx, fy, rb))
+}
+
+/// The pre-reduced source rectangle as Pillow rewrites `box` after the
+/// reduction: `(box - reduce_box) / factor`.
+fn gap_box(rb: [usize; 4], fx: usize, fy: usize, w: usize, h: usize) -> [f64; 4] {
+    [
+        0.0,
+        0.0,
+        (w - rb[0]) as f64 / fx as f64,
+        (h - rb[1]) as f64 / fy as f64,
+    ]
+}
+
 /// Pillow's `reducing_gap` pre-reduction followed by the resize
 /// (`Image.resize` after the premultiply step).
 fn resize_reduced<L: Layout, T: Sample>(
@@ -249,31 +301,11 @@ fn resize_reduced<L: Layout, T: Sample>(
     let mut bx = [0.0, 0.0, w as f64, h as f64];
     let mut cur = Cow::Borrowed(img.as_slice());
 
-    if let (Some(gap), true) = (reducing_gap, filter != ResamplingFilter::Nearest) {
-        // C `int(x) or 1`: truncation, and a zero factor becomes 1.
-        let fx = (((bx[2] - bx[0]) / out_w as f64 / gap) as usize).max(1);
-        let fy = (((bx[3] - bx[1]) / out_h as f64 / gap) as usize).max(1);
-        if fx > 1 || fy > 1 {
-            let support = safe_box_support(filter);
-            let sx = support * (bx[2] - bx[0]) / out_w as f64;
-            let sy = support * (bx[3] - bx[1]) / out_h as f64;
-            // `_get_safe_box`: `int()` truncates, `math.ceil` rounds up.
-            let rb = [
-                ((bx[0] - sx) as i64).max(0) as usize,
-                ((bx[1] - sy) as i64).max(0) as usize,
-                ((bx[2] + sx).ceil() as usize).min(w),
-                ((bx[3] + sy).ceil() as usize).min(h),
-            ];
-            let (reduced, rw, rh) = reduce_region(&cur, w, c, rb, fx, fy);
-            bx = [
-                (bx[0] - rb[0] as f64) / fx as f64,
-                (bx[1] - rb[1] as f64) / fy as f64,
-                (bx[2] - rb[0] as f64) / fx as f64,
-                (bx[3] - rb[1] as f64) / fy as f64,
-            ];
-            cur = Cow::Owned(reduced);
-            (w, h) = (rw, rh);
-        }
+    if let Some((fx, fy, rb)) = gap_plan(w, h, out_w, out_h, filter, reducing_gap) {
+        let (reduced, rw, rh) = reduce_region(&cur, w, c, rb, fx, fy);
+        bx = gap_box(rb, fx, fy, w, h);
+        cur = Cow::Owned(reduced);
+        (w, h) = (rw, rh);
     }
 
     let out = if h > w * 100 && out_h < h {
@@ -386,8 +418,122 @@ pub fn resize_f32(
     out_h: u32,
     filter: ResamplingFilter,
 ) -> Result<Vec<f32>> {
+    resize_f32_with_gap(src, in_w, in_h, c, out_w, out_h, filter, None)
+}
+
+/// Pillow's `Image.reduce` on a float raster. The arithmetic is
+/// `ImagingReduceNxN_32bpc` + `ImagingReduceCorners_32bpc`: a full
+/// `fx x fy` block sums its pixels the way the C loop does — each `2x2`
+/// group as a `float` sub-sum (`((v00 + v01) + v10) + v11`, rounded to
+/// `f32` once per group), the odd trailing column as a `float` pair and
+/// the odd trailing row likewise — and accumulates those `f32` partials
+/// in an `f64`. Blocks cut off by the right or bottom edge (the "corners"
+/// pass) add their samples one at a time straight into `f64` in row-major
+/// order. The stored sample is `ss * (1.0 / n)` in `f64`, narrowed to
+/// `f32`.
+///
+/// Both deviations from an exact `f64` mean matter: the pairwise `f32`
+/// partials (`Reduce.c` adds four `FLOAT32` operands in `float` before
+/// widening) and the reciprocal multiply instead of a divide. They move
+/// the last bit on roughly one output pixel in ten.
+///
+/// Returns the samples and the `ceil(w/fx) x ceil(h/fy)` size.
+fn reduce_region_f32(
+    src: &[f32],
+    in_w: usize,
+    c: usize,
+    rb: [usize; 4],
+    fx: usize,
+    fy: usize,
+) -> (Vec<f32>, usize, usize) {
+    let (bw, bh) = (rb[2] - rb[0], rb[3] - rb[1]);
+    let (ow, oh) = (bw.div_ceil(fx), bh.div_ceil(fy));
+    let mut out = vec![0.0f32; ow * oh * c];
+    for oy in 0..oh {
+        let (y0, y1) = (rb[1] + oy * fy, (rb[1] + (oy + 1) * fy).min(rb[3]));
+        for ox in 0..ow {
+            let (x0, x1) = (rb[0] + ox * fx, (rb[0] + (ox + 1) * fx).min(rb[2]));
+            let n = ((y1 - y0) * (x1 - x0)) as f64;
+            let scale = 1.0 / n;
+            let full = (y1 - y0) == fy && (x1 - x0) == fx;
+            for k in 0..c {
+                let at = |x: usize, y: usize| src[(y * in_w + x) * c + k];
+                let ss = if full {
+                    let mut ss = 0.0f64;
+                    let mut y = y0;
+                    while y < y1 - 1 {
+                        let mut x = x0;
+                        while x < x1 - 1 {
+                            // `line0[xx] + line0[xx+1] + line1[xx] + line1[xx+1]`
+                            // in `f32`, then widened for the accumulator.
+                            let quad = (at(x, y) + at(x + 1, y)) + at(x, y + 1);
+                            ss += f64::from(quad + at(x + 1, y + 1));
+                            x += 2;
+                        }
+                        if fx & 1 == 1 {
+                            ss += f64::from(at(x, y) + at(x, y + 1));
+                        }
+                        y += 2;
+                    }
+                    if fy & 1 == 1 {
+                        let mut x = x0;
+                        while x < x1 - 1 {
+                            ss += f64::from(at(x, y) + at(x + 1, y));
+                            x += 2;
+                        }
+                        if fx & 1 == 1 {
+                            ss += f64::from(at(x, y));
+                        }
+                    }
+                    ss
+                } else {
+                    let mut ss = 0.0f64;
+                    for y in y0..y1 {
+                        for x in x0..x1 {
+                            ss += f64::from(at(x, y));
+                        }
+                    }
+                    ss
+                };
+                out[(oy * ow + ox) * c + k] = (ss * scale) as f32;
+            }
+        }
+    }
+    (out, ow, oh)
+}
+
+/// [`resize_f32`] with Pillow's `reducing_gap`: the source is first
+/// averaged down by an integer factor (Pillow's `Image.reduce` on `F`,
+/// with the `float`-grouped block arithmetic described on
+/// [`reduce_region_f32`]) and the final convolution runs on the result,
+/// exactly as `Image.resize(reducing_gap=...)`.
+///
+/// Pillow refuses `Image.reduce` on `I;16` ("image has wrong mode"), so a
+/// 16-bit gap has no oracle; this float path is the one Pillow itself
+/// exercises.
+///
+/// `Error::BadValue` on a zero dimension, a sample count that does not
+/// match the dimensions, or a gap below 1.0.
+#[allow(clippy::too_many_arguments)]
+pub fn resize_f32_with_gap(
+    src: &[f32],
+    in_w: u32,
+    in_h: u32,
+    c: usize,
+    out_w: u32,
+    out_h: u32,
+    filter: ResamplingFilter,
+    reducing_gap: Option<f64>,
+) -> Result<Vec<f32>> {
     if in_w == 0 || in_h == 0 || out_w == 0 || out_h == 0 || c == 0 {
         return Err(Error::BadValue("dimension or channel count is zero"));
+    }
+    if let Some(gap) = reducing_gap {
+        // The negated comparison also rejects NaN.
+        #[allow(clippy::neg_cmp_op_on_partial_ord)]
+        if !(gap >= 1.0) {
+            return Err(Error::BadValue("reducing_gap must be 1.0 or greater"));
+        }
     }
     let (iw, ih) = (in_w as usize, in_h as usize);
     if iw.checked_mul(ih).and_then(|n| n.checked_mul(c)) != Some(src.len()) {
@@ -398,7 +544,49 @@ pub fn resize_f32(
         .and_then(|n| n.checked_mul(c))
         .filter(|n| n.saturating_mul(4) <= crate::raster::MAX_BUFFER_BYTES)
         .ok_or(Error::BadValue("output exceeds the buffer limit"))?;
-    let full = [0.0, 0.0, iw as f64, ih as f64];
-    let out = pillow::resize_wide(src, f64::from, iw, ih, c, ow, oh, filter, full, Quant::F32);
+    if iw == ow && ih == oh {
+        return Ok(src.to_vec());
+    }
+
+    let mut cur: Vec<f32> = src.to_vec();
+    let (mut w, mut h) = (iw, ih);
+    let mut bx = [0.0, 0.0, iw as f64, ih as f64];
+    if let Some((fx, fy, rb)) = gap_plan(iw, ih, ow, oh, filter, reducing_gap) {
+        let (reduced, rw, rh) = reduce_region_f32(&cur, iw, c, rb, fx, fy);
+        bx = gap_box(rb, fx, fy, iw, ih);
+        cur = reduced;
+        (w, h) = (rw, rh);
+    }
+
+    // Same extremely-tall two-step as the 8-bit path (Pillow bounds the
+    // intermediate buffer the same way for every mode).
+    let out = if h > w * 100 && oh < h {
+        let mid = pillow::resize_wide(
+            &cur,
+            f64::from,
+            w,
+            h,
+            c,
+            w,
+            oh,
+            filter,
+            [0.0, bx[1], w as f64, bx[3]],
+            Quant::F32,
+        );
+        pillow::resize_wide(
+            &mid,
+            |v| v,
+            w,
+            oh,
+            c,
+            ow,
+            oh,
+            filter,
+            [bx[0], 0.0, bx[2], oh as f64],
+            Quant::F32,
+        )
+    } else {
+        pillow::resize_wide(&cur, f64::from, w, h, c, ow, oh, filter, bx, Quant::F32)
+    };
     Ok(out.into_iter().map(|v| v as f32).collect())
 }

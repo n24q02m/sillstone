@@ -13,10 +13,32 @@
 //! range defensively, though a sum of three weights totalling exactly 1
 //! over in-range inputs can never exceed it.
 //!
-//! `Image<Rgb>` converts per pixel through [`luma_bt601`]; `Image<Rgba>`
-//! ignores the alpha channel outright — luma of the picture is wanted,
-//! not a premultiplied composite, which is a rendering concern the
-//! hashing pipeline does not have.
+//! # Two luma formulas, on purpose
+//!
+//! Pillow's `convert("L")` is **not** the rational BT.601 form: it is the
+//! fixed-point `(19595·R + 38470·G + 7471·B + 0x8000) >> 16`
+//! ([`crate::raster::rgb_to_l`], from `libImaging/Convert.c`), whose
+//! coefficients are the `u16` truncations of `0.299 / 0.587 / 0.114`.
+//! [`luma_bt601`] rounds the exact rational instead. The two disagree by
+//! one on 9040 of the 16 777 216 `sRGB` triples (`(0, 0, 250)` is 29
+//! against Pillow's 28), so a caller cannot pick either one blindly:
+//!
+//! * `Image<Rgb>` / `Image<Rgba>` `to_gray` of `u8` samples is Pillow's
+//!   `convert("L")`, so it goes through `rgb_to_l` — that is the whole
+//!   point of the image crate, and `tests/pillow_parity.rs` replays the
+//!   committed `convert` vectors through the public method.
+//! * The modhash pHash oracle (`lab/phash_oracle.py`, pinned by
+//!   `tests/phash_vectors.rs`) is defined on [`luma_bt601`], so `phash`
+//!   keeps using it; `tests/color.rs` pins both numbers for one colour so
+//!   a "unification" cannot silently move the hash.
+//! * `u16` rasters have no Pillow mode to match (`I;16` is single-channel
+//!   and `convert("L")` is 8-bit), so their `to_gray` uses the
+//!   range-general [`luma_bt601`].
+//!
+//! `Image<Rgba>` ignores the alpha channel outright — luma of the picture
+//! is wanted, not a premultiplied composite, which is a rendering concern
+//! the hashing pipeline does not have. That matches Pillow's
+//! `convert("L")`, which drops alpha.
 use alloc::vec::Vec;
 
 use crate::raster::{Cmyk, Gray, Image, La, Rgb, Rgba, Sample};
@@ -123,9 +145,15 @@ pub fn rgb_to_yuv420p_pixel(r: u8, g: u8, b: u8) -> (u8, u8, u8) {
 }
 
 impl Image<Rgb, u8> {
-    /// Per-pixel BT.601 luma as a `Gray` image of the same dimensions.
+    /// Pillow's `convert("L")` luma as a `Gray` image of the same
+    /// dimensions: the fixed-point `rgb_to_l`, not [`luma_bt601`].
     pub fn to_gray(&self) -> Image<Gray, u8> {
-        to_gray_rgb(self)
+        let n = (self.width() * self.height()) as usize;
+        let luma = super::pillow::rgb_plane_to_l(self.as_slice(), 3, n);
+        match Image::from_vec(self.width(), self.height(), luma) {
+            Ok(im) => im,
+            Err(_) => unreachable!("luma buffer is exactly width*height samples"),
+        }
     }
 
     /// Converts to RGBA with alpha = 255.
@@ -145,17 +173,24 @@ impl Image<Rgb, u8> {
 }
 
 impl Image<Rgb, u16> {
-    /// Per-pixel BT.601 luma as a `Gray` image of the same dimensions.
+    /// Range-general BT.601 luma as a `Gray` image of the same
+    /// dimensions. Pillow has no 16-bit RGB mode, so this has no oracle;
+    /// the 8-bit impl above is the Pillow match.
     pub fn to_gray(&self) -> Image<Gray, u16> {
-        to_gray_rgb(self)
+        luma_bt601_image_rgb(self)
     }
 }
 
 impl Image<Rgba, u8> {
-    /// Per-pixel BT.601 luma of the RGB channels; **alpha is ignored**,
-    /// not composited.
+    /// Pillow's `convert("L")` luma of the RGB channels; **alpha is
+    /// ignored**, not composited.
     pub fn to_gray(&self) -> Image<Gray, u8> {
-        to_gray_rgba(self)
+        let n = (self.width() * self.height()) as usize;
+        let luma = super::pillow::rgb_plane_to_l(self.as_slice(), 4, n);
+        match Image::from_vec(self.width(), self.height(), luma) {
+            Ok(im) => im,
+            Err(_) => unreachable!("luma buffer is exactly width*height samples"),
+        }
     }
 
     /// Converts to RGB by dropping alpha channel.
@@ -174,10 +209,10 @@ impl Image<Rgba, u8> {
 }
 
 impl Image<Rgba, u16> {
-    /// Per-pixel BT.601 luma of the RGB channels; **alpha is ignored**,
-    /// not composited.
+    /// Range-general BT.601 luma of the RGB channels; **alpha is
+    /// ignored**, not composited. No Pillow oracle (see the 8-bit impl).
     pub fn to_gray(&self) -> Image<Gray, u16> {
-        to_gray_rgba(self)
+        luma_bt601_image_rgba(self)
     }
 }
 
@@ -258,7 +293,10 @@ impl Image<Cmyk, u8> {
     }
 }
 
-fn to_gray_rgb<T: Sample>(img: &Image<Rgb, T>) -> Image<Gray, T> {
+/// `Image<Rgb, u16>::to_gray`: the range-general BT.601 form, one sample
+/// per pixel. Pillow has no 16-bit RGB mode, so there is no oracle to
+/// match (the `u8` impls go through Pillow's plane luma instead).
+fn luma_bt601_image_rgb<T: Sample>(img: &Image<Rgb, T>) -> Image<Gray, T> {
     let mut out = Vec::with_capacity((img.width() * img.height()) as usize);
     for px in img.as_slice().chunks_exact(3) {
         out.push(luma_bt601(px[0], px[1], px[2]));
@@ -269,7 +307,8 @@ fn to_gray_rgb<T: Sample>(img: &Image<Rgb, T>) -> Image<Gray, T> {
     }
 }
 
-fn to_gray_rgba<T: Sample>(img: &Image<Rgba, T>) -> Image<Gray, T> {
+/// `Image<Rgba, u16>::to_gray`: as [`luma_bt601_image_rgb`], alpha dropped.
+fn luma_bt601_image_rgba<T: Sample>(img: &Image<Rgba, T>) -> Image<Gray, T> {
     let mut out = Vec::with_capacity((img.width() * img.height()) as usize);
     for px in img.as_slice().chunks_exact(4) {
         out.push(luma_bt601(px[0], px[1], px[2]));
