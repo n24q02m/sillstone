@@ -33,6 +33,26 @@ impl<T: Dtype> Tensor<T> {
         })
     }
 
+    /// Creates a contiguous tensor that shares an existing buffer instead of copying it.
+    ///
+    /// The buffer must hold exactly `shape.iter().product()` elements; a buffer
+    /// with slack would make `as_slice` hand out elements the shape does not
+    /// describe. Use [`Tensor::slice`] on a parent tensor to view a prefix of a
+    /// larger buffer.
+    pub fn from_arc(shape: Vec<usize>, data: Arc<Vec<T>>) -> Result<Self> {
+        let numel: usize = shape.iter().product();
+        if numel != data.len() {
+            return Err(Error::BadValue("data length does not match shape product"));
+        }
+        let strides = c_strides(&shape);
+        Ok(Self {
+            shape,
+            strides,
+            offset: 0,
+            data,
+        })
+    }
+
     /// Creates a new contiguous tensor filled with zeros.
     pub fn zeros(shape: &[usize]) -> Self {
         let numel: usize = shape.iter().product();
@@ -111,6 +131,47 @@ impl<T: Dtype> Tensor<T> {
         }
     }
 
+    /// Consumes the tensor and returns its buffer without copying when this
+    /// tensor is the only owner of an exactly-sized C-order buffer.
+    ///
+    /// Returns `None` when a copy is unavoidable — the buffer is still shared
+    /// with another view, the view is strided or offset, or the buffer carries
+    /// elements outside the shape. Callers that only need the elements can
+    /// fall back to [`Tensor::to_vec`].
+    pub fn into_data(self) -> Option<Vec<T>> {
+        let numel = self.numel();
+        if !self.is_contiguous() || self.data.len() != numel {
+            return None;
+        }
+        Arc::try_unwrap(self.data).ok()
+    }
+
+    /// Materializes the elements in C order into a fresh `Vec`, copying them.
+    pub fn to_vec(&self) -> Vec<T> {
+        let numel = self.numel();
+        if self.is_contiguous() && self.data.len() == numel {
+            return self.data.to_vec();
+        }
+        let mut out = Vec::with_capacity(numel);
+        if numel == 0 {
+            return out;
+        }
+        if self.ndim() == 0 {
+            if let Some(val) = self.get(&[]) {
+                out.push(val);
+            }
+            return out;
+        }
+        let mut idx = vec![0usize; self.ndim()];
+        loop {
+            out.push(self.data[linear_offset(&idx, &self.strides, self.offset) as usize]);
+            if !advance_index(&mut idx, &self.shape) {
+                break;
+            }
+        }
+        out
+    }
+
     /// Reads element at the given N-dimensional index coordinate.
     pub fn get(&self, index: &[usize]) -> Option<T> {
         check_bounds(index, &self.shape).ok()?;
@@ -130,7 +191,9 @@ impl<T: Dtype> Tensor<T> {
         // Handle negative dimension inference if requested (-1 as usize is not possible in usize, but 0 is empty)
         let new_numel: usize = target_shape.iter().product();
         if current_numel != new_numel {
-            return Err(Error::BadValue("total elements must remain constant in reshape"));
+            return Err(Error::BadValue(
+                "total elements must remain constant in reshape",
+            ));
         }
 
         if self.is_contiguous() {

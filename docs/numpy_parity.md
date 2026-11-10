@@ -7,7 +7,7 @@
 1. **Zero Third-Party Dependencies**: Pure Rust (`core` + `alloc` only in kernel compute paths).
 2. **Strided Memory Layout**: Complete support for `shape`, `strides`, and `offset`. Views (such as slicing and transposing) do not allocate or copy data buffers.
 3. **NumPy-Compatible Broadcasting**: Multi-dimensional broadcasting rules following standard NumPy semantics (trailing dimensions aligned, dimensions equal or 1, stride-0 dimension expansion).
-4. **Vectorized Math & Axis Reductions**: Vectorized elementwise arithmetic (`add`, `sub`, `mul`, `div`, `neg`, `abs`, `eq`, `ne`) and reductions (`sum`, `mean`, `max`, `min`, `argmax`, `argmin`) across arbitrary axes. The Rust kernel provides `add`/`sub`/`mul`/`div`/`neg`/`eq`/`ne` and `sum`/`min`/`max`/`argmin`/`argmax` (plus `mean` for floats); `abs`, `pow` and `std` are implemented by the language SDKs. NaN propagates through `min`/`max`/`argmin`/`argmax`.
+4. **Vectorized Math & Axis Reductions**: Vectorized elementwise arithmetic (`add`, `sub`, `mul`, `div`, `neg`, `abs`, `eq`, `ne`) and reductions (`sum`, `mean`, `var`, `std`, `max`, `min`, `argmax`, `argmin`) across arbitrary axes. The Rust kernel provides `add`/`sub`/`mul`/`div`/`neg`/`eq`/`ne`; `sum`/`min`/`max`/`argmin`/`argmax` for every dtype; `mean`/`var`/`std` for the four float widths (`f32`, `f64`, `float16`, `bfloat16`); the elementwise `sqrt`/`exp`/`ln`/`log2`/`log10`/`sin`/`cos`/`tan`/`asin`/`acos`/`atan`/`pow`/`atan2`; `dot`/`norm`/`norm_p`/`lu`/`det`/`inv`/`solve`; `concat`/`stack`/`pad`; and `astype` across every scalar pair, half-precision patterns included. `abs` stays in the language SDKs. NaN propagates through `min`/`max`/`argmin`/`argmax`, and `pow`, `atan2` and the elementary functions follow the IEEE rules. `tests/numpy_oracle.rs` replays NumPy-generated vectors for every operation above and records the worst error per operation.
 5. **High-Performance GEMM Matmul**: Cache-blocked matrix multiplication with 32x32 L1-friendly cache tiling.
 6. **Zero-Copy Image-Tensor Bridge**: Bidirectional conversion between `Image` and `Tensor`/`Array` without buffer reallocation.
 7. **Python Buffer Protocol**: Implements `__array_interface__` (v3) allowing direct, zero-copy consumption by external scientific tools when desired.
@@ -55,5 +55,9 @@ Python `Image`:
 
 Rust `Tensor`:
 
-- `mean` of an empty tensor returns an error; NumPy returns `nan` with a warning.
+- `mean`, `var` and `std` of an empty reduction return an error, and `var`/`std` refuse a `ddof` at least as large as the sample count; NumPy returns `nan` with a warning.
 - Float `sum` is sequential; NumPy uses pairwise summation, so the last digits can differ.
+- No implicit dtype promotion: the elementary functions and the moments exist for the four float widths only, so integer input has to `astype` first (NumPy promotes to `float64`).
+- `astype` to an integer saturates at the type bounds and maps NaN to zero (Rust `as` semantics); NumPy leaves float-to-integer overflow undefined and platform-dependent.
+- `norm_p` of a matrix is the elementwise p-norm of the flattened buffer (`np.linalg.norm(a.ravel(), ord)`); NumPy's induced operator norms (`ord=1`, `ord=inf` on a matrix) are not implemented.
+- `solve`/`inv`/`det`/`lu` cover square matrices in `f64` and report a singular matrix instead of returning an infinity.

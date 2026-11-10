@@ -38,7 +38,9 @@ impl<T: Dtype> Tensor<T> {
         let target_ndim = target_shape.len();
 
         if target_ndim < curr_ndim {
-            return Err(Error::BadValue("target shape has fewer dimensions than tensor"));
+            return Err(Error::BadValue(
+                "target shape has fewer dimensions than tensor",
+            ));
         }
 
         let mut new_strides = vec![0isize; target_ndim];
