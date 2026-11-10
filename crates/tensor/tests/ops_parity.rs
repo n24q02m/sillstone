@@ -3,7 +3,7 @@
 //! integer overflow and the documented deviations from NumPy.
 
 use sillstone_digest::Error;
-use sillstone_tensor::{Bf16, F16, NormOrd, Tensor, concat, stack};
+use sillstone_tensor::{Bf16, Dtype, F16, Float, NormOrd, Tensor, concat, stack};
 
 fn t2(shape: [usize; 2], data: &[f64]) -> Tensor<f64> {
     Tensor::from_vec(shape.to_vec(), data.to_vec()).expect("shape matches data")
@@ -533,6 +533,86 @@ fn concat_stack_and_pad() {
         padded_view.as_slice().expect("contiguous"),
         &[0.0, 0.0, 0.0, 1.0, 3.0, 0.0, 2.0, 4.0, 0.0]
     );
+}
+
+// ------------------------------------------------------- element capabilities
+
+/// The `Dtype` and `Float` surface every module above builds on: constants,
+/// the widening pair, the finiteness test and the half-precision arithmetic.
+#[test]
+fn element_capabilities_are_total() {
+    // `Dtype::ZERO` / `Dtype::ONE` exist for every element type.
+    assert_eq!(<f32 as Dtype>::ZERO, 0.0);
+    assert_eq!(<f32 as Dtype>::ONE, 1.0);
+    assert_eq!(<f64 as Dtype>::ZERO, 0.0);
+    assert_eq!(<f64 as Dtype>::ONE, 1.0);
+    macro_rules! check_integral_dtype {
+        ($($t:ty),+ $(,)?) => {
+            $({
+                assert_eq!(<$t as Dtype>::ZERO, 0);
+                assert_eq!(<$t as Dtype>::ONE, 1);
+            })+
+        };
+    }
+    check_integral_dtype!(i8, i16, i32, i64, u8, u16, u32, u64, usize);
+    assert_eq!(
+        &[<bool as Dtype>::ZERO, <bool as Dtype>::ONE],
+        &[false, true]
+    );
+    assert_eq!(<F16 as Dtype>::ZERO.to_f64(), 0.0);
+    assert_eq!(<F16 as Dtype>::ONE.to_f64(), 1.0);
+    assert_eq!(<Bf16 as Dtype>::ZERO.to_f64(), 0.0);
+    assert_eq!(<Bf16 as Dtype>::ONE.to_f64(), 1.0);
+
+    // `Float`: widen, narrow, and the two non-finite markers.
+    assert_eq!(<f32 as Float>::to_f64(0.5), 0.5);
+    assert_eq!(<f32 as Float>::from_f64(0.5), 0.5f32);
+    assert!(<f32 as Float>::NAN.is_nan());
+    assert!(<f32 as Float>::INFINITY.is_infinite());
+    assert!(!<f32 as Float>::is_finite(<f32 as Float>::INFINITY));
+    assert!(<f32 as Float>::is_finite(1.0));
+    assert_eq!(<f64 as Float>::to_f64(0.5), 0.5);
+    assert_eq!(<f64 as Float>::from_f64(0.5), 0.5f64);
+    assert!(<f64 as Float>::NAN.is_nan());
+    assert!(!<f64 as Float>::is_finite(<f64 as Float>::NAN));
+    assert!(<f64 as Float>::is_finite(-2.0));
+    assert!(<F16 as Float>::NAN.is_nan());
+    assert!(!<F16 as Float>::is_finite(<F16 as Float>::INFINITY));
+    assert!(<F16 as Float>::is_finite(F16::from_f64(3.0)));
+    assert!(<Bf16 as Float>::NAN.is_nan());
+    assert!(!<Bf16 as Float>::is_finite(<Bf16 as Float>::NAN));
+    assert!(<Bf16 as Float>::is_finite(Bf16::from_f64(-3.0)));
+
+    // Half-precision arithmetic rounds to the element type after each step.
+    let a = F16::from_f64(1.5);
+    let b = F16::from_f64(0.25);
+    assert_eq!((a + b).to_f64(), 1.75);
+    assert_eq!((a - b).to_f64(), 1.25);
+    assert_eq!((a * b).to_f64(), 0.375);
+    assert_eq!((a / b).to_f64(), 6.0);
+    assert_eq!((-a).to_f64(), -1.5);
+    assert!(F16::from_f64(0.0) == -F16::from_f64(0.0));
+    assert!(F16::from_f64(1.0) < F16::from_f64(2.0));
+    assert!(F16::from_f64(1.0) != F16::from_f64(2.0));
+    let (x, y) = (Bf16::from_f64(1.5), Bf16::from_f64(0.25));
+    assert_eq!((x + y).to_f64(), 1.75);
+    assert_eq!((x - y).to_f64(), 1.25);
+    assert_eq!((x * y).to_f64(), 0.375);
+    assert_eq!((x / y).to_f64(), 6.0);
+    assert_eq!((-x).to_f64(), -1.5);
+    assert!(Bf16::from_f64(1.0) < Bf16::from_f64(2.0));
+
+    // The debug rendering names the value, not the bit pattern.
+    assert_eq!(format!("{:?}", F16::from_f64(1.5)), "F16(1.5)");
+    assert_eq!(format!("{:?}", Bf16::from_f64(1.5)), "Bf16(1.5)");
+
+    // A tensor of halves takes the same elementwise path as the wider floats.
+    let h = Tensor::<F16>::from_vec(vec![2], vec![F16::from_f64(1.5), F16::from_f64(2.5)])
+        .expect("shape");
+    let sum = h.add(&h).expect("broadcast");
+    assert_eq!(sum.as_slice().expect("contiguous")[0].to_f64(), 3.0);
+    let difference = h.sub(&h).expect("broadcast");
+    assert_eq!(difference.as_slice().expect("contiguous")[1].to_f64(), 0.0);
 }
 
 // -------------------------------------------------------------------- casts
