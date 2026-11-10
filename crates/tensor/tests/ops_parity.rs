@@ -585,6 +585,119 @@ fn astype_matches_rust_cast_semantics() {
     );
 }
 
+/// Pushes one tensor through every destination type the crate can convert to.
+macro_rules! to_every_destination {
+    ($t:expr, $want:expr, $($d:ty),+ $(,)?) => {
+        $({
+            let out: Tensor<$d> = $t.astype::<$d>();
+            assert_eq!(out.shape(), &[4], "shape survives the cast");
+            let wide = out.astype::<f64>();
+            assert_eq!(
+                wide.as_slice().expect("contiguous"),
+                $want.as_slice(),
+                "cast to {}",
+                core::any::type_name::<$d>(),
+            );
+        })+
+    };
+}
+
+/// Instantiates and runs every `Cast` implementation the crate ships: four
+/// values through each of the 14 destinations for each of the 13 sources. The
+/// values are small integers, so every pair round-trips through `f64` and can be
+/// compared without a conversion written in the test itself.
+macro_rules! every_destination {
+    ($t:expr, $want:expr) => {{
+        let t = $t;
+        let want: Vec<f64> = $want.to_vec();
+        to_every_destination!(
+            t, want, f32, f64, i8, i16, i32, i64, u8, u16, u32, u64, usize, F16, Bf16
+        );
+        // `bool` is the one destination that drops the value, so it is checked
+        // against the zero test rather than a round trip.
+        let flags = t.astype::<bool>();
+        assert_eq!(
+            flags.as_slice().expect("contiguous"),
+            &want.iter().map(|&v| v != 0.0).collect::<Vec<_>>() as &[bool],
+            "cast to bool"
+        );
+    }};
+}
+
+#[test]
+fn every_cast_pair_converts() {
+    every_destination!(
+        Tensor::<f32>::from_vec(vec![4], vec![0.0, 1.0, 2.0, 3.0]).expect("shape"),
+        &[0.0, 1.0, 2.0, 3.0]
+    );
+    every_destination!(
+        Tensor::<f64>::from_vec(vec![4], vec![0.0, 1.0, 2.0, 3.0]).expect("shape"),
+        &[0.0, 1.0, 2.0, 3.0]
+    );
+    every_destination!(
+        Tensor::<i8>::from_vec(vec![4], vec![0, 1, 2, 3]).expect("shape"),
+        &[0.0, 1.0, 2.0, 3.0]
+    );
+    every_destination!(
+        Tensor::<i16>::from_vec(vec![4], vec![0, 1, 2, 3]).expect("shape"),
+        &[0.0, 1.0, 2.0, 3.0]
+    );
+    every_destination!(
+        Tensor::<i32>::from_vec(vec![4], vec![0, 1, 2, 3]).expect("shape"),
+        &[0.0, 1.0, 2.0, 3.0]
+    );
+    every_destination!(
+        Tensor::<i64>::from_vec(vec![4], vec![0, 1, 2, 3]).expect("shape"),
+        &[0.0, 1.0, 2.0, 3.0]
+    );
+    every_destination!(
+        Tensor::<u8>::from_vec(vec![4], vec![0, 1, 2, 3]).expect("shape"),
+        &[0.0, 1.0, 2.0, 3.0]
+    );
+    every_destination!(
+        Tensor::<u16>::from_vec(vec![4], vec![0, 1, 2, 3]).expect("shape"),
+        &[0.0, 1.0, 2.0, 3.0]
+    );
+    every_destination!(
+        Tensor::<u32>::from_vec(vec![4], vec![0, 1, 2, 3]).expect("shape"),
+        &[0.0, 1.0, 2.0, 3.0]
+    );
+    every_destination!(
+        Tensor::<u64>::from_vec(vec![4], vec![0, 1, 2, 3]).expect("shape"),
+        &[0.0, 1.0, 2.0, 3.0]
+    );
+    every_destination!(
+        Tensor::<usize>::from_vec(vec![4], vec![0, 1, 2, 3]).expect("shape"),
+        &[0.0, 1.0, 2.0, 3.0]
+    );
+    every_destination!(
+        Tensor::<bool>::from_vec(vec![4], vec![false, true, false, true]).expect("shape"),
+        &[0.0, 1.0, 0.0, 1.0]
+    );
+    every_destination!(
+        Tensor::<F16>::from_vec(
+            vec![4],
+            vec![0.0, 1.0, 2.0, 3.0]
+                .into_iter()
+                .map(F16::from_f64)
+                .collect(),
+        )
+        .expect("shape"),
+        &[0.0, 1.0, 2.0, 3.0]
+    );
+    every_destination!(
+        Tensor::<Bf16>::from_vec(
+            vec![4],
+            vec![0.0, 1.0, 2.0, 3.0]
+                .into_iter()
+                .map(Bf16::from_f64)
+                .collect(),
+        )
+        .expect("shape"),
+        &[0.0, 1.0, 2.0, 3.0]
+    );
+}
+
 #[test]
 fn astype_on_views_and_empty_buffers() {
     let a = t2([2, 3], &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
