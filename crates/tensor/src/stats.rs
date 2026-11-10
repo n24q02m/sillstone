@@ -9,7 +9,6 @@ use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
 
-use crate::dtype::Dtype;
 use crate::float::Float;
 use crate::half::{Bf16, F16};
 use crate::layout::{advance_index, c_strides, linear_offset};
@@ -196,10 +195,3 @@ macro_rules! impl_half_mean {
 
 impl_half_mean!(F16);
 impl_half_mean!(Bf16);
-
-/// Keeps the zero-size contract of the reductions above honest: a tensor with a
-/// zero-length dimension still has a shape, and the moments of it are defined
-/// only when the reduced count is positive.
-pub fn _zero_size_guard<T: Dtype>(t: &Tensor<T>) -> bool {
-    t.numel() == 0
-}

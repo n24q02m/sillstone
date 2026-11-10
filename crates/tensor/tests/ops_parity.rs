@@ -127,6 +127,12 @@ fn elementwise_special_values_follow_ieee() {
     assert!(ps[1].is_nan(), "(-1) ** 0.5 is nan");
     assert_eq!(ps[2], 1024.0);
     assert_eq!(ps[3], 2.0, "pow(4, 0.5) is exactly two");
+    // A scalar exponent is the `powf` form of the same kernel.
+    assert_eq!(v(&[4.0]).powf(0.5).as_slice().expect("contiguous")[0], 2.0);
+    assert_eq!(
+        v(&[2.0, 3.0]).powf(2.0).as_slice().expect("contiguous"),
+        &[4.0, 9.0]
+    );
     let a = v(&[0.0, -0.0, 1.0, -1.0])
         .atan2(&v(&[-1.0, 1.0, 0.0, 0.0]))
         .expect("broadcast");
