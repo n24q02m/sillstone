@@ -7,13 +7,16 @@ every platform it advertises.
 Exact-version presence on a registry proves nothing about usability: a JAR
 without its cdylib, a wheel set missing a platform, or an npm tarball missing a
 prebuild all install and then fail at load time, and a version cannot be
-replaced. This gate only lists archive entries (nothing from an archive is
-executed) and exits non-zero when anything is missing, so it can sit in front
-of every publish job.
+replaced. The sdist has the same failure in a different shape: without the Rust
+workspace it builds a Python package whose ctypes library is never compiled.
+This gate only lists archive entries (nothing from an archive is executed) and
+exits non-zero when anything is missing, so it can sit in front of every
+publish job.
 
   check-package-contents.py wheels 'wheelhouse-flat/*.whl' --platforms linux-x64,win32-x64 --stem sillstone_ffi
   check-package-contents.py jar    'sdk/java/target/*.jar' --platforms ... --stem sillstone_ffi --prefix github/sillstone/native
   check-package-contents.py npm    'sdk/node/*.tgz'        --platforms ... --stem sillstone_ffi --addon-stem sillstone_napi
+  check-package-contents.py sdist  'sdk/python/dist/*.tar.gz'
 """
 from __future__ import annotations
 
@@ -93,6 +96,45 @@ def check_jar(jar: pathlib.Path, platforms: list[str], stem: str, prefix: str) -
 
 NPM_DOCS = ("package/README.md", "package/LICENSE")
 
+#: Entries an installable sdist must carry: the setuptools project plus the Rust
+#: workspace `setup.py` compiles the cdylib from when no prebuild is supplied.
+SDIST_REQUIRED = (
+    "pyproject.toml",
+    "setup.py",
+    "MANIFEST.in",
+    "sillstone/__init__.py",
+    "sillstone/_generated.py",
+    "rust/Cargo.toml",
+    "rust/crates/ffi/Cargo.toml",
+)
+
+NATIVE_SUFFIXES = (".dll", ".so", ".dylib", ".node")
+
+
+def check_sdist(tarball: pathlib.Path) -> list[str]:
+    """An sdist installs by compiling its native library, so it must carry the
+    Rust workspace — and must not smuggle in a prebuilt cdylib, because one
+    binary cannot serve the five platforms the wheel set covers."""
+    if not tarball.is_file():
+        return [f"{tarball}: not a file"]
+    with tarfile.open(tarball, "r:*") as t:
+        names = [n for n in t.getnames() if not n.endswith("/")]
+    roots = {n.split("/", 1)[0] for n in names}
+    if len(roots) != 1:
+        return [f"{tarball.name}: expected one top-level directory, found {', '.join(sorted(roots)) or 'none'}"]
+    root = roots.pop()
+    if "sillstone" not in root:
+        return [f"{tarball.name}: top-level directory {root!r} does not name the project"]
+    present = {n[len(root) + 1 :] for n in names if n.startswith(root + "/")}
+    problems = [f"{tarball.name}: missing {entry}" for entry in SDIST_REQUIRED if entry not in present]
+    binaries = sorted(entry for entry in present if entry.endswith(NATIVE_SUFFIXES))
+    if binaries:
+        listed = ", ".join(binaries[:3]) + ("…" if len(binaries) > 3 else "")
+        problems.append(
+            f"{tarball.name}: carries prebuilt binaries ({listed}); the sdist compiles the cdylib instead"
+        )
+    return problems
+
 
 def check_npm(
     tgz: pathlib.Path,
@@ -129,22 +171,28 @@ def _expand(patterns: list[str]) -> list[pathlib.Path]:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("kind", choices=["wheels", "jar", "npm"])
+    ap.add_argument("kind", choices=["wheels", "jar", "npm", "sdist"])
     ap.add_argument("paths", nargs="+", help="files or globs")
-    ap.add_argument("--platforms", required=True, help="comma-separated platform ids")
-    ap.add_argument("--stem", required=True, help="cdylib stem, e.g. sillstone_ffi")
+    ap.add_argument("--platforms", help="comma-separated platform ids (wheels, jar, npm)")
+    ap.add_argument("--stem", help="cdylib stem, e.g. sillstone_ffi (wheels, jar, npm)")
     ap.add_argument("--prefix", default="github/sillstone/native", help="jar resource prefix")
     ap.add_argument("--addon-stem", default="sillstone_napi", help="npm N-API addon stem")
     args = ap.parse_args(argv)
-    platforms = [p.strip() for p in args.platforms.split(",") if p.strip()]
-    unknown = [p for p in platforms if p not in PLATFORMS]
-    if unknown:
-        ap.error(f"unknown platform: {', '.join(unknown)}")
+    platforms: list[str] = []
+    if args.kind != "sdist":
+        if not args.platforms or not args.stem:
+            ap.error(f"--platforms and --stem are required for {args.kind}")
+        platforms = [p.strip() for p in args.platforms.split(",") if p.strip()]
+        unknown = [p for p in platforms if p not in PLATFORMS]
+        if unknown:
+            ap.error(f"unknown platform: {', '.join(unknown)}")
     files = _expand(args.paths)
     if not files:
         print(f"FAIL: nothing matched {args.paths}")
         return 1
-    if args.kind == "wheels":
+    if args.kind == "sdist":
+        problems = [problem for f in files for problem in check_sdist(f)]
+    elif args.kind == "wheels":
         problems = check_wheels(files, platforms, args.stem)
     else:
         problems = []
@@ -157,7 +205,12 @@ def main(argv: list[str] | None = None) -> int:
     for p in problems:
         print(f"FAIL: {p}")
     if not problems:
-        print(f"ok: {len(files)} {args.kind} file(s) carry {', '.join(platforms)}")
+        carries = (
+            "the Rust workspace and no prebuilt binary"
+            if args.kind == "sdist"
+            else ", ".join(platforms)
+        )
+        print(f"ok: {len(files)} {args.kind} file(s) carry {carries}")
     return 1 if problems else 0
 
 

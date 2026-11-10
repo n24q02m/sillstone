@@ -184,6 +184,28 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: "3.15"
+      - name: Set up Rust for the source install
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build Python sdist
+        shell: bash
+        run: |
+          # One sdist serves every platform: it compiles the cdylib on the
+          # installing machine, so it is built here rather than in the wheel
+          # matrix. scripts/build-sdist.py stages the Rust workspace inside the
+          # archive and re-checks the result before exiting.
+          python -m pip install --upgrade build
+          python scripts/build-sdist.py
+      - name: Install the sdist from source and smoke-test it
+        shell: bash
+        run: |
+          # The published archive must build on a machine that never saw this
+          # checkout: pip unpacks it, compiles the cdylib with cargo, and the
+          # resulting wheel has to answer a native call.
+          python -m venv "$RUNNER_TEMP/sdist-venv"
+          python="$RUNNER_TEMP/sdist-venv/bin/python"
+          "$python" -m pip install --upgrade pip
+          "$python" -m pip install --no-cache-dir --no-binary :all: sdk/python/dist/*.tar.gz
+          "$python" -c "import sillstone; print('sdist install ok:', sillstone.version(), sillstone.sha256(b'').hex())"
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
@@ -231,6 +253,8 @@ jobs:
           python -m unittest discover -s scripts/ci -p "test_*.py"
           echo "Verifying Python wheels..."
           python scripts/ci/check-package-contents.py wheels "sdk/python/dist/*.whl" --platforms linux-x64,linux-arm64,darwin-arm64,darwin-x64,win32-x64 --stem sillstone_ffi
+          echo "Verifying Python sdist..."
+          python scripts/ci/check-package-contents.py sdist "sdk/python/dist/*.tar.gz"
           echo "Verifying npm tarball..."
           python scripts/ci/check-package-contents.py npm "sdk/node/*.tgz" --platforms linux-x64,linux-arm64,darwin-arm64,darwin-x64,win32-x64 --stem sillstone_ffi --addon-stem sillstone_napi
           echo "Installing npm tarball into a clean project (linux-x64)..."
@@ -244,6 +268,7 @@ jobs:
           name: packaged-sdks
           path: |
             sdk/python/dist/*.whl
+            sdk/python/dist/*.tar.gz
             sdk/node/*.tgz
             sdk/java/target/*.jar
 
@@ -266,6 +291,7 @@ jobs:
         run: |
           mkdir -p sdk/python/dist sdk/node sdk/java/target
           find artifacts -name "*.whl" -exec cp {} sdk/python/dist/ \;
+          find artifacts -name "*.tar.gz" -exec cp {} sdk/python/dist/ \;
           find artifacts -name "*.tgz" -exec cp {} sdk/node/ \;
           find artifacts -name "*.jar" -exec cp {} sdk/java/target/ \;
           find sdk/python/dist -name "*linux_*.whl" ! -name "*manylinux*" ! -name "*musllinux*" -delete

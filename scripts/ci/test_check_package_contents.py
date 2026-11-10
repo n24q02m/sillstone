@@ -160,5 +160,47 @@ class NpmTests(unittest.TestCase):
         self.assertEqual(cpc.check_npm(tgz, ALL, "sillstone_ffi", require_docs=False), [])
 
 
+class SdistTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = pathlib.Path(tempfile.mkdtemp())
+
+    def sdist(self, entries: list[str], root: str = "sillstone-0.3.1b1") -> pathlib.Path:
+        return make_tgz(self.tmp / f"{root}.tar.gz", [f"{root}/{e}" for e in entries])
+
+    def complete(self) -> list[str]:
+        return list(cpc.SDIST_REQUIRED) + ["rust/crates/unicode/data/ucd.bin", "PKG-INFO"]
+
+    def test_sdist_carrying_the_rust_workspace_passes(self):
+        self.assertEqual(cpc.check_sdist(self.sdist(self.complete())), [])
+
+    def test_sdist_without_the_rust_workspace_fails(self):
+        # What `python -m build --sdist sdk/python` writes: setuptools cannot
+        # pack crates/ above the project root, so nothing here can compile.
+        entries = [e for e in self.complete() if not e.startswith("rust/")]
+        problems = cpc.check_sdist(self.sdist(entries))
+        self.assertEqual(
+            sorted(p.split("missing ", 1)[1] for p in problems),
+            ["rust/Cargo.toml", "rust/crates/ffi/Cargo.toml"],
+        )
+
+    def test_sdist_carrying_a_prebuilt_cdylib_fails(self):
+        problems = cpc.check_sdist(self.sdist(self.complete() + ["sillstone/sillstone_ffi.dll"]))
+        self.assertEqual(len(problems), 1)
+        self.assertIn("prebuilt", problems[0])
+
+    def test_sdist_with_several_roots_fails(self):
+        tgz = make_tgz(self.tmp / "sillstone-0.3.1b1.tar.gz", ["sillstone-0.3.1b1/setup.py", "other/setup.py"])
+        self.assertTrue(any("top-level" in p for p in cpc.check_sdist(tgz)))
+
+    def test_sdist_kind_needs_neither_platforms_nor_stem(self):
+        # The sdist advertises no platform: it compiles the one it is installed on.
+        tgz = self.sdist(self.complete())
+        self.assertEqual(cpc.main(["sdist", str(tgz)]), 0)
+
+    def test_sdist_kind_fails_a_broken_archive(self):
+        entries = [e for e in self.complete() if not e.startswith("rust/")]
+        self.assertEqual(cpc.main(["sdist", str(self.sdist(entries))]), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
