@@ -200,12 +200,14 @@ jobs:
         run: |
           # The published archive must build on a machine that never saw this
           # checkout: pip unpacks it, compiles the cdylib with cargo, and the
-          # resulting wheel has to answer a native call.
+          # resulting wheel has to answer every native call. The same script
+          # runs in CI's `python-sdist` job, so a release cannot pass a check
+          # the pull request that introduced the archive never ran.
           python -m venv "$RUNNER_TEMP/sdist-venv"
           python="$RUNNER_TEMP/sdist-venv/bin/python"
           "$python" -m pip install --upgrade pip
-          "$python" -m pip install --no-cache-dir --no-binary :all: sdk/python/dist/*.tar.gz
-          "$python" -c "import sillstone; print('sdist install ok:', sillstone.version(), sillstone.sha256(b'').hex())"
+          "$python" -m pip install --no-cache-dir --no-binary sillstone sdk/python/dist/*.tar.gz
+          "$python" scripts/ci/smoke-python.py
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:

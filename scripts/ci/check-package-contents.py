@@ -24,6 +24,7 @@ import argparse
 import fnmatch
 import glob
 import pathlib
+import re
 import sys
 import tarfile
 import zipfile
@@ -111,14 +112,31 @@ SDIST_REQUIRED = (
 NATIVE_SUFFIXES = (".dll", ".so", ".dylib", ".node")
 
 
+def sdist_members(manifest: str) -> list[str]:
+    """`members = [...]` of a workspace manifest, in declared order."""
+    match = re.search(r"members\s*=\s*\[([^\]]*)\]", manifest)
+    return re.findall(r'"([^"]+)"', match.group(1)) if match else []
+
+
 def check_sdist(tarball: pathlib.Path) -> list[str]:
     """An sdist installs by compiling its native library, so it must carry the
     Rust workspace — and must not smuggle in a prebuilt cdylib, because one
-    binary cannot serve the five platforms the wheel set covers."""
+    binary cannot serve the five platforms the wheel set covers.
+
+    The workspace manifest inside the archive has to name exactly the members
+    the archive carries: cargo refuses to build when a listed member's directory
+    is missing, so a manifest staged with a member left behind turns into an
+    install-time failure rather than a broken archive anyone can see here."""
     if not tarball.is_file():
         return [f"{tarball}: not a file"]
     with tarfile.open(tarball, "r:*") as t:
         names = [n for n in t.getnames() if not n.endswith("/")]
+        manifest = ""
+        for info in t.getmembers():
+            if info.name.endswith("/rust/Cargo.toml"):
+                handle = t.extractfile(info)
+                if handle is not None:
+                    manifest = handle.read().decode("utf-8", errors="replace")
     roots = {n.split("/", 1)[0] for n in names}
     if len(roots) != 1:
         return [f"{tarball.name}: expected one top-level directory, found {', '.join(sorted(roots)) or 'none'}"]
@@ -127,6 +145,11 @@ def check_sdist(tarball: pathlib.Path) -> list[str]:
         return [f"{tarball.name}: top-level directory {root!r} does not name the project"]
     present = {n[len(root) + 1 :] for n in names if n.startswith(root + "/")}
     problems = [f"{tarball.name}: missing {entry}" for entry in SDIST_REQUIRED if entry not in present]
+    problems += [
+        f"{tarball.name}: rust/Cargo.toml lists member {entry} but the archive does not carry it"
+        for entry in sdist_members(manifest)
+        if f"rust/{entry}/Cargo.toml" not in present
+    ]
     binaries = sorted(entry for entry in present if entry.endswith(NATIVE_SUFFIXES))
     if binaries:
         listed = ", ".join(binaries[:3]) + ("…" if len(binaries) > 3 else "")

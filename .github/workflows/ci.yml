@@ -281,6 +281,59 @@ jobs:
       - name: Python SDK Tests
         run: python -m unittest discover -s sdk/python/tests
 
+  # ============================================================================
+  # The source distribution. `pip install --no-binary sillstone` has to compile
+  # the cdylib from the crates inside the archive, and nothing above builds that
+  # archive: the CD workflow is dispatch-only, so a broken sdist could reach
+  # PyPI and only fail on a user's machine. This job builds it, installs it from
+  # source into a clean venv and makes every native entry point answer. The
+  # wheels are unaffected — they never take this route.
+  # ============================================================================
+  python-sdist:
+    name: Python sdist (build from source)
+    needs: versions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Python ${{ needs.versions.outputs.python-newest }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ needs.versions.outputs.python-newest }}
+
+      # `scripts/build-sdist.py` stages the crates `sillstone-ffi` links as
+      # rust/ beside setup.py; a bare `python -m build --sdist sdk/python`
+      # cannot reach crates/ above the project root and is refused by setup.py.
+      - name: Build the source distribution
+        run: |
+          python -m pip install --upgrade build
+          python scripts/build-sdist.py --outdir "$RUNNER_TEMP/sdist"
+
+      - name: Test the packaging gates
+        run: python -m unittest discover -s scripts/ci -p "test_*.py"
+
+      - name: Verify the archive carries what the install compiles
+        run: python scripts/ci/check-package-contents.py sdist "$RUNNER_TEMP/sdist/*.tar.gz"
+
+      # A clean venv, and `--no-binary sillstone` so this row can never be
+      # satisfied by a wheel: the archive itself has to build.
+      - name: Install the sdist from source into a clean venv
+        run: |
+          python -m venv "$RUNNER_TEMP/sdist-venv"
+          python="$RUNNER_TEMP/sdist-venv/bin/python"
+          "$python" -m pip install --upgrade pip
+          "$python" -m pip install --no-cache-dir --no-binary sillstone "$RUNNER_TEMP"/sdist/*.tar.gz
+
+      # An import proves nothing here: the wrapper loads the cdylib lazily, so
+      # only a native call that has to answer correctly shows the build worked.
+      - name: Exercise the compiled extension
+        run: |
+          "$RUNNER_TEMP/sdist-venv/bin/python" scripts/ci/smoke-python.py
+
   node-matrix:
     name: Node.js ${{ matrix.node-version }}
     needs: versions
