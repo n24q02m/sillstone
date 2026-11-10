@@ -10,8 +10,50 @@ permissions:
   contents: read
 
 jobs:
+  # ============================================================================
+  # Support matrices: every list below is DERIVED, never listed. The resolver reads
+  # the floors this repository already declares -- requires-python in
+  # sdk/python/pyproject.toml, engines.node in sdk/node/package.json,
+  # maven.compiler.release in sdk/java/pom.xml, the go directive in sdk/go/go.mod and
+  # rust-version in Cargo.toml -- and the matrix jobs consume them through
+  # needs.versions.outputs.*. A hand-pinned row is exactly how a matrix falls behind
+  # a release, so scripts/ci/test_ci_versions.py fails if a literal pin for any of
+  # these five languages is added back to this file.
+  # ============================================================================
+  versions:
+    name: Resolve support matrix
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.resolve.outputs.python }}
+      python-newest: ${{ steps.resolve.outputs.python-newest }}
+      node: ${{ steps.resolve.outputs.node }}
+      node-newest: ${{ steps.resolve.outputs.node-newest }}
+      java: ${{ steps.resolve.outputs.java }}
+      java-newest: ${{ steps.resolve.outputs.java-newest }}
+      go: ${{ steps.resolve.outputs.go }}
+      go-newest: ${{ steps.resolve.outputs.go-newest }}
+      rust: ${{ steps.resolve.outputs.rust }}
+      rust-newest: ${{ steps.resolve.outputs.rust-newest }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      # Deliberately NOT actions/setup-python: the resolver runs on the runner's
+      # stock python3, so no interpreter pinned in this file can decide what the
+      # matrix says. scripts/ci_versions.py is stdlib-only for that reason.
+      - name: Show the resolved windows
+        run: python3 scripts/ci_versions.py --format plain
+
+      - name: Resolve the language matrices
+        id: resolve
+        run: python3 scripts/ci_versions.py --format github >> "$GITHUB_OUTPUT"
+
+      - name: Guard the workflow against hand-written pins
+        run: python3 -m unittest scripts/ci/test_ci_versions.py -v
+
   test:
     name: Test (${{ matrix.os }})
+    needs: versions
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -43,7 +85,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: "3.15"
+          python-version: ${{ needs.versions.outputs.python-newest }}
 
       - name: Install Python parity oracles
         run: python -m pip install pillow==13.0.0 numpy imagehash
@@ -54,7 +96,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: "26"
+          node-version: ${{ needs.versions.outputs.node-newest }}
 
       - name: Build Node.js N-API Addon
         run: node sdk/node/scripts/build.js
@@ -66,7 +108,7 @@ jobs:
         uses: actions/setup-java@v6
         with:
           distribution: 'temurin'
-          java-version: '25'
+          java-version: ${{ needs.versions.outputs.java-newest }}
 
       - name: Java SDK Tests
         working-directory: sdk/java
@@ -75,7 +117,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.27'
+          go-version: ${{ needs.versions.outputs.go-newest }}
 
       - name: Go SDK Tests
         working-directory: sdk/go/sillstone
@@ -99,6 +141,9 @@ jobs:
 
   coverage:
     name: Coverage (measured)
+    # The pinned gate runs on the newest row the resolver declares, never on a
+    # version typed here.
+    needs: versions
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -143,7 +188,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: "3.15"
+          python-version: ${{ needs.versions.outputs.python-newest }}
 
       - name: Install Python test dependencies
         run: python -m pip install pillow==13.0.0 numpy imagehash pytest pytest-cov
@@ -157,7 +202,7 @@ jobs:
         uses: actions/setup-java@v6
         with:
           distribution: 'temurin'
-          java-version: '25'
+          java-version: ${{ needs.versions.outputs.java-newest }}
 
       - name: Java binding tests (profile the JNI shim)
         working-directory: sdk/java
@@ -189,3 +234,165 @@ jobs:
             rust-cov.json
             rust-cov.lcov
             py-cov.json
+
+  # ============================================================================
+  # Per-language version matrices. Each job proves one support window from the
+  # floor the package declares to the newest line this repository can install; the
+  # rows come from needs.versions.outputs.* and nothing here names a version.
+  #
+  # The Windows/macOS angling of every SDK stays in the Test job above: these jobs
+  # vary the interpreter, not the OS, so a floor row that fails is a floor row and
+  # not a runner image.
+  # ============================================================================
+  python-matrix:
+    name: Python ${{ matrix.python-version }}
+    needs: versions
+    runs-on: ubuntu-latest
+    strategy:
+      # A floor row that fails is the finding, not a reason to cancel the others.
+      fail-fast: false
+      matrix:
+        python-version: ${{ fromJSON(needs.versions.outputs.python) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build FFI Dynamic Library
+        run: cargo build -p sillstone-ffi
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # The same oracle set as the Test and Coverage jobs, pinned to the same Pillow.
+      # The resize/parity suites compare against Pillow bit for bit, so an unpinned
+      # oracle would let each row define "parity" for itself: measured locally, the
+      # suite passes against Pillow 13.0.0 and fails four resize comparisons against
+      # 12.3.0. Pillow 13 installs from 3.11, which is where the resolver's window
+      # starts; a row below that is reported as excluded, not tested against an
+      # oracle that disagrees with the claim.
+      - name: Install Python parity oracles
+        run: python -m pip install pillow==13.0.0 numpy imagehash
+
+      - name: Python SDK Tests
+        run: python -m unittest discover -s sdk/python/tests
+
+  node-matrix:
+    name: Node.js ${{ matrix.node-version }}
+    needs: versions
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ${{ fromJSON(needs.versions.outputs.node) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build FFI Dynamic Library
+        run: cargo build -p sillstone-ffi
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Build Node.js N-API Addon
+        run: node sdk/node/scripts/build.js
+
+      - name: Node.js SDK Tests
+        # The runner's bash expands the list, so a new test file is picked up here
+        # without editing this workflow.
+        run: node --test sdk/node/test/*.test.js
+
+  java-matrix:
+    name: Java ${{ matrix.java-version }}
+    needs: versions
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java-version: ${{ fromJSON(needs.versions.outputs.java) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build FFI Dynamic Library
+        run: cargo build -p sillstone-ffi
+
+      - name: Set up JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: ${{ matrix.java-version }}
+
+      - name: Java SDK Tests
+        working-directory: sdk/java
+        run: mvn test -DargLine="-Djava.library.path=../../target/debug"
+
+  go-matrix:
+    name: Go ${{ matrix.go-version }}
+    needs: versions
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: ${{ fromJSON(needs.versions.outputs.go) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build FFI Dynamic Library
+        run: cargo build -p sillstone-ffi
+
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Go SDK Tests
+        working-directory: sdk/go/sillstone
+        run: |
+          ROOT="$(cd ../../.. && pwd)"
+          export LD_LIBRARY_PATH="$ROOT/target/debug:${LD_LIBRARY_PATH:-}"
+          go test -v ./...
+
+  rust-matrix:
+    name: Rust ${{ matrix.rust-version }}
+    needs: versions
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rust-version: ${{ fromJSON(needs.versions.outputs.rust) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      # @master carries the `toolchain` input, so the row is data and the action
+      # reference stays free of a version. Clippy is not run here on purpose: its
+      # lint set moves with the toolchain, and the MSRV row is about compiling and
+      # passing tests, not about today's warnings.
+      - name: Set up Rust ${{ matrix.rust-version }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust-version }}
+
+      - name: Rust Workspace Check
+        run: cargo check --workspace --all-targets
+
+      - name: Rust Workspace Test
+        run: cargo test --workspace --lib --tests
