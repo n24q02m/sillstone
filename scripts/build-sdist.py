@@ -13,7 +13,7 @@ It stages a self-contained tree and builds the sdist from there:
 
     <stage>/pyproject.toml, setup.py, MANIFEST.in, README.md, LICENSE, NOTICE
     <stage>/sillstone/            (the Python package)
-    <stage>/rust/                 (Cargo.toml, crates/, tools/idl-gen/)
+    <stage>/rust/                 (Cargo.toml, crates/ -- the members sillstone-ffi links)
 
 ``setup.py`` finds ``rust/`` beside itself and runs
 ``cargo build -p sillstone-ffi --release`` while the wheel is built from the
@@ -33,17 +33,49 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
+import tarfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 PY_SDK = ROOT / "sdk" / "python"
 PACKAGE = "sillstone"
 PROJECT_FILES = ("pyproject.toml", "setup.py", "README.md")
 DOC_FILES = ("LICENSE", "NOTICE")
-RUST_TREES = ("crates", "tools/idl-gen")
 IGNORE = shutil.ignore_patterns("target", "__pycache__", "*.py[cod]", "*.dll", "*.so", "*.dylib", "*.node")
+
+#: Files inside a crate that only its own test run and its reference-vector
+#: generator read. Nothing in the workspace has a `build.rs`, and the only
+#: `include_bytes!` targets are `unicode/data/ucd.bin` and inflate's Brotli
+#: dictionary — both kept — so `cargo build -p sillstone-ffi` never opens these.
+#: `unicode/data/ucd/` is the Unicode text tables the generator used to produce
+#: `ucd.bin`; the binary is what the crate embeds.
+RUST_IGNORE = shutil.ignore_patterns(
+    "target",
+    "__pycache__",
+    "*.py[cod]",
+    "*.dll",
+    "*.so",
+    "*.dylib",
+    "*.node",
+    "tests",
+    "reference.json",
+    "ucd",
+)
+
+#: Workspace members an sdist does not need: it only has to compile
+#: ``sillstone-ffi``. ``crates/cli`` is the ``sillstone`` command line binary
+#: (published to crates.io on its own) and ``tools/idl-gen`` regenerates the IDL
+#: the repository's sync gate compares against; neither is reachable from the
+#: ctypes extension. Shipping them would hand every ``pip install --no-binary``
+#: user a compiler-only binary and a code generator they never run.
+UNNEEDED_MEMBERS = ("crates/cli", "tools/idl-gen")
+
+#: A `path` key only names a directory when it sits in a dependency table; the
+#: same key in `[[bin]]` points at a source file.
+DEPENDENCY_SECTION = re.compile(r"^(?:target\.[^.]+\.)?(?:dev-|build-)?dependencies(?:\.|$)")
 
 MANIFEST = """\
 include LICENSE
@@ -71,6 +103,88 @@ def project_version() -> str:
     raise SystemExit(f"sillstone: no [project] version in {PY_SDK / 'pyproject.toml'}")
 
 
+def staged_members() -> list[str]:
+    """The workspace members the archive carries, in manifest order."""
+    declared = workspace_members()
+    return [member for member in declared if member not in UNNEEDED_MEMBERS]
+
+
+def workspace_members() -> list[str]:
+    """`members` of the repository's workspace manifest, in declared order."""
+    text = (ROOT / "Cargo.toml").read_text(encoding="utf-8")
+    match = re.search(r"members\s*=\s*\[([^\]]*)\]", text)
+    if match is None:
+        raise SystemExit(f"sillstone: no `members = [...]` array in {ROOT / 'Cargo.toml'}")
+    return re.findall(r'"([^"]+)"', match.group(1))
+
+
+def workspace_manifest(members: list[str]) -> str:
+    """The workspace manifest narrowed to the members the archive actually ships.
+
+    Cargo refuses to build when a listed member's directory is absent, so the
+    staged manifest has to name exactly what was staged. Everything outside the
+    `members` array (lints, profile, workspace.package) is copied verbatim.
+    """
+    text = (ROOT / "Cargo.toml").read_text(encoding="utf-8")
+    block = "members = [\n" + "".join(f'    "{member}",\n' for member in members) + "]"
+    rewritten, count = re.subn(r"members\s*=\s*\[[^\]]*\]", block, text, count=1)
+    if count != 1:
+        raise SystemExit(f"sillstone: cannot rewrite `members` in {ROOT / 'Cargo.toml'}")
+    return rewritten
+
+
+def path_dependencies(manifest: pathlib.Path) -> list[str]:
+    """`path = "..."` values of every dependency table in one manifest."""
+    targets: list[str] = []
+    section = ""
+    for line in manifest.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            section = stripped.strip("[]").strip()
+            continue
+        if DEPENDENCY_SECTION.match(section):
+            found = re.search(r'path\s*=\s*"([^"]+)"', stripped)
+            if found:
+                targets.append(found.group(1))
+    return targets
+
+
+def assert_workspace_complete(rust: pathlib.Path) -> None:
+    """Refuse to build from a staged workspace with a dependency left behind.
+
+    Dropping a member that another crate depends on produces a `cargo build`
+    failure deep inside the install, where the message is about a missing file
+    rather than about the archive. Checking here names the crate and the path.
+    """
+    missing = []
+    for manifest in sorted(rust.glob("**/Cargo.toml")):
+        if manifest.parent == rust:
+            continue
+        for target in path_dependencies(manifest):
+            resolved = (manifest.parent / target).resolve()
+            if not (resolved / "Cargo.toml").is_file():
+                missing.append(f"{manifest.parent.relative_to(rust)} -> {target}")
+    if missing:
+        raise SystemExit(
+            "sillstone: the staged Rust workspace is incomplete; these dependencies are not in "
+            f"UNNEEDED_MEMBERS but their directories were not staged: {'; '.join(missing)}"
+        )
+
+
+def stage_rust(dest: pathlib.Path) -> None:
+    """Stage the crates `sillstone-ffi` links and rewrite the workspace members."""
+    rust = dest / "rust"
+    (rust / "crates").mkdir(parents=True)
+    members = staged_members()
+    for member in members:
+        source = ROOT / member
+        if not (source / "Cargo.toml").is_file():
+            raise SystemExit(f"sillstone: workspace member {member} has no manifest at {source}")
+        shutil.copytree(source, rust / member, ignore=RUST_IGNORE)
+    (rust / "Cargo.toml").write_text(workspace_manifest(members), encoding="utf-8")
+    assert_workspace_complete(rust)
+
+
 def stage_tree(dest: pathlib.Path) -> pathlib.Path:
     """Write the self-contained tree the sdist is built from."""
     if dest.exists():
@@ -81,11 +195,7 @@ def stage_tree(dest: pathlib.Path) -> pathlib.Path:
     shutil.copytree(PY_SDK / PACKAGE, dest / PACKAGE, ignore=IGNORE)
     for name in DOC_FILES:
         shutil.copy2(ROOT / name, dest / name)
-    rust = dest / "rust"
-    rust.mkdir()
-    shutil.copy2(ROOT / "Cargo.toml", rust / "Cargo.toml")
-    for tree in RUST_TREES:
-        shutil.copytree(ROOT / tree, rust / tree, ignore=IGNORE)
+    stage_rust(dest)
     (dest / "MANIFEST.in").write_text(MANIFEST, encoding="utf-8")
     return dest
 
@@ -112,13 +222,26 @@ def build_sdist(stage: pathlib.Path, outdir: pathlib.Path, isolation: bool) -> p
 
 
 def contents_gate(tarball: pathlib.Path) -> None:
-    """Reject an archive that would install a package with no native library."""
+    """Reject an archive that would install a package with no native library,
+    or that carries crates the extension never builds."""
     spec = importlib.util.spec_from_file_location(
         "check_package_contents", pathlib.Path(__file__).with_name("ci") / "check-package-contents.py"
     )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     problems = module.check_sdist(tarball)
+    with tarfile.open(tarball, "r:*") as archive:
+        entries = {name.split("/", 1)[1] for name in archive.getnames() if "/" in name}
+    problems += [
+        f"{tarball.name}: ships rust/{member}, which `sillstone-ffi` does not build"
+        for member in UNNEEDED_MEMBERS
+        if f"rust/{member}/Cargo.toml" in entries
+    ]
+    problems += [
+        f"{tarball.name}: the staged workspace is missing {member}"
+        for member in staged_members()
+        if f"rust/{member}/Cargo.toml" not in entries
+    ]
     for problem in problems:
         print(f"FAIL: {problem}")
     if problems:
@@ -142,7 +265,10 @@ def main(argv: list[str] | None = None) -> int:
         if not args.keep and stage.exists():
             shutil.rmtree(stage)
     size = tarball.stat().st_size
-    print(f"ok: {tarball} ({size} bytes) carries the Python package and the Rust workspace")
+    print(
+        f"ok: {tarball} ({size} bytes) carries the Python package and {len(staged_members())} "
+        "Rust crates; it compiles the cdylib on install"
+    )
     return 0
 
 

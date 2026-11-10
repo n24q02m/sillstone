@@ -35,7 +35,11 @@ pip install --only-binary :all: sillstone
 ```
 
 The sdist carries no prebuilt library — one binary cannot serve five platforms —
-so the platform you install on is the one that gets compiled.
+so the platform you install on is the one that gets compiled. It also carries
+only the crates the ctypes extension links: the `sillstone` CLI crate and the
+IDL generator are published separately and are not part of the archive. CI
+builds the archive and installs it from source on Linux on every change, so a
+broken source route fails the pipeline rather than a user's install.
 
 ## Crates
 

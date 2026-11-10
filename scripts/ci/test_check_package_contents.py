@@ -33,12 +33,14 @@ def make_zip(path: pathlib.Path, names: list[str]) -> pathlib.Path:
     return path
 
 
-def make_tgz(path: pathlib.Path, names: list[str]) -> pathlib.Path:
+def make_tgz(path: pathlib.Path, names: list[str], contents: dict[str, bytes] | None = None) -> pathlib.Path:
+    payloads = contents or {}
     with tarfile.open(path, "w:gz") as t:
         for n in names:
+            payload = payloads.get(n, b"x")
             info = tarfile.TarInfo(n)
-            info.size = 1
-            t.addfile(info, io.BytesIO(b"x"))
+            info.size = len(payload)
+            t.addfile(info, io.BytesIO(payload))
     return path
 
 
@@ -164,14 +166,39 @@ class SdistTests(unittest.TestCase):
     def setUp(self):
         self.tmp = pathlib.Path(tempfile.mkdtemp())
 
-    def sdist(self, entries: list[str], root: str = "sillstone-0.3.1b1") -> pathlib.Path:
-        return make_tgz(self.tmp / f"{root}.tar.gz", [f"{root}/{e}" for e in entries])
+    def manifest(self, members: list[str]) -> bytes:
+        return ("members = [\n" + "".join(f'    "{m}",\n' for m in members) + "]\n").encode()
+
+    def sdist(
+        self, entries: list[str], members: list[str] | None = None, root: str = "sillstone-0.3.1b1"
+    ) -> pathlib.Path:
+        names = [f"{root}/{e}" for e in entries]
+        contents = {f"{root}/rust/Cargo.toml": self.manifest(members or ["crates/ffi"])}
+        return make_tgz(self.tmp / f"{root}.tar.gz", names, contents)
 
     def complete(self) -> list[str]:
         return list(cpc.SDIST_REQUIRED) + ["rust/crates/unicode/data/ucd.bin", "PKG-INFO"]
 
     def test_sdist_carrying_the_rust_workspace_passes(self):
         self.assertEqual(cpc.check_sdist(self.sdist(self.complete())), [])
+
+    def test_sdist_members_are_read_from_the_archive_manifest(self):
+        self.assertEqual(
+            cpc.sdist_members(self.manifest(["crates/ffi", "crates/buffer"]).decode()),
+            ["crates/ffi", "crates/buffer"],
+        )
+        self.assertEqual(cpc.sdist_members(""), [])
+
+    def test_sdist_listing_a_member_it_does_not_carry_fails(self):
+        # Cargo refuses to build when a listed member's directory is absent, so
+        # a manifest staged with a member left behind has to fail here instead.
+        problems = cpc.check_sdist(self.sdist(self.complete(), members=["crates/ffi", "crates/cli"]))
+        self.assertEqual(len(problems), 1)
+        self.assertIn("crates/cli", problems[0])
+
+    def test_sdist_carrying_the_members_its_manifest_lists_passes(self):
+        entries = self.complete() + ["rust/crates/buffer/Cargo.toml"]
+        self.assertEqual(cpc.check_sdist(self.sdist(entries, members=["crates/ffi", "crates/buffer"])), [])
 
     def test_sdist_without_the_rust_workspace_fails(self):
         # What `python -m build --sdist sdk/python` writes: setuptools cannot
