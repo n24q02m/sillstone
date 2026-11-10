@@ -435,6 +435,52 @@ fn brotli_metadata_metablock_is_skipped() {
 }
 
 #[test]
+fn brotli_metadata_metablock_may_be_the_last() {
+    // A metadata meta-block with ISLAST set ends the stream once its payload
+    // is skipped; the reference decoder accepts it and returns the data
+    // decoded so far (google/brotli 1.2.0 produced the expected bytes below).
+    // `0x1a`: WBITS 16, ISLAST, not empty, MNIBBLES 3 (metadata), reserved 0,
+    // MSKIPBYTES 0 - a metadata-only stream that decodes to nothing.
+    assert_eq!(inflate_brotli(&[0x1A], Limits::default()).unwrap(), b"");
+    // WBITS 23, a two-byte uncompressed meta-block ("\xd1 "), then the same
+    // last metadata meta-block.
+    assert_eq!(
+        inflate_brotli(&[0x8D, 0x00, 0x80, 0xD1, 0x20, 0x0D], Limits::default()).unwrap(),
+        b"\xd1 "
+    );
+    // The same shape with a three-byte metadata payload.
+    let mut b = Bits::default();
+    for (v, n) in [(0, 1), (1, 1), (0, 1), (3, 2), (0, 1), (1, 2), (2, 8)] {
+        b.push(v, n);
+    }
+    b.align();
+    b.bytes.extend_from_slice(&[0xAA, 0xBB, 0xCC]);
+    assert_eq!(inflate_brotli(&b.finish(), Limits::default()).unwrap(), b"");
+}
+
+#[test]
+fn brotli_trailing_bytes_after_the_last_meta_block_are_rejected() {
+    // The data set ends with the last meta-block: the reference decoder
+    // rejects a byte after it whether the byte is zero or not.
+    for extra in [b'x', 0] {
+        let mut with_junk = TEXT_BR.to_vec();
+        with_junk.push(extra);
+        assert!(
+            matches!(
+                inflate_brotli(&with_junk, Limits::default()),
+                Err(Error::BadValue("trailing bytes after the brotli stream"))
+            ),
+            "trailing {extra:#04x} must be rejected"
+        );
+    }
+    // A last metadata meta-block does not license trailing bytes either.
+    assert!(matches!(
+        inflate_brotli(&[0x1A, 0x00], Limits::default()),
+        Err(Error::BadValue("trailing bytes after the brotli stream"))
+    ));
+}
+
+#[test]
 fn brotli_malformed_framing_is_rejected() {
     // Metadata with the reserved bit set.
     let mut b = Bits::default();
@@ -444,15 +490,6 @@ fn brotli_malformed_framing_is_rejected() {
     assert!(matches!(
         inflate_brotli(&b.finish(), Limits::default()),
         Err(Error::BadValue("brotli reserved bit nonzero"))
-    ));
-    // ISLAST meta-block that is metadata.
-    let mut b = Bits::default();
-    for (v, n) in [(0, 1), (1, 1), (0, 1), (3, 2)] {
-        b.push(v, n);
-    }
-    assert!(matches!(
-        inflate_brotli(&b.finish(), Limits::default()),
-        Err(Error::BadValue("brotli last meta-block cannot be metadata"))
     ));
     // Metadata length whose most-significant byte is zero (not minimal).
     let mut b = Bits::default();

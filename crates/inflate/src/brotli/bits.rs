@@ -96,6 +96,16 @@ impl<'a> BitReader<'a> {
         self.bits_in_buf = 0;
         Ok(&self.data[start..end])
     }
+
+    /// Ends the stream: the bits that pad the final byte must be zero and no
+    /// byte may follow the last meta-block.
+    pub(super) fn finish(&mut self) -> Result<()> {
+        self.align_to_byte()?;
+        if self.bits_in_buf != 0 || self.byte_idx != self.data.len() {
+            return Err(Error::BadValue("trailing bytes after the brotli stream"));
+        }
+        Ok(())
+    }
 }
 
 /// Inverse move-to-front over byte values, in place (RFC 7932 section 7.3).

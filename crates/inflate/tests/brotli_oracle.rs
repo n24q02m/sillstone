@@ -19,9 +19,21 @@
 //!   round trip. `SILLSTONE_BROTLI_CORPUS_OUT=<path>` rewrites the committed
 //!   corpus from the first cases; `SILLSTONE_BROTLI_TRANSFORMS_OUT=<path>`
 //!   rewrites the transform fixture, using the same binary as the oracle.
+//! * `oracle_mutants_agree_with_brotli_cli` is `#[ignore]`d for the same
+//!   reason: it damages committed streams (`SILLSTONE_BROTLI_MUTANTS`,
+//!   default 2000) and requires the reference decoder to reach the same
+//!   verdict - the same bytes when both accept, an error when either does.
 //!
 //! Corpus record: `u32 LE compressed length | u64 LE plaintext length |
 //! 32-byte SHA-256 of the plaintext | compressed bytes`.
+//!
+//! Oracle: `brotli` 1.2.0, both the CLI and the reference C decoder behind the
+//! Python `brotli` wheel. Both committed fixtures regenerate byte-identically
+//! with that version (`oracle_fuzz_against_brotli_cli` at the default seed,
+//! `SILLSTONE_BROTLI_CORPUS_OUT` / `SILLSTONE_BROTLI_TRANSFORMS_OUT`, then
+//! `cmp`), and every record decodes to the recorded length and SHA-256 under
+//! both surfaces. Brotli stays a development-time dependency: the crate has no
+//! runtime dependency on it.
 
 use sillstone_digest::sha256;
 use sillstone_inflate::{Limits, inflate_brotli};
@@ -719,4 +731,111 @@ fn oracle_fuzz_against_brotli_cli() {
         std::fs::write(&path, &fixture).unwrap();
         eprintln!("wrote {n} transform records to {path}");
     }
+}
+
+/// One mutation of a committed stream: the kind of damage a truncation, a
+/// bit flip, a stray byte or a splice between two streams does.
+fn mutate(rng: &mut Rng, base: &[u8], other: &[u8]) -> Vec<u8> {
+    let mut m = base.to_vec();
+    for _ in 0..1 + rng.below(3) {
+        if m.is_empty() {
+            break;
+        }
+        match rng.below(7) {
+            0 => {
+                let cut = rng.below(m.len() as u64) as usize;
+                m.truncate(cut);
+            }
+            1 => {
+                let i = rng.below(m.len().min(8) as u64) as usize;
+                m[i] ^= 1 << rng.below(8);
+            }
+            2 => {
+                let i = rng.below(m.len() as u64) as usize;
+                m[i] = rng.next() as u8;
+            }
+            3 => {
+                let i = rng.below(m.len() as u64 + 1) as usize;
+                m.insert(i, rng.next() as u8);
+            }
+            4 => {
+                let i = rng.below(m.len() as u64) as usize;
+                m.remove(i);
+            }
+            5 => {
+                // Splice: the head of this stream, the tail of another.
+                let cut = rng.below(m.len() as u64) as usize;
+                let keep = rng.below(other.len() as u64 + 1) as usize;
+                m.truncate(cut);
+                m.extend_from_slice(&other[..keep]);
+            }
+            _ => {
+                let i = rng.below(m.len().min(4) as u64) as usize;
+                m[i] ^= 0xff;
+            }
+        }
+    }
+    m
+}
+
+/// Damage must be judged exactly as the reference decoder judges it: the same
+/// accept/reject verdict and, when both accept, the same bytes. This is the
+/// test that keeps the framing rules honest - it caught a metadata meta-block
+/// being refused when it is the last one, and trailing bytes being ignored.
+#[test]
+#[ignore = "needs the reference brotli binary: set SILLSTONE_BROTLI_BIN"]
+fn oracle_mutants_agree_with_brotli_cli() {
+    let bin = std::env::var("SILLSTONE_BROTLI_BIN").expect("SILLSTONE_BROTLI_BIN");
+    let rounds: usize = std::env::var("SILLSTONE_BROTLI_MUTANTS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(2000);
+    let recs = records(CORPUS);
+    let streams: Vec<&[u8]> = recs
+        .iter()
+        .map(|(stream, _, _)| *stream)
+        .filter(|s| s.len() <= 4000)
+        .collect();
+    assert!(streams.len() > 20, "only {} small streams", streams.len());
+    let mut rng = Rng(0x0BAD_F00D_7932);
+    let mut accepted = 0usize;
+    for round in 0..rounds {
+        let base = streams[rng.below(streams.len() as u64) as usize];
+        let other = streams[rng.below(streams.len() as u64) as usize];
+        let damaged = mutate(&mut rng, base, other);
+        let ours = inflate_brotli(&damaged, limits());
+        let theirs = run_decode(&bin, &damaged);
+        match (&ours, &theirs) {
+            (Ok(a), Some(b)) => {
+                accepted += 1;
+                assert_eq!(a, b, "round {round}: bytes differ for {}", hex(&damaged));
+            }
+            (Err(_), None) => {}
+            (Ok(a), None) => panic!(
+                "round {round}: we accept {} bytes, the reference rejects {}",
+                a.len(),
+                hex(&damaged)
+            ),
+            (Err(e), Some(b)) => {
+                panic!(
+                    "round {round}: we reject ({e}), the reference decodes {} bytes from {}",
+                    b.len(),
+                    hex(&damaged)
+                )
+            }
+        }
+    }
+    eprintln!("{rounds} mutants agree with the reference decoder ({accepted} of them decode)");
+}
+
+/// Hex for a failure message; long streams are cut so the message stays usable.
+fn hex(data: &[u8]) -> String {
+    let mut s = String::new();
+    for b in data.iter().take(64) {
+        s.push_str(&format!("{b:02x}"));
+    }
+    if data.len() > 64 {
+        s.push_str("...");
+    }
+    s
 }

@@ -12,6 +12,12 @@
 //! part of RFC 7932. A stream that announces it is refused with
 //! [`Error::Unsupported`]; the decoder never guesses and never returns bytes
 //! it did not decode.
+//!
+//! The data set ends with the last meta-block, which may be an empty one
+//! (`ISLASTEMPTY`), an ordinary one or a metadata one. Its padding bits must
+//! be zero and no byte may follow it: trailing bytes are rejected with
+//! [`Error::BadValue`] instead of being silently ignored, so a caller cannot
+//! mistake a concatenation or a mis-framed buffer for a decoded stream.
 
 mod bits;
 mod dict;
@@ -120,9 +126,6 @@ pub fn decompress(input: &[u8], limits: Limits) -> Result<Vec<u8>> {
         };
 
         if mnibbles == 0 {
-            if is_last {
-                return Err(Error::BadValue("brotli last meta-block cannot be metadata"));
-            }
             if br.read_bits(1)? != 0 {
                 return Err(Error::BadValue("brotli reserved bit nonzero"));
             }
@@ -140,6 +143,11 @@ pub fn decompress(input: &[u8], limits: Limits) -> Result<Vec<u8>> {
             }
             br.align_to_byte()?;
             br.read_exact_bytes(skip_len)?;
+            // A metadata meta-block is allowed to be the last one: the stream
+            // ends after its payload, as the reference decoder accepts.
+            if is_last {
+                break;
+            }
             continue;
         }
 
@@ -169,8 +177,10 @@ pub fn decompress(input: &[u8], limits: Limits) -> Result<Vec<u8>> {
         }
     }
 
-    // The bits after the last meta-block pad the final byte and must be zero.
-    br.align_to_byte()?;
+    // The last meta-block ends the data set: its final byte is padded with
+    // zeros and nothing may follow it (RFC 7932 section 9.2; the reference
+    // decoder rejects a stream with trailing bytes).
+    br.finish()?;
     Ok(out)
 }
 
