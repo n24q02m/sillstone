@@ -141,9 +141,20 @@ jobs:
             # non-manylinux linux wheel, so a swallowed error would silently drop
             # the Linux wheel from the release.
             auditwheel repair sdk/python/dist/*.whl -w sdk/python/dist/repaired/
-            ls sdk/python/dist/repaired/*.whl
+            repaired=(sdk/python/dist/repaired/*.whl)
+            if [ "${#repaired[@]}" -ne 1 ] || [ ! -f "${repaired[0]}" ]; then
+              echo "::error title=auditwheel::expected exactly one repaired wheel, found ${#repaired[@]}"
+              exit 1
+            fi
+            case "${repaired[0]}" in
+              *manylinux* | *musllinux*) ;;
+              *)
+                echo "::error title=auditwheel::repair produced a non-manylinux wheel: ${repaired[0]}"
+                exit 1
+                ;;
+            esac
             rm -f sdk/python/dist/*.whl
-            mv sdk/python/dist/repaired/*.whl sdk/python/dist/
+            mv "${repaired[0]}" sdk/python/dist/
             rm -rf sdk/python/dist/repaired
           fi
       - name: Upload wheel artifact

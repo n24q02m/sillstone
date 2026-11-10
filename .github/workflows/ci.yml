@@ -174,10 +174,12 @@ jobs:
           cargo llvm-cov report --lcov --output-path rust-cov.lcov
 
       - name: Report Rust coverage
-        run: python scripts/ci/coverage_report.py llvm rust-cov.json --target 95
+        # --fail-under makes the 95% target in docs/scorecard.md a gate instead of a
+        # printout: measuring a shortfall and staying green is the claim without proof.
+        run: python scripts/ci/coverage_report.py llvm rust-cov.json --target 95 --fail-under 95
 
       - name: Report Python coverage
-        run: python scripts/ci/coverage_report.py py py-cov.json --target 95
+        run: python scripts/ci/coverage_report.py py py-cov.json --target 95 --fail-under 95
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v7

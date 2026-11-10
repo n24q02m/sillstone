@@ -18,7 +18,7 @@ Sillstone provides verified, zero-dependency implementations of hashing, codecs,
 | T1 Core | `sillstone-math`, `sillstone-digest`, `sillstone-inflate`, `sillstone-unicode` | Arithmetic kernels, cryptographic/non-cryptographic digests, decompression, text algorithms |
 | T2 Codecs | `sillstone-png`, `sillstone-jpeg`, `sillstone-mp3`, `sillstone-flac`, etc. | Pure-Rust media decoders and encoders |
 | T3 Domains | `sillstone-image`, `sillstone-audio`, `sillstone-video`, `sillstone-text`, `sillstone-file` | Domain abstractions and perception pipelines |
-| T4 Fingerprints | `sillstone-fingerprint`, `sillstone-cdc` | Perceptual hashing (pHash, minhash, chromaprint) and chunking |
+| T4 Fingerprints | `sillstone-cdc` (chunking); perceptual hashing, MinHash and audio/video fingerprints live in `sillstone-image`, `sillstone-text`, `sillstone-audio`, `sillstone-video` | Perceptual hashing (pHash, minhash, chromaprint) and chunking |
 
 ## Language SDKs
 
