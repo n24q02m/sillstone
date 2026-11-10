@@ -5,17 +5,29 @@
 extern crate alloc;
 
 pub mod broadcast;
+pub mod cast;
 pub mod dtype;
 pub mod ffi;
+pub mod float;
+pub mod half;
+pub mod kernels;
 pub mod layout;
 pub mod linalg;
+pub mod manip;
+pub mod math;
 pub mod ops;
 pub mod reduce;
+pub mod stats;
 pub mod tensor;
 
 pub use broadcast::broadcast_shapes;
+pub use cast::Cast;
 pub use dtype::Dtype;
+pub use float::Float;
+pub use half::{Bf16, F16};
 pub use layout::c_strides;
+pub use linalg::{Lu, NormOrd};
+pub use manip::{concat, stack};
 pub use tensor::Tensor;
 
 #[cfg(test)]
@@ -76,14 +88,20 @@ mod tests {
 
         let c = a.add(&b).unwrap();
         assert_eq!(c.shape(), &[2, 3]);
-        assert_eq!(c.contiguous().as_slice(), Some(&[11, 22, 33, 41, 52, 63][..]));
+        assert_eq!(
+            c.contiguous().as_slice(),
+            Some(&[11, 22, 33, 41, 52, 63][..])
+        );
 
         // [2, 1] * [1, 3] -> [2, 3]
         let x = Tensor::from_vec(vec![2, 1], vec![2, 3]).unwrap();
         let y = Tensor::from_vec(vec![1, 3], vec![10, 20, 30]).unwrap();
         let z = x.mul(&y).unwrap();
         assert_eq!(z.shape(), &[2, 3]);
-        assert_eq!(z.contiguous().as_slice(), Some(&[20, 40, 60, 30, 60, 90][..]));
+        assert_eq!(
+            z.contiguous().as_slice(),
+            Some(&[20, 40, 60, 30, 60, 90][..])
+        );
     }
 
     #[test]
