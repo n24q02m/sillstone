@@ -496,7 +496,7 @@ jobs:
           echo "Release type: ${{ env.RELEASE_TYPE }}"
           echo "Expected version: ${{ env.EXPECTED_VERSION }}"
           python -m unittest discover -s scripts/ci -p "test_*.py"
-          python scripts/ci/check-registries.py --version "${{ env.EXPECTED_VERSION }}" --only crates,pypi,npm --wait-seconds 300
+          python scripts/ci/check-registries.py --version "${{ env.EXPECTED_VERSION }}" --only crates,pypi,npm --wait-seconds 1200
 
   github-release:
     name: Tag and GitHub Release
