@@ -784,9 +784,7 @@ mod tests {
     fn par0_seeds_whole_boundary_row_from_first_pair() {
         let mut cur = mb(MbType::P16x16);
         let mut left = mb(MbType::P16x16);
-        for b in 0..16usize {
-            cur.mv[b] = [8, 0];
-        }
+        cur.mv.fill([8, 0]);
         // Seed pair (block (0,0) vs neighbour (3,0)) differs by 8 qpel:
         // the seeded verdict 1 fills the row…
         let m = compute_bs(&cur, Some(&left), None);
