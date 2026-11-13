@@ -56,7 +56,7 @@ SDIST_FROM = (0, 3, 2)
 # First release whose npm tarball must carry README.md and LICENSE (0.3.0 and
 # earlier were published without them and stay as they are).
 NPM_DOCS_FROM = (0, 3, 1)
-JAR_PREFIX = "github/sillstone/native"
+JAR_PREFIX = "io/github/sillstone/native"
 
 EXPECTED_VERSION = "0.3.1"
 USER_AGENT = "sillstone-registry-readback (github.com/n24q02m/sillstone)"
