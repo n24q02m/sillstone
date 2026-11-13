@@ -497,7 +497,10 @@ jobs:
           echo "Release type: ${{ env.RELEASE_TYPE }}"
           echo "Expected version: ${{ env.EXPECTED_VERSION }}"
           python -m unittest discover -s scripts/ci -p "test_*.py"
-          python scripts/ci/check-registries.py --version "${{ env.EXPECTED_VERSION }}" --wait-seconds 1800
+          # Central Portal publishes asynchronously: 0.3.2-beta.1 took over an hour to
+          # appear on repo1, so the maven readback needs the full hour. -u keeps the
+          # per-registry lines visible while the gate waits.
+          python -u scripts/ci/check-registries.py --version "${{ env.EXPECTED_VERSION }}" --wait-seconds 3600
 
   github-release:
     name: Tag and GitHub Release
