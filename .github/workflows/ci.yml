@@ -168,6 +168,7 @@ jobs:
           cargo llvm-cov show-env --export-prefix > "$RUNNER_TEMP/llvm-cov-env.sh"
           source "$RUNNER_TEMP/llvm-cov-env.sh"
           cargo llvm-cov clean --workspace
+          cargo build -p sillstone-text
 
       - name: Rust workspace tests
         run: |
@@ -446,6 +447,12 @@ jobs:
 
       - name: Rust Workspace Check
         run: cargo check --workspace --all-targets
+
+      # `cargo test` does not emit the cdylib for a library-only target, and one
+      # integration test dlopens it. Build it explicitly so the test does not
+      # depend on an artifact left behind by another step or by the CI cache.
+      - name: Build the text cdylib
+        run: cargo build -p sillstone-text
 
       - name: Rust Workspace Test
         run: cargo test --workspace --lib --tests
