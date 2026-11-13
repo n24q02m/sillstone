@@ -519,7 +519,7 @@ pub(crate) fn filter_frame(
             // edge y=4*e on all 16 columns.
             for band in 0..4usize {
                 let y0 = mb_y * 16 + band * 4;
-                for e in 0..4usize {
+                for (e, row) in bs.v.iter().enumerate().take(4) {
                     let x = mb_x * 16 + e * 4;
                     let mut qp_p = [0u8; 4];
                     if e == 0 {
@@ -534,7 +534,7 @@ pub(crate) fn filter_frame(
                     } else {
                         qp_p.fill(cur.qp_y);
                     }
-                    let one = bs.v[e][band];
+                    let one = row[band];
                     filter_v_edge(
                         y, stride, x, y0, &[one; 4], &qp_p, cur.qp_y, off_a, off_b, false,
                     );
@@ -559,8 +559,7 @@ pub(crate) fn filter_frame(
                 if do_edge {
                     // h edge at yy covers 4 columns groups: bs.h[band][k] per 4-col
                     // filter_h_edge covers cols x0..x0+3 per call -> need 4 calls
-                    for cg in 0..4usize {
-                        let one = bs.h[band][cg];
+                    for (cg, &one) in bs.h[band].iter().enumerate().take(4) {
                         filter_h_edge(
                             y,
                             stride,
@@ -785,9 +784,7 @@ mod tests {
     fn par0_seeds_whole_boundary_row_from_first_pair() {
         let mut cur = mb(MbType::P16x16);
         let mut left = mb(MbType::P16x16);
-        for b in 0..16usize {
-            cur.mv[b] = [8, 0];
-        }
+        cur.mv.fill([8, 0]);
         // Seed pair (block (0,0) vs neighbour (3,0)) differs by 8 qpel:
         // the seeded verdict 1 fills the row…
         let m = compute_bs(&cur, Some(&left), None);

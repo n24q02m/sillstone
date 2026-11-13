@@ -361,9 +361,9 @@ impl Huffman {
             h.count[len as usize] += 1;
         }
         let mut left: i32 = 1;
-        for len in 1..=MAX_BITS {
+        for &count in &h.count[1..=MAX_BITS] {
             left <<= 1;
-            left -= i32::from(h.count[len]);
+            left -= i32::from(count);
             if left < 0 {
                 return Err(Error::BadValue("over-subscribed Huffman code lengths"));
             }

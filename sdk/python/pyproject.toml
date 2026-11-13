@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sillstone"
-version = "0.3.1b2"
+version = "0.3.1"
 description = "Pure-Rust zero-dependency multimedia, hashing, and array computing suite"
 readme = "README.md"
 requires-python = ">=3.9"
