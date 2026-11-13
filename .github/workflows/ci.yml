@@ -73,6 +73,12 @@ jobs:
       - name: Rust Workspace Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
+      # `cargo test` does not emit the cdylib for a library-only target, and one
+      # integration test dlopens it. Build it explicitly so the test does not
+      # depend on an artifact left behind by another step or by the CI cache.
+      - name: Build the text cdylib
+        run: cargo build -p sillstone-text
+
       - name: Rust Workspace Test
         run: cargo test --workspace --lib --tests
       - name: IDL Generator Sync Check
