@@ -133,11 +133,12 @@
                         <configuration>
                             <publishingServerId>central</publishingServerId>
                             <!--
-                              The first release is validated by the portal and
-                              then published by hand from the portal UI; flip
-                              autoPublish to true once a release has gone out.
+                              autoPublish stays on: a stable cut must reach
+                              Maven Central without a human step, otherwise the
+                              release gate can pass while the Java artifact is
+                              missing.
                             -->
-                            <autoPublish>false</autoPublish>
+                            <autoPublish>true</autoPublish>
                             <waitUntil>validated</waitUntil>
                         </configuration>
                     </plugin>
