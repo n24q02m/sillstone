@@ -424,16 +424,7 @@ jobs:
         run: |
           mkdir -p sdk/java/target
           find artifacts -name "*.jar" -exec cp {} sdk/java/target/ \;
-          JAR="$(cd sdk/java/target && pwd)/$(basename "$(find sdk/java/target -maxdepth 1 -name 'sillstone-*.jar' | head -1)")"
-          unzip -l "$JAR" | grep -q 'io/github/sillstone/native/linux-x64/libsillstone_ffi.so' || {
-            echo "::error title=Java jar::the packaged jar carries no native prebuilds; refusing to deploy a jar that cannot load the native library"
-            exit 1
-          }
-          # The release build compiles the jar from src/, so the prebuilds have to
-          # sit in src/main/resources before mvn runs; copying the finished jar
-          # into target/ alone does not survive the rebuild.
-          ( cd sdk/java/src/main/resources && unzip -o "$JAR" 'io/github/sillstone/native/*' >/dev/null )
-          find sdk/java/src/main/resources/io/github/sillstone/native -type f | sort
+          python3 scripts/ci/stage-java-natives.py
       - name: Set up JDK
         uses: actions/setup-java@v6
         with:
