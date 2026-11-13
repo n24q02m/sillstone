@@ -204,5 +204,18 @@ class NpmTests(unittest.TestCase):
         self.assertTrue(any("missing" in p for p in got))
 
 
+class JarPrefixTests(unittest.TestCase):
+    """The gate, the packaging check and the Java loader must agree on where the
+    native prebuilds live inside the jar; a drifting prefix lets a jar without
+    the native library pass every check."""
+
+    def test_prefix_matches_loader_and_packaging(self):
+        root = pathlib.Path(__file__).resolve().parents[2]
+        loader = (root / "sdk/java/src/main/java/io/github/sillstone/SillstoneNative.java").read_text()
+        self.assertIn(f'"/{cr.JAR_PREFIX}/"', loader)
+        workflow = (root / ".github/workflows/cd.yml").read_text()
+        self.assertIn(f"--prefix {cr.JAR_PREFIX}", workflow)
+
+
 if __name__ == "__main__":
     unittest.main()
