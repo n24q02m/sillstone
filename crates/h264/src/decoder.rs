@@ -1243,10 +1243,10 @@ fn mb_decode(
         if let MbType::I16x16 { .. } = mb_type {
             let nc = nc_value(&pic.mbs, &nz_acc, map, 0, Plane::Luma);
             let r = cavlc::decode_block(br, nc, BlockKind::LumaOrChromaAc4x4)?;
-            for s in 0..16 {
-                // The 4x4 DC grid is raster-ordered over luma blocks:
-                // position = by*4 + bx of the block (spec 8.5.11.1).
-                dc_y[cavlc::raster_index(BlockKind::LumaOrChromaAc4x4, s)] = r.levels[s];
+            // The 4x4 DC grid is raster-ordered over luma blocks:
+            // position = by*4 + bx of the block (spec 8.5.11.1).
+            for (s, &level) in r.levels[..16].iter().enumerate() {
+                dc_y[cavlc::raster_index(BlockKind::LumaOrChromaAc4x4, s)] = level;
             }
             for g in 0..4usize {
                 if cbp_luma & (1 << g) == 0 {
@@ -1256,9 +1256,9 @@ fn mb_decode(
                     let blk = g * 4 + s4;
                     let nc = nc_value(&pic.mbs, &nz_acc, map, blk, Plane::Luma);
                     let r = cavlc::decode_block(br, nc, BlockKind::Ac15)?;
-                    for s in 0..15 {
+                    for (s, &level) in r.levels[..15].iter().enumerate() {
                         let ri = cavlc::raster_index(BlockKind::Ac15, s);
-                        luma_res[blk][ri] = r.levels[s];
+                        luma_res[blk][ri] = level;
                     }
                     nz_acc[blk] = r.total_coeff;
                 }
@@ -1288,9 +1288,9 @@ fn mb_decode(
                         let blk = g * 4 + s4;
                         let nc = nc_value(&pic.mbs, &nz_acc, map, blk, Plane::Luma);
                         let r = cavlc::decode_block(br, nc, BlockKind::LumaOrChromaAc4x4)?;
-                        for s in 0..16 {
+                        for (s, &level) in r.levels[..16].iter().enumerate() {
                             let ri = cavlc::raster_index(BlockKind::LumaOrChromaAc4x4, s);
-                            luma_res[blk][ri] = r.levels[s];
+                            luma_res[blk][ri] = level;
                         }
                         nz_acc[blk] = r.total_coeff;
                     }
@@ -1300,8 +1300,8 @@ fn mb_decode(
         if cbp_chroma > 0 {
             for dc in chroma_dc.iter_mut() {
                 let r = cavlc::decode_block(br, -1, BlockKind::ChromaDc)?;
-                for s in 0..4 {
-                    dc[cavlc::raster_index(BlockKind::ChromaDc, s)] = r.levels[s];
+                for (s, &level) in r.levels[..4].iter().enumerate() {
+                    dc[cavlc::raster_index(BlockKind::ChromaDc, s)] = level;
                 }
             }
             if cbp_chroma == 2 {
@@ -1309,9 +1309,9 @@ fn mb_decode(
                     for b in 0..4usize {
                         let nc = nc_value(&pic.mbs, &nz_acc, map, b, Plane::chroma(c));
                         let r = cavlc::decode_block(br, nc, BlockKind::Ac15)?;
-                        for s in 0..15 {
+                        for (s, &level) in r.levels[..15].iter().enumerate() {
                             let ri = cavlc::raster_index(BlockKind::Ac15, s);
-                            chroma_ac[c][b][ri] = r.levels[s];
+                            chroma_ac[c][b][ri] = level;
                         }
                         nz_acc[16 + c * 4 + b] = r.total_coeff;
                     }
@@ -3430,8 +3430,8 @@ fn mb_decode_cabac(
                             cbf_ctx,
                             &ZIGZAG_4X4[1..],
                         )?;
-                        for s in 0..15 {
-                            chroma_ac[c][b][ZIGZAG_4X4[s + 1] as usize] = r.levels[s];
+                        for (s, &level) in r.levels[..15].iter().enumerate() {
+                            chroma_ac[c][b][ZIGZAG_4X4[s + 1] as usize] = level;
                         }
                         nz_acc[16 + c * 4 + b] = r.total_coeff;
                     }
