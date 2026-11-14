@@ -2,20 +2,28 @@
 # SPDX-License-Identifier: Apache-2.0
 """Print measured coverage and the files that fall short of the target.
 
-Reads either a ``cargo llvm-cov --json`` export (``--format llvm``) or a
-``coverage.py`` ``coverage json`` report and prints the overall line
-coverage, a per-crate (or per-package) table and every file below the
-target. The measured numbers are reported as they are; the script never
-fails on a shortfall (``--fail-under`` opts in) and never edits a claim.
+Reads one coverage report per binding and prints the overall coverage, a
+per-crate (or per-package) table and every file below the target:
+
+    kind    report                                    unit
+    llvm    ``cargo llvm-cov --json`` export (Rust)   lines
+    py      ``coverage json`` report (Python)         statements
+    go      ``go test -coverprofile`` profile (Go)    statements
+    lcov    LCOV tracefile, e.g. ``node --test
+            --test-reporter=lcov`` (Node.js)          lines
+    jacoco  JaCoCo ``jacoco.csv`` (Java)              lines, per class
+
+The measured numbers are reported as they are; the script never fails on a
+shortfall (``--fail-under`` opts in) and never edits a claim.
 
 Usage:
-    coverage_report.py llvm  cov.json  [--target 95] [--fail-under N]
-    coverage_report.py py    cov.json  [--target 95] [--fail-under N]
+    coverage_report.py {llvm,py,go,lcov,jacoco} REPORT [--target 95] [--fail-under N]
 """
 
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
 import sys
@@ -44,6 +52,66 @@ def load_py(path: Path) -> dict[str, tuple[int, int]]:
     return files
 
 
+def load_go(path: Path) -> dict[str, tuple[int, int]]:
+    """Returns ``{file: (covered_statements, statements)}`` from a Go cover profile.
+
+    A block can appear more than once (one entry per test binary that compiled
+    it), so blocks are de-duplicated and count as covered if any entry ran them.
+    """
+    blocks: dict[str, tuple[int, bool]] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip() or line.startswith("mode:"):
+            continue
+        block, statements, count = line.rsplit(" ", 2)
+        seen = blocks.get(block, (int(statements), False))
+        blocks[block] = (seen[0], seen[1] or int(count) > 0)
+    files: dict[str, list[int]] = defaultdict(lambda: [0, 0])
+    for block, (statements, hit) in blocks.items():
+        name = block.rsplit(":", 1)[0]
+        files[name][0] += statements if hit else 0
+        files[name][1] += statements
+    return {name: (cov, tot) for name, (cov, tot) in files.items()}
+
+
+def load_lcov(path: Path) -> dict[str, tuple[int, int]]:
+    """Returns ``{file: (lines_hit, lines_found)}`` from an LCOV tracefile."""
+    files: dict[str, tuple[int, int]] = {}
+    name, hit, found = None, 0, 0
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("SF:"):
+            name, hit, found = line[3:], 0, 0
+        elif line.startswith("LH:"):
+            hit = int(line[3:])
+        elif line.startswith("LF:"):
+            found = int(line[3:])
+        elif line == "end_of_record" and name is not None:
+            files[name] = (hit, found)
+            name = None
+    return files
+
+
+def load_jacoco(path: Path) -> dict[str, tuple[int, int]]:
+    """Returns ``{package/Class: (lines_covered, lines)}`` from a JaCoCo CSV report."""
+    files: dict[str, tuple[int, int]] = {}
+    with path.open(encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            covered = int(row["LINE_COVERED"])
+            files[f"{row['PACKAGE']}/{row['CLASS']}"] = (
+                covered,
+                covered + int(row["LINE_MISSED"]),
+            )
+    return files
+
+
+LOADERS = {
+    "llvm": load_llvm,
+    "py": load_py,
+    "go": load_go,
+    "lcov": load_lcov,
+    "jacoco": load_jacoco,
+}
+
+
 def group_key(kind: str, filename: str) -> str:
     parts = Path(filename.replace("\\", "/")).parts
     if kind == "llvm" and "crates" in parts:
@@ -59,13 +127,13 @@ def pct(covered: int, total: int) -> float:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("kind", choices=["llvm", "py"])
+    ap.add_argument("kind", choices=sorted(LOADERS))
     ap.add_argument("report", type=Path)
     ap.add_argument("--target", type=float, default=95.0)
     ap.add_argument("--fail-under", type=float, default=None)
     args = ap.parse_args()
 
-    files = load_llvm(args.report) if args.kind == "llvm" else load_py(args.report)
+    files = LOADERS[args.kind](args.report)
     if args.kind == "llvm":
         # Tests and integration fixtures are not subjects of the measurement.
         files = {

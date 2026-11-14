@@ -71,6 +71,43 @@
       and the signing key is imported into the keyring before `mvn deploy`.
     -->
     <profiles>
+        <!--
+          Line coverage of the Java binding, used by the CI coverage job:
+            mvn -Pcoverage test "-DargLine=@{jacocoArgLine} -Djava.library.path=..."
+          The agent goes into its own property, so the caller's -DargLine (which
+          carries the native library path) cannot overwrite it; surefire resolves
+          @{jacocoArgLine} late. The report lands in target/site/jacoco/jacoco.csv.
+        -->
+        <profile>
+            <id>coverage</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.jacoco</groupId>
+                        <artifactId>jacoco-maven-plugin</artifactId>
+                        <version>0.8.16</version>
+                        <configuration>
+                            <propertyName>jacocoArgLine</propertyName>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>prepare-agent</id>
+                                <goals>
+                                    <goal>prepare-agent</goal>
+                                </goals>
+                            </execution>
+                            <execution>
+                                <id>report</id>
+                                <phase>test</phase>
+                                <goals>
+                                    <goal>report</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <profile>
             <id>release</id>
             <build>

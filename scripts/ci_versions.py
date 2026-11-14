@@ -1,43 +1,50 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2026 sillstone Contributors
-"""Derive the five CI language matrices from the versions this repository declares.
+"""Derive the five CI language matrices: the upstream-supported lines this repo declares.
 
-A hand-written matrix is checked against nothing, so it rots: the floor moves in
-``sdk/python/pyproject.toml`` (or the pom, the ``go.mod``, the package's
-``engines``, the workspace ``rust-version``) and the workflow keeps testing a
-version the package no longer claims -- or stops testing one it just started
-claiming. Every list below is read from the declaring file at run time::
+Every library in this fleet runs CI on the language versions upstream still supports,
+at most five rows per language. A row is therefore the intersection of two windows:
 
-    language  declaring file and key
-    python    sdk/python/pyproject.toml   project.requires-python
-    node      sdk/node/package.json       engines.node
-    java      sdk/java/pom.xml            maven.compiler.release (else .source)
-    go        sdk/go/go.mod               go
-    rust      Cargo.toml                  workspace.package.rust-version
-                                         (else rust-toolchain.toml [toolchain].channel)
+* the **declared** window -- the floor this repository promises, read at run time
+  from the declaring file, so the matrix cannot drift away from the manifest::
 
-The top of each window is not "the newest release upstream ships" but "the newest
-release this repository can actually install and run". A row that cannot resolve is
-worse than an absent row: it turns every PR red for a reason no PR caused. Each
-ceiling is therefore a constant shipped with the evidence it was read from and the
-date it was read, the same way the rest of this fleet records a ceiling.
+      language  declaring file and key
+      python    sdk/python/pyproject.toml   project.requires-python
+      node      sdk/node/package.json       engines.node
+      java      sdk/java/pom.xml            maven.compiler.release (else .source)
+      go        sdk/go/go.mod               go
+      rust      Cargo.toml                  workspace.package.rust-version
+                                           (else rust-toolchain.toml [toolchain].channel)
 
-Rows are capped at five. When a language's window is wider than that, the floor row
-is kept -- it is the promise that rots -- together with the newest four minors, where
-breakage from a new compiler or interpreter actually lands. Every dropped version is
-reported in ``excluded`` with its reason; nothing is ever dropped silently.
+* the **upstream** window -- every line that has been released and has not reached
+  end of life on the day the resolver runs. Each language carries a dated table read
+  from the upstream's own schedule (``source`` and ``LAST_VERIFIED`` below). Filtering
+  by today's date means a line leaves the matrix on its end-of-life date without anyone
+  editing this file; a new line enters when the table is re-read, never by guessing.
+
+A declared floor below the upstream window is not tested silently either way: every
+line between the floor and the newest row that is not a row is listed in ``excluded``
+with its end-of-life date. Rust is the one deliberate exception: upstream supports only
+the current stable, while ``rust-version`` is a compiler promise Cargo enforces, so the
+declared MSRV stays a row next to the supported stable line.
+
+Rows are capped at five. When the window is wider, the oldest supported line is kept --
+it is the promise that rots -- together with the newest four, where breakage from a new
+compiler or interpreter lands. Every dropped version is reported; nothing is dropped
+silently.
 
 Usage::
 
-    python scripts/ci_versions.py                   # JSON, every language
-    python scripts/ci_versions.py --format github   # $GITHUB_OUTPUT lines
-    python scripts/ci_versions.py --format plain    # one line per language
+    python scripts/ci_versions.py                     # JSON, every language
+    python scripts/ci_versions.py --format github     # $GITHUB_OUTPUT lines
+    python scripts/ci_versions.py --format plain      # one line per language
+    python scripts/ci_versions.py --today 2027-11-01  # resolve as of another day
 
-``scripts/test_ci_versions.py`` is the drift guard: it re-reads the declarations
-with its own parser, asserts every list stays inside the declared window, and fails
-when ``.github/workflows/ci.yml`` carries a literal version pin for one of these
-five languages again.
+``scripts/ci/test_ci_versions.py`` is the drift guard: it re-reads the declarations
+with its own parser, asserts every list stays inside both windows, and fails when
+``.github/workflows/ci.yml`` carries a literal version pin for one of these five
+languages again.
 """
 
 from __future__ import annotations
@@ -49,90 +56,157 @@ import sys
 import tomllib
 import xml.etree.ElementTree as ElementTree
 from dataclasses import dataclass
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-#: The Q34 contract caps every language matrix at five rows.
+#: Every language matrix is capped at five rows.
 MAX_MATRIX_ROWS = 5
 
-#: Date the ceilings below were read. Re-read them, do not guess, before moving one.
-AS_OF = "2026-11-11"
+#: Day the upstream tables below were read. Re-read them, do not guess, before adding
+#: a line: a row that cannot install turns every PR red for a reason no PR caused.
+LAST_VERIFIED = date(2026, 11, 14)
+
+#: After this long the resolver warns that the tables need a re-read. A line that
+#: reaches end of life still drops on its own; a new line only appears on a re-read.
+REVIEW_AFTER = timedelta(days=120)
+
+
+@dataclass(frozen=True)
+class Line:
+    """One upstream release line and its support dates."""
+
+    version: str
+    released: date
+    #: ``None`` while upstream has not scheduled the end of support yet.
+    eol: date | None = None
+
+    def supported_on(self, today: date) -> bool:
+        return self.released <= today and (self.eol is None or today < self.eol)
+
+
+@dataclass(frozen=True)
+class Upstream:
+    """An upstream's support policy and the dated lines read from its schedule."""
+
+    source: str
+    policy: str
+    lines: tuple[Line, ...]
+
+
+def _d(text: str) -> date:
+    return date.fromisoformat(text)
+
 
 # ---------------------------------------------------------------------------
-# Ceilings, with the evidence they were read from.
+# Upstream support tables, read on LAST_VERIFIED from the sources named in each.
 # ---------------------------------------------------------------------------
-# CPython ships one minor every October, so 3.15 is the newest stable line as of
-# AS_OF. It is also the interpreter the canonical CI suite and the release build
-# already run, so a row above it would be installed by nothing.
-NEWEST_CPYTHON_MINOR = 15
-CPYTHON_CEILING_REASON = (
-    f"3.{NEWEST_CPYTHON_MINOR} is the newest stable CPython line as of {AS_OF}: "
-    "CPython ships one minor every October and both the canonical CI suite and the "
-    "release build already run this one, so nothing would install a row above it."
+PYTHON_UPSTREAM = Upstream(
+    source=(
+        "peps.python.org/api/release-cycle.json (the data behind the devguide's "
+        "'Status of Python versions') and endoflife.date/api/python.json for the day"
+    ),
+    policy=(
+        "CPython supports a minor for five years from its October release: bugfix "
+        "releases for two years, security-only releases after that."
+    ),
+    lines=(
+        Line("3.9", _d("2020-10-05"), _d("2025-10-31")),
+        Line("3.10", _d("2021-10-04"), _d("2026-10-01")),
+        Line("3.11", _d("2022-10-24"), _d("2027-10-31")),
+        Line("3.12", _d("2023-10-02"), _d("2028-10-31")),
+        Line("3.13", _d("2024-10-07"), _d("2029-10-31")),
+        Line("3.14", _d("2025-10-07"), _d("2030-10-31")),
+        Line("3.15", _d("2026-10-09"), _d("2031-10-31")),
+    ),
 )
 
-# The bottom of the window is where the test *oracle* still installs, not where the
-# package claims to run. The resize/parity suites compare sillstone against Pillow
-# bit for bit and ship pillow==13.0.0 as the oracle, and Pillow 13 declares
-# requires-python >=3.11 (PyPI metadata read on AS_OF; pip refuses the pin on 3.10:
-# "Could not find a version that satisfies the requirement pillow==13.0.0").
-# A row below that cannot verify the parity claim, so it is reported as excluded and
-# not silently dropped.
-PYTHON_ORACLE_FLOOR_MINOR = 11
-PYTHON_ORACLE_REASON = (
-    "the parity oracle pillow==13.0.0 declares requires-python >=3.11 "
-    f"(PyPI metadata read {AS_OF}) and the resize/parity suites compare against it "
-    "bit for bit, so a row below 3.11 cannot verify the SDK's parity claim; open the "
-    "row by dropping the oracle pin, not by testing against one that disagrees"
-)
-PYTHON_GRID_RULE = (
-    "Rows run every CPython minor from the newest of the declared floor and the "
-    f"oracle floor (3.{PYTHON_ORACLE_FLOOR_MINOR}, under the row cap) to 3."
-    f"{NEWEST_CPYTHON_MINOR}, because that is the window whose bit-for-bit parity "
-    "claim against Pillow can actually be executed. requires-python still declares the "
-    "wider promise; the exclusions below say which rows that promise costs."
+NODE_UPSTREAM = Upstream(
+    source="github.com/nodejs/Release schedule.json (start and end of every line)",
+    policy=(
+        "Node.js supports an even major for 30 months (LTS from the October after its "
+        "release) and an odd major for about seven months."
+    ),
+    lines=(
+        Line("22", _d("2024-04-24"), _d("2027-04-30")),
+        Line("23", _d("2024-10-16"), _d("2025-06-01")),
+        Line("24", _d("2025-05-06"), _d("2028-04-30")),
+        Line("25", _d("2025-10-15"), _d("2026-06-01")),
+        Line("26", _d("2026-05-05"), _d("2029-04-30")),
+    ),
 )
 
-# nodejs.org/dist/index.json as of AS_OF: 26 is the current Active LTS ("Lithium",
-# LTS since 2026-10-28), 24 and 22 are in maintenance (22 until 2027-04).
-NODE_LTS_MAJORS = (22, 24, 26)
-NODE_GRID_RULE = (
-    "Only LTS lines are rows. Even majors enter LTS in October of their release year "
-    f"and keep it for 30 months, so as of {AS_OF} the maintainable grid is "
-    f"{', '.join(str(major) for major in NODE_LTS_MAJORS)}. Odd majors go EOL six "
-    "months after release: a green row on one is a clean bill of health for a runtime "
-    "no consumer should be running."
+JAVA_UPSTREAM = Upstream(
+    source=(
+        "endoflife.date/api/eclipse-temurin.json, cross-checked against "
+        "api.adoptium.net/v3/info/available_releases (most_recent_lts 25, "
+        "most_recent_feature_release 27); every CI JDK is a Temurin build"
+    ),
+    policy=(
+        "Temurin supports an LTS line (17, 21, 25) for years and a feature release "
+        "only until the next one ships six months later."
+    ),
+    lines=(
+        Line("17", _d("2021-09-22"), _d("2027-10-31")),
+        Line("18", _d("2022-03-24"), _d("2022-09-30")),
+        Line("19", _d("2022-09-26"), _d("2023-03-31")),
+        Line("20", _d("2023-03-23"), _d("2023-09-19")),
+        Line("21", _d("2023-10-10"), _d("2029-12-31")),
+        Line("22", _d("2024-03-20"), _d("2024-09-17")),
+        Line("23", _d("2024-09-17"), _d("2025-03-18")),
+        Line("24", _d("2025-03-20"), _d("2025-09-22")),
+        Line("25", _d("2025-09-22"), _d("2031-09-30")),
+        Line("26", _d("2026-03-23"), _d("2026-09-22")),
+        Line("27", _d("2026-09-22"), _d("2027-03-23")),
+    ),
 )
 
-# Adoptium available_releases as of AS_OF: available_lts_releases [8, 11, 17, 21, 25],
-# most_recent_lts 25, most_recent_feature_release 27.
-JAVA_LTS_MAJORS = (17, 21, 25)
-JAVA_GRID_RULE = (
-    "Only LTS lines are rows, because the pom compiles for source/target 17 and "
-    "consumers deploy on LTS. Adoptium's available_lts_releases reads [8, 11, 17, 21, "
-    f"25] with most_recent_lts 25 as of {AS_OF}; feature releases are dropped after "
-    "six months and were never a support promise."
+GO_UPSTREAM = Upstream(
+    source=(
+        "go.dev/doc/devel/release (policy), go.dev/dl/?mode=json (go1.27.4 and "
+        "go1.26.11 are the supported stable releases) and endoflife.date/api/go.json"
+    ),
+    policy=(
+        "Go supports a release until there are two newer major releases, so exactly "
+        "the two newest minors are supported; the end of one is the next release's date."
+    ),
+    lines=(
+        Line("1.22", _d("2024-02-06"), _d("2025-02-11")),
+        Line("1.23", _d("2024-08-13"), _d("2025-08-12")),
+        Line("1.24", _d("2025-02-11"), _d("2026-02-10")),
+        Line("1.25", _d("2025-08-12"), _d("2026-08-19")),
+        Line("1.26", _d("2026-02-10")),
+        Line("1.27", _d("2026-08-19")),
+    ),
 )
 
-# go.dev/dl/?mode=json as of AS_OF: go1.27.4 is the newest stable release, and the
-# canonical CI job already builds with 1.27.
-NEWEST_GO_MINOR = 27
-GO_CEILING_REASON = (
-    f"1.{NEWEST_GO_MINOR} is the newest stable Go release as of {AS_OF} "
-    "(go.dev/dl lists go1.27.4); the canonical CI job already builds with it, so a "
-    "row above it would be installed by nothing."
+RUST_UPSTREAM = Upstream(
+    source=(
+        "static.rust-lang.org/dist/channel-rust-stable.toml (rustc 1.100.0, channel "
+        "dated 2026-11-12) and endoflife.date/api/rust.json"
+    ),
+    policy=(
+        "Rust supports only the current stable release, superseded six weeks later. The "
+        "declared MSRV is kept as a row on top: rust-version is a promise Cargo enforces, "
+        "and stable is a backward-compatible superset of every minor in between."
+    ),
+    lines=(
+        Line("1.99.0", _d("2026-10-01"), _d("2026-11-12")),
+        Line("1.100.0", _d("2026-11-12")),
+    ),
 )
 
-# static.rust-lang.org/dist/channel-rust-1.98.0.toml resolves as of AS_OF.
-NEWEST_STABLE_RUST = "1.98.0"
-RUST_GRID_RULE = (
-    "The grid is the declared MSRV plus the current stable toolchain. Rust's stable "
-    "channel is a backward-compatible superset of every earlier minor, so interim "
-    "minors add build minutes without a configuration that can fail differently. "
-    f"{NEWEST_STABLE_RUST} is the stable release as of {AS_OF}."
-)
+UPSTREAM = {
+    "python": PYTHON_UPSTREAM,
+    "node": NODE_UPSTREAM,
+    "java": JAVA_UPSTREAM,
+    "go": GO_UPSTREAM,
+    "rust": RUST_UPSTREAM,
+}
 
+# requires-python cannot drop below 3.11 while the parity suites pin pillow==13.0.0 as
+# their bit-for-bit oracle: Pillow 13 declares requires-python >=3.11.
 PYTHON_SOURCE = "sdk/python/pyproject.toml project.requires-python"
 NODE_SOURCE = "sdk/node/package.json engines.node"
 JAVA_SOURCE = "sdk/java/pom.xml maven.compiler.release|source"
@@ -150,6 +224,7 @@ class Matrix:
     grid_rule: str
     versions: list[str]
     excluded: list[dict[str, str]]
+    upstream: str = ""
 
     @property
     def newest(self) -> str:
@@ -161,6 +236,7 @@ class Matrix:
             "newest": self.newest,
             "source": self.source,
             "grid_rule": self.grid_rule,
+            "upstream": self.upstream,
             "versions": self.versions,
             "excluded": self.excluded,
         }
@@ -174,8 +250,12 @@ def _sort_key(version: str) -> tuple[int, ...]:
     return tuple(int(part) for part in version.split("."))
 
 
+def _utc_today() -> date:
+    return datetime.now(timezone.utc).date()
+
+
 def _cap(versions: list[str]) -> tuple[list[str], list[dict[str, str]]]:
-    """Trim a window to MAX_MATRIX_ROWS rows, keeping the floor and the newest rows."""
+    """Trim a window to MAX_MATRIX_ROWS rows, keeping the oldest and the newest rows."""
     if len(versions) <= MAX_MATRIX_ROWS:
         return versions, []
     kept = [versions[0], *versions[-(MAX_MATRIX_ROWS - 1) :]]
@@ -184,8 +264,8 @@ def _cap(versions: list[str]) -> tuple[list[str], list[dict[str, str]]]:
         {
             "version": version,
             "reason": (
-                f"dropped by the {MAX_MATRIX_ROWS}-row cap: the declared floor row and "
-                "the newest four minors are the rows that can fail"
+                f"dropped by the {MAX_MATRIX_ROWS}-row cap: the oldest supported row and "
+                "the newest four are the rows that can fail"
             ),
         }
         for version in dropped
@@ -199,7 +279,7 @@ def python_floor() -> str:
     document = tomllib.loads(_read("sdk/python/pyproject.toml"))
     try:
         declared = document["project"]["requires-python"]
-    except KeyError as exc:  # pragma: no cover - the file declares it today
+    except KeyError as exc:
         raise ValueError("sdk/python/pyproject.toml declares no project.requires-python") from exc
     for clause in str(declared).split(","):
         match = re.fullmatch(r">=\s*3\.(\d+)", clause.strip())
@@ -258,100 +338,78 @@ def rust_floor() -> str:
 
 
 # ---------------------------------------------------------------------------
-# One resolver per language.
+# The intersection of the declared and the upstream window.
 # ---------------------------------------------------------------------------
-def python_matrix() -> Matrix:
-    floor = python_floor()
-    floor_minor = _sort_key(floor)[1]
-    if floor_minor > NEWEST_CPYTHON_MINOR:
-        raise ValueError(
-            f"requires-python floor 3.{floor_minor} is above the newest row this repo can "
-            f"install (3.{NEWEST_CPYTHON_MINOR}): {CPYTHON_CEILING_REASON}"
-        )
-    start = max(floor_minor, PYTHON_ORACLE_FLOOR_MINOR)
-    excluded = [
-        {"version": f"3.{minor}", "reason": PYTHON_ORACLE_REASON}
-        for minor in range(floor_minor, start)
-    ]
-    candidates = [f"3.{minor}" for minor in range(start, NEWEST_CPYTHON_MINOR + 1)]
-    versions, dropped = _cap(candidates)
-    return Matrix("python", floor, PYTHON_SOURCE, PYTHON_GRID_RULE, versions, excluded + dropped)
+def support_window(
+    language: str,
+    floor: str,
+    source: str,
+    upstream: Upstream,
+    today: date,
+    *,
+    floor_row: bool = False,
+) -> Matrix:
+    """Rows = upstream lines supported on ``today`` at or above the declared ``floor``.
 
-
-def node_matrix() -> Matrix:
-    floor = node_floor()
-    newest = max(NODE_LTS_MAJORS)
-    if int(floor) > newest:
+    ``floor_row`` keeps the declared floor as a row even when upstream no longer
+    supports it (Rust's MSRV); otherwise a floor older than every tabled line is an
+    error, because the table cannot say whether the lines in between are supported.
+    """
+    lines = sorted(upstream.lines, key=lambda line: _sort_key(line.version))
+    floor_key = _sort_key(floor)
+    if not floor_row and floor_key < _sort_key(lines[0].version):
         raise ValueError(
-            f"engines.node declares >={floor} but the newest LTS line is {newest}: {NODE_GRID_RULE}"
+            f"{language}: the declared floor {floor} predates every line in the upstream "
+            f"table (oldest {lines[0].version}); extend the table from {upstream.source}"
         )
-    grid = [major for major in NODE_LTS_MAJORS if major >= int(floor)]
+    in_window = [line for line in lines if _sort_key(line.version) >= floor_key]
+    supported = [line.version for line in in_window if line.supported_on(today)]
+    if not supported:
+        raise ValueError(
+            f"{language}: no line at or above the declared floor {floor} is supported "
+            f"upstream on {today.isoformat()}. {upstream.policy}"
+        )
     excluded = [
         {
-            "version": str(major),
+            "version": line.version,
             "reason": (
-                "not an LTS line: odd majors go EOL six months after release, so the row "
-                "would prove a runtime no consumer should be running"
+                f"not released upstream until {line.released.isoformat()}"
+                if line.released > today
+                else f"end of life upstream on {line.eol.isoformat()}"
             ),
         }
-        for major in range(int(floor), newest)
-        if major not in grid
+        for line in in_window
+        if not line.supported_on(today)
     ]
+    rows = supported
+    if floor_row and floor_key < _sort_key(supported[0]):
+        rows = [floor, *supported]
+    versions, dropped = _cap(rows)
     return Matrix(
-        "node", floor, NODE_SOURCE, NODE_GRID_RULE, [str(major) for major in grid], excluded
+        language, floor, source, upstream.policy, versions, excluded + dropped, upstream.source
     )
 
 
-def java_matrix() -> Matrix:
-    floor = int(java_floor())
-    newest = max(JAVA_LTS_MAJORS)
-    if floor > newest:
-        raise ValueError(
-            f"the pom compiles for {floor} but the newest LTS line is {newest}: {JAVA_GRID_RULE}"
-        )
-    grid = [major for major in JAVA_LTS_MAJORS if major >= floor]
-    if floor not in grid:
-        # A floor that is not itself an LTS line is still the row that must run.
-        grid.insert(0, floor)
-    excluded = [
-        {
-            "version": str(major),
-            "reason": (
-                "not an LTS line: feature releases are dropped after six months and were "
-                "never a support promise"
-            ),
-        }
-        for major in range(floor, newest)
-        if major not in grid
-    ]
-    return Matrix(
-        "java", str(floor), JAVA_SOURCE, JAVA_GRID_RULE, [str(major) for major in grid], excluded
+def python_matrix(today: date) -> Matrix:
+    return support_window("python", python_floor(), PYTHON_SOURCE, PYTHON_UPSTREAM, today)
+
+
+def node_matrix(today: date) -> Matrix:
+    return support_window("node", node_floor(), NODE_SOURCE, NODE_UPSTREAM, today)
+
+
+def java_matrix(today: date) -> Matrix:
+    return support_window("java", java_floor(), JAVA_SOURCE, JAVA_UPSTREAM, today)
+
+
+def go_matrix(today: date) -> Matrix:
+    return support_window("go", go_floor(), GO_SOURCE, GO_UPSTREAM, today)
+
+
+def rust_matrix(today: date) -> Matrix:
+    return support_window(
+        "rust", rust_floor(), RUST_SOURCE, RUST_UPSTREAM, today, floor_row=True
     )
-
-
-def go_matrix() -> Matrix:
-    floor = go_floor()
-    floor_minor = _sort_key(floor)[1]
-    if floor_minor > NEWEST_GO_MINOR:
-        raise ValueError(
-            f"the go directive floor 1.{floor_minor} is above the newest installable row "
-            f"(1.{NEWEST_GO_MINOR}): {GO_CEILING_REASON}"
-        )
-    candidates = [f"1.{minor}" for minor in range(floor_minor, NEWEST_GO_MINOR + 1)]
-    versions, excluded = _cap(candidates)
-    return Matrix("go", floor, GO_SOURCE, GO_CEILING_REASON, versions, excluded)
-
-
-def rust_matrix() -> Matrix:
-    floor = rust_floor()
-    newest = NEWEST_STABLE_RUST
-    if _sort_key(floor) > _sort_key(newest):
-        raise ValueError(
-            f"[workspace.package] rust-version {floor} is above the stable release "
-            f"{newest}: {RUST_GRID_RULE}"
-        )
-    versions = [floor] if _sort_key(floor) == _sort_key(newest) else [floor, newest]
-    return Matrix("rust", floor, RUST_SOURCE, RUST_GRID_RULE, versions, [])
 
 
 RESOLVERS = {
@@ -363,14 +421,26 @@ RESOLVERS = {
 }
 
 
-def resolve() -> dict[str, Matrix]:
-    """Return every language matrix, keyed by language in declaration order."""
-    return {language: resolver() for language, resolver in RESOLVERS.items()}
+def resolve(today: date | None = None) -> dict[str, Matrix]:
+    """Return every language matrix as of ``today`` (UTC), keyed in declaration order."""
+    day = _utc_today() if today is None else today
+    return {language: resolver(day) for language, resolver in RESOLVERS.items()}
+
+
+def stale_tables(today: date) -> str | None:
+    """A warning when the upstream tables are older than REVIEW_AFTER, else None."""
+    if today - LAST_VERIFIED <= REVIEW_AFTER:
+        return None
+    return (
+        f"the upstream support tables in scripts/ci_versions.py were last verified on "
+        f"{LAST_VERIFIED.isoformat()}; lines released since then are not rows until the "
+        "tables are re-read from their sources"
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Derive the CI language matrices from the declared floors."
+        description="Derive the CI language matrices from the declared and upstream windows."
     )
     parser.add_argument(
         "--format",
@@ -378,8 +448,19 @@ def main(argv: list[str] | None = None) -> int:
         default="json",
         help="json (default), github ($GITHUB_OUTPUT lines) or plain (one line per language)",
     )
+    parser.add_argument(
+        "--today",
+        type=date.fromisoformat,
+        default=None,
+        help="resolve as of this ISO date instead of today (UTC)",
+    )
     arguments = parser.parse_args(argv)
-    matrices = resolve()
+    today = _utc_today() if arguments.today is None else arguments.today
+    matrices = resolve(today)
+    warning = stale_tables(today)
+    if warning is not None:
+        prefix = "::warning title=Stale support tables::" if arguments.format == "github" else "warning: "
+        print(prefix + warning, file=sys.stderr)
     if arguments.format == "json":
         print(json.dumps({name: matrix.as_dict() for name, matrix in matrices.items()}, indent=2))
         return 0
@@ -388,11 +469,13 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{name}={json.dumps(matrix.versions)}")
             print(f"{name}-newest={matrix.newest}")
         return 0
+    print(f"resolved for {today.isoformat()} (tables verified {LAST_VERIFIED.isoformat()})")
     for name, matrix in matrices.items():
         print(
             f"{name:<7}{' '.join(matrix.versions):<28} floor {matrix.floor}  newest "
             f"{matrix.newest}  ({matrix.source})"
         )
+        print(f"        upstream: {matrix.upstream}")
         for entry in matrix.excluded:
             print(f"        excluded {entry['version']}: {entry['reason']}")
     return 0
