@@ -282,7 +282,7 @@ jobs:
         run: python scripts/ci/coverage_report.py lcov node-cov.lcov --target 95 --fail-under 91
 
       - name: Report Java coverage
-        run: python scripts/ci/coverage_report.py jacoco sdk/java/target/site/jacoco/jacoco.csv --target 95 --fail-under 77
+        run: python scripts/ci/coverage_report.py jacoco sdk/java/target/site/jacoco/jacoco.csv --target 95 --fail-under 78
 
       # The resolver and the report script decide what this pipeline tests and gates,
       # so they are held to the target themselves.
