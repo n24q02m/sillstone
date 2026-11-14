@@ -1,8 +1,8 @@
 //! DEFLATE and zlib stream decoding (RFC 1951, RFC 1950).
 //!
-//! Part of the `pith` suite (sillstone-curator), the company split of the `modhash`
+//! Part of the `sillstone` suite, the company split of the `modhash`
 //! zero-dependency hashing kit: the suite's only allowed dependencies are
-//! its own `pith-*` crates, so it still resolves without a single registry
+//! its own `sillstone-*` crates, so it still resolves without a single registry
 //! package. A hashing kit that walks PNG, ZIP, DOCX and half the web has to
 //! reach the bytes inside those containers, and it cannot add a compression
 //! library without breaking that rule - so the decompressor is written here,
@@ -44,18 +44,18 @@ use core::cmp::Ordering;
 use sillstone_digest::{Error, Result};
 
 pub mod ffi;
-// The Java SDK's native-method surface: `Java_hash_sillstone_inflate_*`
+// The Java SDK's native-method surface: `Java_io_github_sillstone_SillstoneInflate_*`
 // exports that forward to the C ABI above. Compiled out of the unit
 // test build (the `#[no_mangle]` exports would collide with the test
 // binary's copies); `tests/java_ffi.rs` covers the glue against a
 // synthetic JNI environment instead. Private module: the JVM links
 // the exports by symbol name, so nothing here needs to be publicly
 // nameable in Rust.
+/// Pure Rust Brotli decompressor (RFC 7932), large-window streams excepted.
+pub mod brotli;
 #[cfg(not(test))]
 mod ffi_jni;
 pub mod stream;
-/// Pure Rust Brotli decompressor (RFC 7932), large-window streams excepted.
-pub mod brotli;
 /// Pure Rust Zstandard decompressor (RFC 8878), dictionaries excepted.
 pub mod zstd;
 pub use brotli::decompress as inflate_brotli;

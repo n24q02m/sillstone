@@ -6,7 +6,7 @@
 //! (6-tap) and eighth-sample chroma interpolation, and the in-loop
 //! deblocking filter.
 //!
-//! Part of the `pith` zero-dependency hashing suite: every crate in
+//! Part of the `sillstone` zero-dependency hashing suite: every crate in
 //! this suite builds without a single registry package, so the
 //! whole suite resolves offline.
 //!

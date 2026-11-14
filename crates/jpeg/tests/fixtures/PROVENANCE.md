@@ -1,4 +1,4 @@
-# Fixture provenance — pith-jpeg
+# Fixture provenance — sillstone-jpeg
 
 All `*.jpg` fixtures were generated offline and every `*.raw` is the
 reference decoder's pixel output (`PIL.Image.open(...).tobytes()`),

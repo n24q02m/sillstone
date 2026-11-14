@@ -2,7 +2,7 @@
 //! (ctypes), Node (koffi) and Go (cgo) SDKs bind through.
 //!
 //! The suite's FFI convention, defined by this module and mirrored by
-//! every `pith-*` cdylib:
+//! every `sillstone-*` cdylib:
 //!
 //! * one flat set of `#[unsafe(no_mangle)] pub unsafe extern "C"`
 //!   functions — raw pointers plus lengths, no structs across the
@@ -21,8 +21,8 @@
 //! Wire codes follow declaration order — the same rule every suite
 //! cdylib uses:
 //!
-//! * modality: [`PITH_HASH_MODALITY_IMAGE`] … [`PITH_HASH_MODALITY_VIDEO`];
-//! * format: [`PITH_HASH_FORMAT_PNG`] … [`PITH_HASH_FORMAT_UNKNOWN`]
+//! * modality: [`SILLSTONE_HASH_MODALITY_IMAGE`] … [`SILLSTONE_HASH_MODALITY_VIDEO`];
+//! * format: [`SILLSTONE_HASH_FORMAT_PNG`] … [`SILLSTONE_HASH_FORMAT_UNKNOWN`]
 //!   (the `sillstone_digest::Format` declaration order; `as_str()` values
 //!   in that order: `png`, `jpeg`, `bmp`, `zip`, `mp4`, `mp3`, `wav`,
 //!   `flac`, `pdf`, `gif`, `unknown`);
@@ -55,66 +55,66 @@ use crate::reference::{describe_stream, format_code, modality_code, signature_st
 use crate::{Error, MatchOutcome};
 
 /// Status: success.
-pub const PITH_OK: i32 = 0;
+pub const SILLSTONE_OK: i32 = 0;
 /// Status: a caller argument is invalid — a null pointer or a capacity
 /// too small for the fixed wire shape.
-pub const PITH_E_INVALID: i32 = -1;
+pub const SILLSTONE_E_INVALID: i32 = -1;
 /// Status: the core pipeline refused the input — a decode failure in
 /// any modality, a pending-lane refusal, a PDF/audio-layer rejection,
 /// or a cross-modality `match` (`Error` is `#[non_exhaustive]`; every
 /// variant, named or future, is an input rejection at this boundary).
-pub const PITH_E_REJECTED: i32 = -2;
+pub const SILLSTONE_E_REJECTED: i32 = -2;
 
 /// Format code for `Format::Png` (`"png"`).
-pub const PITH_HASH_FORMAT_PNG: u32 = 0;
+pub const SILLSTONE_HASH_FORMAT_PNG: u32 = 0;
 /// Format code for `Format::Jpeg` (`"jpeg"`).
-pub const PITH_HASH_FORMAT_JPEG: u32 = 1;
+pub const SILLSTONE_HASH_FORMAT_JPEG: u32 = 1;
 /// Format code for `Format::Bmp` (`"bmp"`).
-pub const PITH_HASH_FORMAT_BMP: u32 = 2;
+pub const SILLSTONE_HASH_FORMAT_BMP: u32 = 2;
 /// Format code for `Format::Zip` (`"zip"`).
-pub const PITH_HASH_FORMAT_ZIP: u32 = 3;
+pub const SILLSTONE_HASH_FORMAT_ZIP: u32 = 3;
 /// Format code for `Format::Mp4` (`"mp4"`).
-pub const PITH_HASH_FORMAT_MP4: u32 = 4;
+pub const SILLSTONE_HASH_FORMAT_MP4: u32 = 4;
 /// Format code for `Format::Mp3` (`"mp3"`).
-pub const PITH_HASH_FORMAT_MP3: u32 = 5;
+pub const SILLSTONE_HASH_FORMAT_MP3: u32 = 5;
 /// Format code for `Format::Wav` (`"wav"`).
-pub const PITH_HASH_FORMAT_WAV: u32 = 6;
+pub const SILLSTONE_HASH_FORMAT_WAV: u32 = 6;
 /// Format code for `Format::Flac` (`"flac"`).
-pub const PITH_HASH_FORMAT_FLAC: u32 = 7;
+pub const SILLSTONE_HASH_FORMAT_FLAC: u32 = 7;
 /// Format code for `Format::Pdf` (`"pdf"`).
-pub const PITH_HASH_FORMAT_PDF: u32 = 8;
+pub const SILLSTONE_HASH_FORMAT_PDF: u32 = 8;
 /// Format code for `Format::Gif` (`"gif"`).
-pub const PITH_HASH_FORMAT_GIF: u32 = 9;
+pub const SILLSTONE_HASH_FORMAT_GIF: u32 = 9;
 /// Format code for `Format::Unknown` (`"unknown"` — bare text and
 /// binary inputs).
-pub const PITH_HASH_FORMAT_UNKNOWN: u32 = 10;
+pub const SILLSTONE_HASH_FORMAT_UNKNOWN: u32 = 10;
 
 /// Modality code for `Modality::Image`.
-pub const PITH_HASH_MODALITY_IMAGE: u32 = 0;
+pub const SILLSTONE_HASH_MODALITY_IMAGE: u32 = 0;
 /// Modality code for `Modality::Audio`.
-pub const PITH_HASH_MODALITY_AUDIO: u32 = 1;
+pub const SILLSTONE_HASH_MODALITY_AUDIO: u32 = 1;
 /// Modality code for `Modality::Text`.
-pub const PITH_HASH_MODALITY_TEXT: u32 = 2;
+pub const SILLSTONE_HASH_MODALITY_TEXT: u32 = 2;
 /// Modality code for `Modality::Binary`.
-pub const PITH_HASH_MODALITY_BINARY: u32 = 3;
+pub const SILLSTONE_HASH_MODALITY_BINARY: u32 = 3;
 /// Modality code for `Modality::Video`.
-pub const PITH_HASH_MODALITY_VIDEO: u32 = 4;
+pub const SILLSTONE_HASH_MODALITY_VIDEO: u32 = 4;
 
 /// Match tag: image (slots: hamming).
-pub const PITH_HASH_MATCH_IMAGE: u32 = 0;
+pub const SILLSTONE_HASH_MATCH_IMAGE: u32 = 0;
 /// Match tag: audio (slots: votes, delta_t).
-pub const PITH_HASH_MATCH_AUDIO: u32 = 1;
+pub const SILLSTONE_HASH_MATCH_AUDIO: u32 = 1;
 /// Match tag: text (slots: Jaccard bits).
-pub const PITH_HASH_MATCH_TEXT: u32 = 2;
+pub const SILLSTONE_HASH_MATCH_TEXT: u32 = 2;
 /// Match tag: binary (slots: Jaccard bits).
-pub const PITH_HASH_MATCH_BINARY: u32 = 3;
+pub const SILLSTONE_HASH_MATCH_BINARY: u32 = 3;
 /// Match tag: video (slots: score bits, minhash Jaccard bits).
-pub const PITH_HASH_MATCH_VIDEO: u32 = 4;
+pub const SILLSTONE_HASH_MATCH_VIDEO: u32 = 4;
 
 /// The slot count every `sillstone_curator_match` caller must provide room
 /// for — the largest outcome (audio, video) uses two, the protocol
 /// reserves four.
-pub const PITH_HASH_MATCH_SLOTS: usize = 4;
+pub const SILLSTONE_HASH_MATCH_SLOTS: usize = 4;
 
 /// Maps a facade error onto the flat status code: every variant is an
 /// input rejection at this boundary (`-2`); nothing here is a caller
@@ -125,14 +125,14 @@ fn status_of(err: &Error) -> i32 {
         | Error::Unsupported { .. }
         | Error::Pdf(_)
         | Error::Audio(_)
-        | Error::BadValue(_) => PITH_E_REJECTED,
+        | Error::BadValue(_) => SILLSTONE_E_REJECTED,
         // `Error` is `#[non_exhaustive]`: downstream crates can see new
         // variants at any time, and this boundary refuses them all. The
         // arm is unreachable inside the defining crate (which sees
         // every variant), kept so the status can never silently change
         // meaning when one is added.
         #[allow(unreachable_patterns)]
-        _ => PITH_E_REJECTED,
+        _ => SILLSTONE_E_REJECTED,
     }
 }
 
@@ -149,13 +149,13 @@ fn emit(stream: alloc::vec::Vec<u8>, out: *mut *mut u8, out_len: *mut usize) -> 
         *out = ptr.cast::<u8>();
         *out_len = len;
     }
-    PITH_OK
+    SILLSTONE_OK
 }
 
 /// Sniffs `data` and reports the verdict without decoding: the format
 /// code, the modality code and the pending flag (`0`/`1`) through the
 /// three out-params. Infallible for readable input — only null
-/// pointers are [`PITH_E_INVALID`].
+/// pointers are [`SILLSTONE_E_INVALID`].
 ///
 /// # Safety
 ///
@@ -170,7 +170,7 @@ pub unsafe extern "C" fn sillstone_curator_detect(
     out_pending: *mut u32,
 ) -> i32 {
     if data.is_null() || out_format.is_null() || out_modality.is_null() || out_pending.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     // Safety: the caller contracted `len` readable bytes.
     let bytes = unsafe { core::slice::from_raw_parts(data, len) };
@@ -181,12 +181,12 @@ pub unsafe extern "C" fn sillstone_curator_detect(
         *out_modality = u32::from(modality_code(det.modality));
         *out_pending = u32::from(det.pending);
     }
-    PITH_OK
+    SILLSTONE_OK
 }
 
 /// Computes the tier-2 signature of `data` and hands the canonical
 /// signature stream (see [`crate::reference`]) to the caller: on
-/// [`PITH_OK`] the buffer address goes through `out`, its length
+/// [`SILLSTONE_OK`] the buffer address goes through `out`, its length
 /// through `out_len`, and the caller owns it until
 /// [`sillstone_curator_free`].
 ///
@@ -203,7 +203,7 @@ pub unsafe extern "C" fn sillstone_curator_signature(
     out_len: *mut usize,
 ) -> i32 {
     if data.is_null() || out.is_null() || out_len.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     // Safety: the caller contracted `len` readable bytes.
     let bytes = unsafe { core::slice::from_raw_parts(data, len) };
@@ -230,7 +230,7 @@ pub unsafe extern "C" fn sillstone_curator_describe(
     out_len: *mut usize,
 ) -> i32 {
     if data.is_null() || out.is_null() || out_len.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     // Safety: the caller contracted `len` readable bytes.
     let bytes = unsafe { core::slice::from_raw_parts(data, len) };
@@ -244,10 +244,10 @@ pub unsafe extern "C" fn sillstone_curator_describe(
 /// [`crate::match_`] outcome as slots (see the module-doc table): the
 /// outcome tag through `out_tag`, the fields through the first slots
 /// of `out_slots`, and `0`/`1` through `out_matched`. Nothing is
-/// written on a non-`PITH_OK` return — a cross-modality pair is
-/// [`PITH_E_REJECTED`] with all three out-params untouched.
+/// written on a non-`SILLSTONE_OK` return — a cross-modality pair is
+/// [`SILLSTONE_E_REJECTED`] with all three out-params untouched.
 ///
-/// `slots_cap` below [`PITH_HASH_MATCH_SLOTS`] is [`PITH_E_INVALID`].
+/// `slots_cap` below [`SILLSTONE_HASH_MATCH_SLOTS`] is [`SILLSTONE_E_INVALID`].
 ///
 /// # Safety
 ///
@@ -272,10 +272,10 @@ pub unsafe extern "C" fn sillstone_curator_match(
         || out_slots.is_null()
         || out_matched.is_null()
     {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
-    if slots_cap < PITH_HASH_MATCH_SLOTS {
-        return PITH_E_INVALID;
+    if slots_cap < SILLSTONE_HASH_MATCH_SLOTS {
+        return SILLSTONE_E_INVALID;
     }
     // Safety: the caller contracted `a_len`/`b_len` readable bytes.
     let (left, right) = unsafe {
@@ -292,7 +292,7 @@ pub unsafe extern "C" fn sillstone_curator_match(
                 core::ptr::copy_nonoverlapping(slots.as_ptr(), out_slots, slots.len());
                 *out_matched = matched;
             }
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(status) => status,
     }
@@ -300,7 +300,7 @@ pub unsafe extern "C" fn sillstone_curator_match(
 
 /// Computes the tier-1 content hash of `data` and writes the 32-byte
 /// digest into `out`, reporting the written length through `out_len`.
-/// `out_cap` below 32 is [`PITH_E_INVALID`].
+/// `out_cap` below 32 is [`SILLSTONE_E_INVALID`].
 ///
 /// # Safety
 ///
@@ -315,10 +315,10 @@ pub unsafe extern "C" fn sillstone_curator_content_hash(
     out_len: *mut usize,
 ) -> i32 {
     if data.is_null() || out.is_null() || out_len.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     if out_cap < 32 {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     // Safety: the caller contracted `len` readable bytes.
     let bytes = unsafe { core::slice::from_raw_parts(data, len) };
@@ -329,7 +329,7 @@ pub unsafe extern "C" fn sillstone_curator_content_hash(
                 core::ptr::copy_nonoverlapping(digest.as_bytes().as_ptr(), out, 32);
                 *out_len = 32;
             }
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(err) => status_of(&err),
     }
@@ -356,7 +356,7 @@ pub unsafe extern "C" fn sillstone_curator_free(ptr: *mut u8, len: usize) {
 }
 
 /// The safe core of [`sillstone_curator_signature`]: sign, then serialize.
-/// Every facade refusal maps to [`PITH_E_REJECTED`]. `pub(crate)`: the
+/// Every facade refusal maps to [`SILLSTONE_E_REJECTED`]. `pub(crate)`: the
 /// JNI surface (`ffi_jni`) routes through the same core.
 pub(crate) fn signature_bytes(bytes: &[u8]) -> Result<alloc::vec::Vec<u8>, i32> {
     let sig = crate::signature(bytes).map_err(|err| status_of(&err))?;
@@ -377,7 +377,7 @@ pub(crate) fn describe_bytes(bytes: &[u8]) -> Result<alloc::vec::Vec<u8>, i32> {
 pub(crate) fn match_slots(
     a: &[u8],
     b: &[u8],
-) -> Result<(u32, [u64; PITH_HASH_MATCH_SLOTS], u32), i32> {
+) -> Result<(u32, [u64; SILLSTONE_HASH_MATCH_SLOTS], u32), i32> {
     let left = crate::signature(a).map_err(|err| status_of(&err))?;
     let right = crate::signature(b).map_err(|err| status_of(&err))?;
     let outcome = crate::match_(&left, &right).map_err(|err| status_of(&err))?;
@@ -388,11 +388,11 @@ pub(crate) fn match_slots(
 /// The match-outcome wire tag.
 fn tag_of(outcome: &MatchOutcome) -> u32 {
     match outcome {
-        MatchOutcome::Image { .. } => PITH_HASH_MATCH_IMAGE,
-        MatchOutcome::Audio { .. } => PITH_HASH_MATCH_AUDIO,
-        MatchOutcome::Text { .. } => PITH_HASH_MATCH_TEXT,
-        MatchOutcome::Binary { .. } => PITH_HASH_MATCH_BINARY,
-        MatchOutcome::Video { .. } => PITH_HASH_MATCH_VIDEO,
+        MatchOutcome::Image { .. } => SILLSTONE_HASH_MATCH_IMAGE,
+        MatchOutcome::Audio { .. } => SILLSTONE_HASH_MATCH_AUDIO,
+        MatchOutcome::Text { .. } => SILLSTONE_HASH_MATCH_TEXT,
+        MatchOutcome::Binary { .. } => SILLSTONE_HASH_MATCH_BINARY,
+        MatchOutcome::Video { .. } => SILLSTONE_HASH_MATCH_VIDEO,
     }
 }
 
@@ -408,7 +408,7 @@ fn matched_flag(outcome: &MatchOutcome) -> bool {
 }
 
 /// The outcome's fields, slot-flattened per the module-doc table.
-fn slots_of(outcome: &MatchOutcome) -> [u64; PITH_HASH_MATCH_SLOTS] {
+fn slots_of(outcome: &MatchOutcome) -> [u64; SILLSTONE_HASH_MATCH_SLOTS] {
     match outcome {
         MatchOutcome::Image { hamming, .. } => [u64::from(*hamming), 0, 0, 0],
         MatchOutcome::Audio { best, .. } => match best {
@@ -426,3 +426,82 @@ fn slots_of(outcome: &MatchOutcome) -> [u64; PITH_HASH_MATCH_SLOTS] {
         } => [score.to_bits(), minhash_jaccard.to_bits(), 0, 0],
     }
 }
+
+// Deprecated pre-rename aliases: the `PITH_*` names the suite shipped before
+// it became `sillstone`. Each one is the same value as its `SILLSTONE_*` twin.
+
+/// Deprecated alias of [`SILLSTONE_OK`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_OK`")]
+pub const PITH_OK: i32 = SILLSTONE_OK;
+/// Deprecated alias of [`SILLSTONE_E_INVALID`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_INVALID`")]
+pub const PITH_E_INVALID: i32 = SILLSTONE_E_INVALID;
+/// Deprecated alias of [`SILLSTONE_E_REJECTED`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_REJECTED`")]
+pub const PITH_E_REJECTED: i32 = SILLSTONE_E_REJECTED;
+/// Deprecated alias of [`SILLSTONE_HASH_FORMAT_PNG`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_HASH_FORMAT_PNG`")]
+pub const PITH_HASH_FORMAT_PNG: u32 = SILLSTONE_HASH_FORMAT_PNG;
+/// Deprecated alias of [`SILLSTONE_HASH_FORMAT_JPEG`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_HASH_FORMAT_JPEG`")]
+pub const PITH_HASH_FORMAT_JPEG: u32 = SILLSTONE_HASH_FORMAT_JPEG;
+/// Deprecated alias of [`SILLSTONE_HASH_FORMAT_BMP`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_HASH_FORMAT_BMP`")]
+pub const PITH_HASH_FORMAT_BMP: u32 = SILLSTONE_HASH_FORMAT_BMP;
+/// Deprecated alias of [`SILLSTONE_HASH_FORMAT_ZIP`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_HASH_FORMAT_ZIP`")]
+pub const PITH_HASH_FORMAT_ZIP: u32 = SILLSTONE_HASH_FORMAT_ZIP;
+/// Deprecated alias of [`SILLSTONE_HASH_FORMAT_MP4`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_HASH_FORMAT_MP4`")]
+pub const PITH_HASH_FORMAT_MP4: u32 = SILLSTONE_HASH_FORMAT_MP4;
+/// Deprecated alias of [`SILLSTONE_HASH_FORMAT_MP3`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_HASH_FORMAT_MP3`")]
+pub const PITH_HASH_FORMAT_MP3: u32 = SILLSTONE_HASH_FORMAT_MP3;
+/// Deprecated alias of [`SILLSTONE_HASH_FORMAT_WAV`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_HASH_FORMAT_WAV`")]
+pub const PITH_HASH_FORMAT_WAV: u32 = SILLSTONE_HASH_FORMAT_WAV;
+/// Deprecated alias of [`SILLSTONE_HASH_FORMAT_FLAC`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_HASH_FORMAT_FLAC`")]
+pub const PITH_HASH_FORMAT_FLAC: u32 = SILLSTONE_HASH_FORMAT_FLAC;
+/// Deprecated alias of [`SILLSTONE_HASH_FORMAT_PDF`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_HASH_FORMAT_PDF`")]
+pub const PITH_HASH_FORMAT_PDF: u32 = SILLSTONE_HASH_FORMAT_PDF;
+/// Deprecated alias of [`SILLSTONE_HASH_FORMAT_GIF`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_HASH_FORMAT_GIF`")]
+pub const PITH_HASH_FORMAT_GIF: u32 = SILLSTONE_HASH_FORMAT_GIF;
+/// Deprecated alias of [`SILLSTONE_HASH_FORMAT_UNKNOWN`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_HASH_FORMAT_UNKNOWN`")]
+pub const PITH_HASH_FORMAT_UNKNOWN: u32 = SILLSTONE_HASH_FORMAT_UNKNOWN;
+/// Deprecated alias of [`SILLSTONE_HASH_MODALITY_IMAGE`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_HASH_MODALITY_IMAGE`")]
+pub const PITH_HASH_MODALITY_IMAGE: u32 = SILLSTONE_HASH_MODALITY_IMAGE;
+/// Deprecated alias of [`SILLSTONE_HASH_MODALITY_AUDIO`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_HASH_MODALITY_AUDIO`")]
+pub const PITH_HASH_MODALITY_AUDIO: u32 = SILLSTONE_HASH_MODALITY_AUDIO;
+/// Deprecated alias of [`SILLSTONE_HASH_MODALITY_TEXT`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_HASH_MODALITY_TEXT`")]
+pub const PITH_HASH_MODALITY_TEXT: u32 = SILLSTONE_HASH_MODALITY_TEXT;
+/// Deprecated alias of [`SILLSTONE_HASH_MODALITY_BINARY`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_HASH_MODALITY_BINARY`")]
+pub const PITH_HASH_MODALITY_BINARY: u32 = SILLSTONE_HASH_MODALITY_BINARY;
+/// Deprecated alias of [`SILLSTONE_HASH_MODALITY_VIDEO`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_HASH_MODALITY_VIDEO`")]
+pub const PITH_HASH_MODALITY_VIDEO: u32 = SILLSTONE_HASH_MODALITY_VIDEO;
+/// Deprecated alias of [`SILLSTONE_HASH_MATCH_IMAGE`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_HASH_MATCH_IMAGE`")]
+pub const PITH_HASH_MATCH_IMAGE: u32 = SILLSTONE_HASH_MATCH_IMAGE;
+/// Deprecated alias of [`SILLSTONE_HASH_MATCH_AUDIO`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_HASH_MATCH_AUDIO`")]
+pub const PITH_HASH_MATCH_AUDIO: u32 = SILLSTONE_HASH_MATCH_AUDIO;
+/// Deprecated alias of [`SILLSTONE_HASH_MATCH_TEXT`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_HASH_MATCH_TEXT`")]
+pub const PITH_HASH_MATCH_TEXT: u32 = SILLSTONE_HASH_MATCH_TEXT;
+/// Deprecated alias of [`SILLSTONE_HASH_MATCH_BINARY`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_HASH_MATCH_BINARY`")]
+pub const PITH_HASH_MATCH_BINARY: u32 = SILLSTONE_HASH_MATCH_BINARY;
+/// Deprecated alias of [`SILLSTONE_HASH_MATCH_VIDEO`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_HASH_MATCH_VIDEO`")]
+pub const PITH_HASH_MATCH_VIDEO: u32 = SILLSTONE_HASH_MATCH_VIDEO;
+/// Deprecated alias of [`SILLSTONE_HASH_MATCH_SLOTS`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_HASH_MATCH_SLOTS`")]
+pub const PITH_HASH_MATCH_SLOTS: usize = SILLSTONE_HASH_MATCH_SLOTS;

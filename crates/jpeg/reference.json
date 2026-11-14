@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "suite": "pith-jpeg",
+  "suite": "sillstone-jpeg",
   "note": "every f64 is its raw IEEE-754 bit pattern as 16-digit lowercase hex; exact vectors must match bit-for-bit, the orthonormal-oracle vector within max(tol_abs, tol_rel * |expected|); digests are fnv1a64 over the decoded sample bytes (row-major, channel-interleaved); dequant.8x8 and idct.islow.8x8 inputs are 64 coefficients followed by 64 quant values, natural order",
   "digests": {
     "base_420_odd": "a707599fcb82ef2a",

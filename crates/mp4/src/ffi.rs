@@ -2,7 +2,7 @@
 //! (ctypes), Node (koffi) and Go (cgo) SDKs bind through.
 //!
 //! The suite's FFI convention, defined by the pilot cdylibs and
-//! mirrored by every `pith-*` cdylib:
+//! mirrored by every `sillstone-*` cdylib:
 //!
 //! * one flat set of `#[unsafe(no_mangle)] pub unsafe extern "C"`
 //!   functions — raw pointers plus lengths, no structs across the
@@ -57,7 +57,7 @@
 //! ```
 //!
 //! On a refusal the `err` out-parameter carries one of the
-//! `PITH_ERR_*` kind codes — the stable variant names `reference.json`
+//! `SILLSTONE_ERR_*` kind codes — the stable variant names `reference.json`
 //! `errors` records as numbers, so an SDK test can assert the exact
 //! refusal kind.
 
@@ -69,40 +69,40 @@ use crate::{EntryKind, demux};
 use sillstone_digest::Error;
 
 /// Status: success.
-pub const PITH_OK: i32 = 0;
+pub const SILLSTONE_OK: i32 = 0;
 /// Status: a caller argument is invalid — a null pointer.
-pub const PITH_E_INVALID: i32 = -1;
+pub const SILLSTONE_E_INVALID: i32 = -1;
 /// Status: the core demuxer refused the input (no `ftyp`, unrecognised
 /// brands, missing `moov`, fragmented file, or a truncated stream).
-pub const PITH_E_REJECTED: i32 = -2;
+pub const SILLSTONE_E_REJECTED: i32 = -2;
 
 /// Refusal kind: `Error::BadValue` (`"BadValue"` in reference.json).
-pub const PITH_ERR_BAD_VALUE: i32 = 1;
+pub const SILLSTONE_ERR_BAD_VALUE: i32 = 1;
 /// Refusal kind: `Error::InvalidMagic` (`"InvalidMagic"`).
-pub const PITH_ERR_INVALID_MAGIC: i32 = 2;
+pub const SILLSTONE_ERR_INVALID_MAGIC: i32 = 2;
 /// Refusal kind: `Error::TooLarge` (`"TooLarge"`).
-pub const PITH_ERR_TOO_LARGE: i32 = 3;
+pub const SILLSTONE_ERR_TOO_LARGE: i32 = 3;
 /// Refusal kind: `Error::Truncated` (`"Truncated"`).
-pub const PITH_ERR_TRUNCATED: i32 = 4;
+pub const SILLSTONE_ERR_TRUNCATED: i32 = 4;
 /// Refusal kind: `Error::Unsupported` (`"Unsupported"`).
-pub const PITH_ERR_UNSUPPORTED: i32 = 5;
+pub const SILLSTONE_ERR_UNSUPPORTED: i32 = 5;
 
 /// `stsd` entry kind code: a visual sample entry.
-pub const PITH_ENTRY_VISUAL: u8 = 0;
+pub const SILLSTONE_ENTRY_VISUAL: u8 = 0;
 /// `stsd` entry kind code: an audio sample entry.
-pub const PITH_ENTRY_AUDIO: u8 = 1;
+pub const SILLSTONE_ENTRY_AUDIO: u8 = 1;
 /// `stsd` entry kind code: neither visual nor audio.
-pub const PITH_ENTRY_OTHER: u8 = 2;
+pub const SILLSTONE_ENTRY_OTHER: u8 = 2;
 
 /// Maps a demuxer error to its stable kind code (alphabetical over the
 /// variant names reference.json records).
 fn err_kind(e: &Error) -> i32 {
     match e {
-        Error::BadValue(_) => PITH_ERR_BAD_VALUE,
-        Error::InvalidMagic { .. } => PITH_ERR_INVALID_MAGIC,
-        Error::TooLarge { .. } => PITH_ERR_TOO_LARGE,
-        Error::Truncated { .. } => PITH_ERR_TRUNCATED,
-        Error::Unsupported(_) => PITH_ERR_UNSUPPORTED,
+        Error::BadValue(_) => SILLSTONE_ERR_BAD_VALUE,
+        Error::InvalidMagic { .. } => SILLSTONE_ERR_INVALID_MAGIC,
+        Error::TooLarge { .. } => SILLSTONE_ERR_TOO_LARGE,
+        Error::Truncated { .. } => SILLSTONE_ERR_TRUNCATED,
+        Error::Unsupported(_) => SILLSTONE_ERR_UNSUPPORTED,
     }
 }
 
@@ -173,7 +173,7 @@ fn serialize(mp4: &crate::Mp4) -> Vec<u8> {
                     avcc,
                     esds,
                 } => {
-                    out.push(PITH_ENTRY_VISUAL);
+                    out.push(SILLSTONE_ENTRY_VISUAL);
                     out.extend_from_slice(coding);
                     push_u32(&mut out, u32::from(*width));
                     push_u32(&mut out, u32::from(*height));
@@ -186,14 +186,14 @@ fn serialize(mp4: &crate::Mp4) -> Vec<u8> {
                     rate,
                     esds,
                 } => {
-                    out.push(PITH_ENTRY_AUDIO);
+                    out.push(SILLSTONE_ENTRY_AUDIO);
                     out.extend_from_slice(coding);
                     push_u32(&mut out, u32::from(*channels));
                     push_u32(&mut out, *rate);
                     push_blob(&mut out, esds.as_deref().unwrap_or(&[]));
                 }
                 EntryKind::Other { coding } => {
-                    out.push(PITH_ENTRY_OTHER);
+                    out.push(SILLSTONE_ENTRY_OTHER);
                     out.extend_from_slice(coding);
                 }
             }
@@ -230,13 +230,13 @@ unsafe fn refuse(out: *mut *mut u8, out_len: *mut usize, err: *mut i32, kind: i3
 /// `data` points at `len` bytes of the complete file. On success the
 /// function allocates a buffer, writes its address through `out`, its
 /// length through `out_len`, a zero kind through `err`, and returns
-/// [`PITH_OK`]; the caller owns the buffer and must release it with
+/// [`SILLSTONE_OK`]; the caller owns the buffer and must release it with
 /// [`sillstone_mp4_free`], passing back the same pointer *and* length. The
 /// buffer layout is the canonical wire format documented on this
 /// module.
 ///
-/// On a refusal the function returns [`PITH_E_REJECTED`], writes zero
-/// through `out`, and stores one `PITH_ERR_*` kind code through `err`.
+/// On a refusal the function returns [`SILLSTONE_E_REJECTED`], writes zero
+/// through `out`, and stores one `SILLSTONE_ERR_*` kind code through `err`.
 ///
 /// # Safety
 ///
@@ -253,20 +253,20 @@ pub unsafe extern "C" fn sillstone_mp4_demux(
     err: *mut i32,
 ) -> i32 {
     if data.is_null() || out.is_null() || out_len.is_null() || err.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let bytes = unsafe { core::slice::from_raw_parts(data, len) };
     match demux(bytes) {
         Ok(mp4) => {
             unsafe {
                 hand_out(serialize(&mp4), out, out_len);
-                *err = PITH_OK;
+                *err = SILLSTONE_OK;
             }
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(e) => {
             unsafe { refuse(out, out_len, err, err_kind(&e)) };
-            PITH_E_REJECTED
+            SILLSTONE_E_REJECTED
         }
     }
 }
@@ -288,12 +288,50 @@ pub unsafe extern "C" fn sillstone_mp4_free(ptr: *mut u8, len: usize) {
     drop(unsafe { alloc::boxed::Box::from_raw(slice) });
 }
 
+// Deprecated pre-rename aliases: the `PITH_*` names the suite shipped before
+// it became `sillstone`. Each one is the same value as its `SILLSTONE_*` twin.
+
+/// Deprecated alias of [`SILLSTONE_OK`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_OK`")]
+pub const PITH_OK: i32 = SILLSTONE_OK;
+/// Deprecated alias of [`SILLSTONE_E_INVALID`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_INVALID`")]
+pub const PITH_E_INVALID: i32 = SILLSTONE_E_INVALID;
+/// Deprecated alias of [`SILLSTONE_E_REJECTED`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_REJECTED`")]
+pub const PITH_E_REJECTED: i32 = SILLSTONE_E_REJECTED;
+/// Deprecated alias of [`SILLSTONE_ERR_BAD_VALUE`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_ERR_BAD_VALUE`")]
+pub const PITH_ERR_BAD_VALUE: i32 = SILLSTONE_ERR_BAD_VALUE;
+/// Deprecated alias of [`SILLSTONE_ERR_INVALID_MAGIC`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_ERR_INVALID_MAGIC`")]
+pub const PITH_ERR_INVALID_MAGIC: i32 = SILLSTONE_ERR_INVALID_MAGIC;
+/// Deprecated alias of [`SILLSTONE_ERR_TOO_LARGE`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_ERR_TOO_LARGE`")]
+pub const PITH_ERR_TOO_LARGE: i32 = SILLSTONE_ERR_TOO_LARGE;
+/// Deprecated alias of [`SILLSTONE_ERR_TRUNCATED`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_ERR_TRUNCATED`")]
+pub const PITH_ERR_TRUNCATED: i32 = SILLSTONE_ERR_TRUNCATED;
+/// Deprecated alias of [`SILLSTONE_ERR_UNSUPPORTED`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_ERR_UNSUPPORTED`")]
+pub const PITH_ERR_UNSUPPORTED: i32 = SILLSTONE_ERR_UNSUPPORTED;
+/// Deprecated alias of [`SILLSTONE_ENTRY_VISUAL`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_ENTRY_VISUAL`")]
+pub const PITH_ENTRY_VISUAL: u8 = SILLSTONE_ENTRY_VISUAL;
+/// Deprecated alias of [`SILLSTONE_ENTRY_AUDIO`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_ENTRY_AUDIO`")]
+pub const PITH_ENTRY_AUDIO: u8 = SILLSTONE_ENTRY_AUDIO;
+/// Deprecated alias of [`SILLSTONE_ENTRY_OTHER`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_ENTRY_OTHER`")]
+pub const PITH_ENTRY_OTHER: u8 = SILLSTONE_ENTRY_OTHER;
+
 #[cfg(test)]
 mod tests {
     use super::{
-        PITH_E_INVALID, PITH_E_REJECTED, PITH_ERR_BAD_VALUE, PITH_ERR_INVALID_MAGIC,
-        PITH_ERR_TOO_LARGE, PITH_ERR_TRUNCATED, PITH_ERR_UNSUPPORTED, PITH_OK, err_kind,
-        sillstone_mp4_demux, sillstone_mp4_free, serialize,
+        SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_ERR_BAD_VALUE,
+        SILLSTONE_ERR_INVALID_MAGIC, SILLSTONE_ERR_TOO_LARGE, SILLSTONE_ERR_TRUNCATED,
+        SILLSTONE_ERR_UNSUPPORTED, SILLSTONE_OK, err_kind, serialize, sillstone_mp4_demux,
+        sillstone_mp4_free,
     };
     use crate::demux;
     use sillstone_digest::{Error, sha256};
@@ -323,8 +361,8 @@ mod tests {
                 &mut err,
             )
         };
-        assert_eq!(status, PITH_OK);
-        assert_eq!(err, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
+        assert_eq!(err, SILLSTONE_OK);
         assert_eq!(out_len, expected.len());
         let handed_back = unsafe { core::slice::from_raw_parts(out, out_len) };
         assert_eq!(handed_back, expected.as_slice());
@@ -348,7 +386,7 @@ mod tests {
     }
 
     /// Every committed error fixture is refused with its recorded
-    /// kind; null pointers are [`PITH_E_INVALID`]; a null buffer is a
+    /// kind; null pointers are [`SILLSTONE_E_INVALID`]; a null buffer is a
     /// legal free.
     #[test]
     fn ffi_refusals() {
@@ -357,7 +395,7 @@ mod tests {
         let mut err: i32 = -99;
         let null_data =
             unsafe { sillstone_mp4_demux(core::ptr::null(), 0, &mut out, &mut out_len, &mut err) };
-        assert_eq!(null_data, PITH_E_INVALID);
+        assert_eq!(null_data, SILLSTONE_E_INVALID);
 
         let stream = [0u8; 16];
         let null_err = unsafe {
@@ -369,7 +407,7 @@ mod tests {
                 core::ptr::null_mut(),
             )
         };
-        assert_eq!(null_err, PITH_E_INVALID);
+        assert_eq!(null_err, SILLSTONE_E_INVALID);
 
         // fragmented-moof: recorded kind "Unsupported".
         let path = format!(
@@ -386,8 +424,8 @@ mod tests {
                 &mut err,
             )
         };
-        assert_eq!(refused, PITH_E_REJECTED);
-        assert_eq!(err, PITH_ERR_UNSUPPORTED);
+        assert_eq!(refused, SILLSTONE_E_REJECTED);
+        assert_eq!(err, SILLSTONE_ERR_UNSUPPORTED);
         assert!(out.is_null() && out_len == 0);
 
         unsafe { sillstone_mp4_free(core::ptr::null_mut(), 0) };
@@ -406,11 +444,12 @@ mod tests {
             let mut out: *mut u8 = core::ptr::null_mut();
             let mut out_len: usize = 0;
             let mut err: i32 = -99;
-            let status =
-                unsafe { sillstone_mp4_demux(input.as_ptr(), cut, &mut out, &mut out_len, &mut err) };
-            assert_eq!(status, PITH_E_REJECTED, "cut {cut}");
+            let status = unsafe {
+                sillstone_mp4_demux(input.as_ptr(), cut, &mut out, &mut out_len, &mut err)
+            };
+            assert_eq!(status, SILLSTONE_E_REJECTED, "cut {cut}");
             assert!(
-                err == PITH_ERR_INVALID_MAGIC || err == 4,
+                err == SILLSTONE_ERR_INVALID_MAGIC || err == 4,
                 "cut {cut} err {err}"
             );
             assert!(out.is_null());
@@ -420,13 +459,40 @@ mod tests {
     /// Every decoder error maps to its stable kind code.
     #[test]
     fn err_kinds_map_one_to_one() {
-        assert_eq!(err_kind(&Error::BadValue("x")), PITH_ERR_BAD_VALUE);
+        assert_eq!(err_kind(&Error::BadValue("x")), SILLSTONE_ERR_BAD_VALUE);
         assert_eq!(
             err_kind(&Error::InvalidMagic { what: "x" }),
-            PITH_ERR_INVALID_MAGIC
+            SILLSTONE_ERR_INVALID_MAGIC
         );
-        assert_eq!(err_kind(&Error::too_large("x", 0)), PITH_ERR_TOO_LARGE);
-        assert_eq!(err_kind(&Error::truncated("x", 1, 0)), PITH_ERR_TRUNCATED);
-        assert_eq!(err_kind(&Error::Unsupported("x")), PITH_ERR_UNSUPPORTED);
+        assert_eq!(err_kind(&Error::too_large("x", 0)), SILLSTONE_ERR_TOO_LARGE);
+        assert_eq!(
+            err_kind(&Error::truncated("x", 1, 0)),
+            SILLSTONE_ERR_TRUNCATED
+        );
+        assert_eq!(
+            err_kind(&Error::Unsupported("x")),
+            SILLSTONE_ERR_UNSUPPORTED
+        );
+    }
+}
+
+#[cfg(test)]
+mod deprecated_alias_tests {
+    #![allow(deprecated)]
+    use super::*;
+
+    #[test]
+    fn pith_aliases_equal_their_sillstone_twins() {
+        assert_eq!(PITH_OK, SILLSTONE_OK);
+        assert_eq!(PITH_E_INVALID, SILLSTONE_E_INVALID);
+        assert_eq!(PITH_E_REJECTED, SILLSTONE_E_REJECTED);
+        assert_eq!(PITH_ERR_BAD_VALUE, SILLSTONE_ERR_BAD_VALUE);
+        assert_eq!(PITH_ERR_INVALID_MAGIC, SILLSTONE_ERR_INVALID_MAGIC);
+        assert_eq!(PITH_ERR_TOO_LARGE, SILLSTONE_ERR_TOO_LARGE);
+        assert_eq!(PITH_ERR_TRUNCATED, SILLSTONE_ERR_TRUNCATED);
+        assert_eq!(PITH_ERR_UNSUPPORTED, SILLSTONE_ERR_UNSUPPORTED);
+        assert_eq!(PITH_ENTRY_VISUAL, SILLSTONE_ENTRY_VISUAL);
+        assert_eq!(PITH_ENTRY_AUDIO, SILLSTONE_ENTRY_AUDIO);
+        assert_eq!(PITH_ENTRY_OTHER, SILLSTONE_ENTRY_OTHER);
     }
 }

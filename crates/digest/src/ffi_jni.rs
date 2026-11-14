@@ -1,5 +1,5 @@
 //! The JNI surface of `sillstone-digest`: the
-//! `Java_hash_sillstone_digest_PithDigest_*` exports the Java SDK
+//! `Java_io_github_sillstone_SillstoneDigest_*` exports the Java SDK
 //! (`sdk/java`) binds its `native` methods through.
 //!
 //! The C ABI of [`crate::ffi`] is untouched: JNI requires exports
@@ -17,16 +17,16 @@
 //! * every export takes the JNI environment first and the receiving
 //!   class second (the methods are static), then the Java arguments;
 //! * the status code crosses back through a trailing one-element
-//!   `int[]` — the same `PITH_OK` / `PITH_E_INVALID` /
-//!   `PITH_E_REJECTED` values the C ABI returns;
+//!   `int[]` — the same `SILLSTONE_OK` / `SILLSTONE_E_INVALID` /
+//!   `SILLSTONE_E_REJECTED` values the C ABI returns;
 //! * digests and base64 text cross back as a fresh `byte[]` — null
-//!   unless the status is `PITH_OK`; base64 text is the RFC 4648
+//!   unless the status is `SILLSTONE_OK`; base64 text is the RFC 4648
 //!   ASCII bytes, so no UTF machinery is needed;
 //! * scalar results (the u32 checksums, the u64 hashes) cross back as
 //!   the plain `jint`/`jlong` return value, zero unless the status is
-//!   `PITH_OK`;
+//!   `SILLSTONE_OK`;
 //! * the splitmix64/xoshiro256** output sequences cross back as a
-//!   fresh `long[]`; a null input array maps to `PITH_E_INVALID`,
+//!   fresh `long[]`; a null input array maps to `SILLSTONE_E_INVALID`,
 //!   mirroring the C ABI's null-pointer rule; a null environment or
 //!   status array short-circuits to a zero return without touching
 //!   memory.
@@ -45,10 +45,11 @@
 use core::ffi::c_void;
 
 use crate::ffi::{
-    PITH_E_INVALID, PITH_E_REJECTED, PITH_OK, sillstone_digest_adler32, sillstone_digest_base64_decode,
-    sillstone_digest_base64_encode, sillstone_digest_crc32, sillstone_digest_crc32c, sillstone_digest_fnv1a64,
-    sillstone_digest_hmac_sha1, sillstone_digest_hmac_sha256, sillstone_digest_hmac_sha512,
-    sillstone_digest_murmur3_x64_128, sillstone_digest_sha1, sillstone_digest_sha256, sillstone_digest_sha512,
+    SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_OK, sillstone_digest_adler32,
+    sillstone_digest_base64_decode, sillstone_digest_base64_encode, sillstone_digest_crc32,
+    sillstone_digest_crc32c, sillstone_digest_fnv1a64, sillstone_digest_hmac_sha1,
+    sillstone_digest_hmac_sha256, sillstone_digest_hmac_sha512, sillstone_digest_murmur3_x64_128,
+    sillstone_digest_sha1, sillstone_digest_sha256, sillstone_digest_sha512,
     sillstone_digest_splitmix64_fill, sillstone_digest_xoshiro256_fill, sillstone_digest_xxh64,
 };
 
@@ -154,15 +155,15 @@ unsafe fn table<'a>(env: *mut JNIEnv) -> &'a JniTable {
 ///
 /// `env` must be a live JNI environment and `array` a live `byte[]`
 /// reference for the duration of the call; a null array is
-/// [`PITH_E_INVALID`], mirroring the C ABI's null-pointer rule.
+/// [`SILLSTONE_E_INVALID`], mirroring the C ABI's null-pointer rule.
 unsafe fn java_bytes(env: *mut JNIEnv, array: JArray) -> Result<Vec<u8>, i32> {
     if array.is_null() {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let functions = unsafe { table(env) };
     let len = unsafe { (functions.get_array_length)(env, array) };
     if len < 0 {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let mut bytes = vec![0u8; len as usize];
     unsafe { (functions.get_byte_array_region)(env, array, 0, len, bytes.as_mut_ptr().cast()) };
@@ -243,20 +244,20 @@ unsafe fn digest_in<const LEN: usize>(
     };
     let mut out = [0u8; LEN];
     let code = produce(&bytes, out.as_mut_ptr());
-    if code != PITH_OK {
+    if code != SILLSTONE_OK {
         unsafe { set_status(env, status, code) };
         return core::ptr::null_mut();
     }
     match unsafe { new_java_bytes(env, &out) } {
         Some(array) => {
-            unsafe { set_status(env, status, PITH_OK) };
+            unsafe { set_status(env, status, SILLSTONE_OK) };
             array
         }
         None => {
             // The only failure left is the environment refusing the
             // array allocation; there is no dedicated code for it, so
             // it surfaces as a rejection, never as a panic.
-            unsafe { set_status(env, status, PITH_E_REJECTED) };
+            unsafe { set_status(env, status, SILLSTONE_E_REJECTED) };
             core::ptr::null_mut()
         }
     }
@@ -264,7 +265,7 @@ unsafe fn digest_in<const LEN: usize>(
 
 /// Shared body of the scalar exports: copies `data` through the
 /// environment once and hands it to `produce`; the status crosses
-/// through `status` and `PITH_E_INVALID` is returned when the
+/// through `status` and `SILLSTONE_E_INVALID` is returned when the
 /// environment or status slot is null.
 ///
 /// # Safety
@@ -277,13 +278,13 @@ unsafe fn with_data(
     produce: impl FnOnce(&[u8]) -> i32,
 ) -> i32 {
     if env.is_null() || status.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let bytes = match unsafe { java_bytes(env, data) } {
         Ok(bytes) => bytes,
         Err(status_code) => {
             unsafe { set_status(env, status, status_code) };
-            return PITH_E_INVALID;
+            return SILLSTONE_E_INVALID;
         }
     };
     produce(&bytes)
@@ -305,22 +306,22 @@ unsafe fn longs_out(
         return core::ptr::null_mut();
     }
     if count < 0 {
-        unsafe { set_status(env, status, PITH_E_INVALID) };
+        unsafe { set_status(env, status, SILLSTONE_E_INVALID) };
         return core::ptr::null_mut();
     }
     let mut out = vec![0u64; count as usize];
     let code = unsafe { fill(seed as u64, out.as_mut_ptr(), out.len()) };
-    if code != PITH_OK {
+    if code != SILLSTONE_OK {
         unsafe { set_status(env, status, code) };
         return core::ptr::null_mut();
     }
     match unsafe { new_java_longs(env, &out) } {
         Some(array) => {
-            unsafe { set_status(env, status, PITH_OK) };
+            unsafe { set_status(env, status, SILLSTONE_OK) };
             array
         }
         None => {
-            unsafe { set_status(env, status, PITH_E_REJECTED) };
+            unsafe { set_status(env, status, SILLSTONE_E_REJECTED) };
             core::ptr::null_mut()
         }
     }
@@ -337,7 +338,7 @@ unsafe fn longs_out(
 // signature over the private table type would trip
 // `private_interfaces`.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_sha256Native(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneDigest_sha256Native(
     env: *mut JNIEnv,
     _class: JClass,
     data: JArray,
@@ -359,7 +360,7 @@ unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_sha256Native(
 //
 // Private: the JVM links the export by symbol name.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_sha1Native(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneDigest_sha1Native(
     env: *mut JNIEnv,
     _class: JClass,
     data: JArray,
@@ -381,7 +382,7 @@ unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_sha1Native(
 //
 // Private: the JVM links the export by symbol name.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_sha512Native(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneDigest_sha512Native(
     env: *mut JNIEnv,
     _class: JClass,
     data: JArray,
@@ -434,17 +435,17 @@ unsafe fn hmac_out<const LEN: usize>(
             out.as_mut_ptr(),
         )
     };
-    if code != PITH_OK {
+    if code != SILLSTONE_OK {
         unsafe { set_status(env, status, code) };
         return core::ptr::null_mut();
     }
     match unsafe { new_java_bytes(env, &out) } {
         Some(array) => {
-            unsafe { set_status(env, status, PITH_OK) };
+            unsafe { set_status(env, status, SILLSTONE_OK) };
             array
         }
         None => {
-            unsafe { set_status(env, status, PITH_E_REJECTED) };
+            unsafe { set_status(env, status, SILLSTONE_E_REJECTED) };
             core::ptr::null_mut()
         }
     }
@@ -459,7 +460,7 @@ unsafe fn hmac_out<const LEN: usize>(
 //
 // Private: the JVM links the export by symbol name.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_hmacSha1Native(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneDigest_hmacSha1Native(
     env: *mut JNIEnv,
     _class: JClass,
     key: JArray,
@@ -478,7 +479,7 @@ unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_hmacSha1Native(
 //
 // Private: the JVM links the export by symbol name.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_hmacSha256Native(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneDigest_hmacSha256Native(
     env: *mut JNIEnv,
     _class: JClass,
     key: JArray,
@@ -497,7 +498,7 @@ unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_hmacSha256Native
 //
 // Private: the JVM links the export by symbol name.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_hmacSha512Native(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneDigest_hmacSha512Native(
     env: *mut JNIEnv,
     _class: JClass,
     key: JArray,
@@ -508,7 +509,7 @@ unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_hmacSha512Native
 }
 
 /// Shared body of the u32-checksum exports: the value crosses back as
-/// the `jint` return, zero unless the status is `PITH_OK`.
+/// the `jint` return, zero unless the status is `SILLSTONE_OK`.
 ///
 /// # Safety
 ///
@@ -525,7 +526,7 @@ unsafe fn checksum32_out(
         with_data(env, status, data, |bytes| {
             sum(bytes.as_ptr(), bytes.len(), &mut out)
         })
-    } != PITH_OK
+    } != SILLSTONE_OK
     {
         return 0;
     }
@@ -541,7 +542,7 @@ unsafe fn checksum32_out(
 //
 // Private: the JVM links the export by symbol name.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_crc32Native(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneDigest_crc32Native(
     env: *mut JNIEnv,
     _class: JClass,
     data: JArray,
@@ -559,7 +560,7 @@ unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_crc32Native(
 //
 // Private: the JVM links the export by symbol name.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_adler32Native(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneDigest_adler32Native(
     env: *mut JNIEnv,
     _class: JClass,
     data: JArray,
@@ -577,7 +578,7 @@ unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_adler32Native(
 //
 // Private: the JVM links the export by symbol name.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_crc32cNative(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneDigest_crc32cNative(
     env: *mut JNIEnv,
     _class: JClass,
     data: JArray,
@@ -587,7 +588,7 @@ unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_crc32cNative(
 }
 
 /// Shared body of the u64-hash exports: the value crosses back as the
-/// `jlong` return, zero unless the status is `PITH_OK`.
+/// `jlong` return, zero unless the status is `SILLSTONE_OK`.
 ///
 /// # Safety
 ///
@@ -604,7 +605,7 @@ unsafe fn hash64_out(
         with_data(env, status, data, |bytes| {
             hash(bytes.as_ptr(), bytes.len(), &mut out)
         })
-    } != PITH_OK
+    } != SILLSTONE_OK
     {
         return 0;
     }
@@ -620,7 +621,7 @@ unsafe fn hash64_out(
 //
 // Private: the JVM links the export by symbol name.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_fnv1a64Native(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneDigest_fnv1a64Native(
     env: *mut JNIEnv,
     _class: JClass,
     data: JArray,
@@ -638,7 +639,7 @@ unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_fnv1a64Native(
 //
 // Private: the JVM links the export by symbol name.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_xxh64Native(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneDigest_xxh64Native(
     env: *mut JNIEnv,
     _class: JClass,
     data: JArray,
@@ -650,7 +651,7 @@ unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_xxh64Native(
         with_data(env, status, data, |bytes| {
             sillstone_digest_xxh64(bytes.as_ptr(), bytes.len(), seed as u64, &mut out)
         })
-    } != PITH_OK
+    } != SILLSTONE_OK
     {
         return 0;
     }
@@ -666,7 +667,7 @@ unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_xxh64Native(
 //
 // Private: the JVM links the export by symbol name.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_murmur3X64128Native(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneDigest_murmur3X64128Native(
     env: *mut JNIEnv,
     _class: JClass,
     data: JArray,
@@ -688,7 +689,7 @@ unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_murmur3X64128Nat
 //
 // Private: the JVM links the export by symbol name.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_splitmix64FillNative(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneDigest_splitmix64FillNative(
     env: *mut JNIEnv,
     _class: JClass,
     seed: jlong,
@@ -706,7 +707,7 @@ unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_splitmix64FillNa
 //
 // Private: the JVM links the export by symbol name.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_xoshiro256FillNative(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneDigest_xoshiro256FillNative(
     env: *mut JNIEnv,
     _class: JClass,
     seed: jlong,
@@ -726,7 +727,7 @@ unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_xoshiro256FillNa
 //
 // Private: the JVM links the export by symbol name.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_base64EncodeNative(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneDigest_base64EncodeNative(
     env: *mut JNIEnv,
     _class: JClass,
     data: JArray,
@@ -753,17 +754,17 @@ unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_base64EncodeNati
             &mut out_len,
         )
     };
-    if code != PITH_OK {
+    if code != SILLSTONE_OK {
         unsafe { set_status(env, status, code) };
         return core::ptr::null_mut();
     }
     match unsafe { new_java_bytes(env, &out[..out_len]) } {
         Some(array) => {
-            unsafe { set_status(env, status, PITH_OK) };
+            unsafe { set_status(env, status, SILLSTONE_OK) };
             array
         }
         None => {
-            unsafe { set_status(env, status, PITH_E_REJECTED) };
+            unsafe { set_status(env, status, SILLSTONE_E_REJECTED) };
             core::ptr::null_mut()
         }
     }
@@ -779,7 +780,7 @@ unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_base64EncodeNati
 //
 // Private: the JVM links the export by symbol name.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_base64DecodeNative(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneDigest_base64DecodeNative(
     env: *mut JNIEnv,
     _class: JClass,
     data: JArray,
@@ -806,18 +807,317 @@ unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_base64DecodeNati
             &mut out_len,
         )
     };
-    if code != PITH_OK {
+    if code != SILLSTONE_OK {
         unsafe { set_status(env, status, code) };
         return core::ptr::null_mut();
     }
     match unsafe { new_java_bytes(env, &out[..out_len]) } {
         Some(array) => {
-            unsafe { set_status(env, status, PITH_OK) };
+            unsafe { set_status(env, status, SILLSTONE_OK) };
             array
         }
         None => {
-            unsafe { set_status(env, status, PITH_E_REJECTED) };
+            unsafe { set_status(env, status, SILLSTONE_E_REJECTED) };
             core::ptr::null_mut()
         }
     }
+}
+
+// Deprecated pre-rename JNI exports: the symbols Java classes compiled against the
+// suite's old class names resolve. Each one forwards to its canonical
+// `io.github.sillstone` export unchanged.
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneDigest_sha256Native`]: the export for the
+/// pre-rename `hash.sillstone.digest.PithDigest` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneDigest_sha256Native`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneDigest_sha256Native`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_sha256Native(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    status: JIntArray,
+) -> JArray {
+    unsafe { Java_io_github_sillstone_SillstoneDigest_sha256Native(env, class, data, status) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneDigest_sha1Native`]: the export for the
+/// pre-rename `hash.sillstone.digest.PithDigest` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneDigest_sha1Native`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneDigest_sha1Native`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_sha1Native(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    status: JIntArray,
+) -> JArray {
+    unsafe { Java_io_github_sillstone_SillstoneDigest_sha1Native(env, class, data, status) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneDigest_sha512Native`]: the export for the
+/// pre-rename `hash.sillstone.digest.PithDigest` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneDigest_sha512Native`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneDigest_sha512Native`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_sha512Native(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    status: JIntArray,
+) -> JArray {
+    unsafe { Java_io_github_sillstone_SillstoneDigest_sha512Native(env, class, data, status) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneDigest_hmacSha1Native`]: the export for the
+/// pre-rename `hash.sillstone.digest.PithDigest` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneDigest_hmacSha1Native`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneDigest_hmacSha1Native`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_hmacSha1Native(
+    env: *mut JNIEnv,
+    class: JClass,
+    key: JArray,
+    data: JArray,
+    status: JIntArray,
+) -> JArray {
+    unsafe {
+        Java_io_github_sillstone_SillstoneDigest_hmacSha1Native(env, class, key, data, status)
+    }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneDigest_hmacSha256Native`]: the export for the
+/// pre-rename `hash.sillstone.digest.PithDigest` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneDigest_hmacSha256Native`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneDigest_hmacSha256Native`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_hmacSha256Native(
+    env: *mut JNIEnv,
+    class: JClass,
+    key: JArray,
+    data: JArray,
+    status: JIntArray,
+) -> JArray {
+    unsafe {
+        Java_io_github_sillstone_SillstoneDigest_hmacSha256Native(env, class, key, data, status)
+    }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneDigest_hmacSha512Native`]: the export for the
+/// pre-rename `hash.sillstone.digest.PithDigest` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneDigest_hmacSha512Native`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneDigest_hmacSha512Native`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_hmacSha512Native(
+    env: *mut JNIEnv,
+    class: JClass,
+    key: JArray,
+    data: JArray,
+    status: JIntArray,
+) -> JArray {
+    unsafe {
+        Java_io_github_sillstone_SillstoneDigest_hmacSha512Native(env, class, key, data, status)
+    }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneDigest_crc32Native`]: the export for the
+/// pre-rename `hash.sillstone.digest.PithDigest` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneDigest_crc32Native`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneDigest_crc32Native`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_crc32Native(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    status: JIntArray,
+) -> jint {
+    unsafe { Java_io_github_sillstone_SillstoneDigest_crc32Native(env, class, data, status) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneDigest_adler32Native`]: the export for the
+/// pre-rename `hash.sillstone.digest.PithDigest` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneDigest_adler32Native`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneDigest_adler32Native`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_adler32Native(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    status: JIntArray,
+) -> jint {
+    unsafe { Java_io_github_sillstone_SillstoneDigest_adler32Native(env, class, data, status) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneDigest_crc32cNative`]: the export for the
+/// pre-rename `hash.sillstone.digest.PithDigest` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneDigest_crc32cNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneDigest_crc32cNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_crc32cNative(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    status: JIntArray,
+) -> jint {
+    unsafe { Java_io_github_sillstone_SillstoneDigest_crc32cNative(env, class, data, status) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneDigest_fnv1a64Native`]: the export for the
+/// pre-rename `hash.sillstone.digest.PithDigest` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneDigest_fnv1a64Native`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneDigest_fnv1a64Native`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_fnv1a64Native(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    status: JIntArray,
+) -> jlong {
+    unsafe { Java_io_github_sillstone_SillstoneDigest_fnv1a64Native(env, class, data, status) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneDigest_xxh64Native`]: the export for the
+/// pre-rename `hash.sillstone.digest.PithDigest` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneDigest_xxh64Native`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneDigest_xxh64Native`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_xxh64Native(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    seed: jlong,
+    status: JIntArray,
+) -> jlong {
+    unsafe { Java_io_github_sillstone_SillstoneDigest_xxh64Native(env, class, data, seed, status) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneDigest_murmur3X64128Native`]: the export for the
+/// pre-rename `hash.sillstone.digest.PithDigest` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneDigest_murmur3X64128Native`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneDigest_murmur3X64128Native`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_murmur3X64128Native(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    seed: jint,
+    status: JIntArray,
+) -> JArray {
+    unsafe {
+        Java_io_github_sillstone_SillstoneDigest_murmur3X64128Native(env, class, data, seed, status)
+    }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneDigest_splitmix64FillNative`]: the export for the
+/// pre-rename `hash.sillstone.digest.PithDigest` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneDigest_splitmix64FillNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneDigest_splitmix64FillNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_splitmix64FillNative(
+    env: *mut JNIEnv,
+    class: JClass,
+    seed: jlong,
+    count: jint,
+    status: JIntArray,
+) -> JArray {
+    unsafe {
+        Java_io_github_sillstone_SillstoneDigest_splitmix64FillNative(
+            env, class, seed, count, status,
+        )
+    }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneDigest_xoshiro256FillNative`]: the export for the
+/// pre-rename `hash.sillstone.digest.PithDigest` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneDigest_xoshiro256FillNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneDigest_xoshiro256FillNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_xoshiro256FillNative(
+    env: *mut JNIEnv,
+    class: JClass,
+    seed: jlong,
+    count: jint,
+    status: JIntArray,
+) -> JArray {
+    unsafe {
+        Java_io_github_sillstone_SillstoneDigest_xoshiro256FillNative(
+            env, class, seed, count, status,
+        )
+    }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneDigest_base64EncodeNative`]: the export for the
+/// pre-rename `hash.sillstone.digest.PithDigest` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneDigest_base64EncodeNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneDigest_base64EncodeNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_base64EncodeNative(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    status: JIntArray,
+) -> JArray {
+    unsafe { Java_io_github_sillstone_SillstoneDigest_base64EncodeNative(env, class, data, status) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneDigest_base64DecodeNative`]: the export for the
+/// pre-rename `hash.sillstone.digest.PithDigest` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneDigest_base64DecodeNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneDigest_base64DecodeNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_digest_PithDigest_base64DecodeNative(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    status: JIntArray,
+) -> JArray {
+    unsafe { Java_io_github_sillstone_SillstoneDigest_base64DecodeNative(env, class, data, status) }
 }

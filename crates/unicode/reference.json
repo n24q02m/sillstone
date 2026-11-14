@@ -1,7 +1,7 @@
 {
   "format": 1,
   "generator": "cargo run --bin gen-reference -- gen",
-  "description": "Hex-exact NFC/NFD vectors for pith-unicode: UTF-8 bytes of the input string and of its NFC and NFD forms. Inputs are every 16th line of the UCD 15.1.0 NormalizationTest corpus (keeping only lines whose normalization changes) plus the Vietnamese decomposed/precomposed pair.",
+  "description": "Hex-exact NFC/NFD vectors for sillstone-unicode: UTF-8 bytes of the input string and of its NFC and NFD forms. Inputs are every 16th line of the UCD 15.1.0 NormalizationTest corpus (keeping only lines whose normalization changes) plus the Vietnamese decomposed/precomposed pair.",
   "vectors": [
     ["e1b88a", "e1b88a", "44cc87"],
     ["e1b894", "e1b894", "45cc84cc80"],

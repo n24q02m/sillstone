@@ -5,8 +5,8 @@
 //! The suite's Java FFI convention, defined by this module:
 //!
 //! * one flat set of `#[unsafe(no_mangle)] pub unsafe extern "system"`
-//!   functions named `Java_sillstone_math_PithMath_<op>` for the static
-//!   natives of `pith.math.PithMath` — no overloads, so no mangled
+//!   functions named `Java_io_github_sillstone_SillstoneMath_<op>` for the static
+//!   natives of `io.github.sillstone.SillstoneMath` — no overloads, so no mangled
 //!   signature suffixes;
 //! * arrays cross as `jdoubleArray` in and out; scalars as `jdouble`
 //!   returns; geometry as `jint`/`jlong` parameters — no structs;
@@ -240,13 +240,13 @@ fn from_complex(cs: &[Complex]) -> Vec<f64> {
 
 // -- DCT ----------------------------------------------------------------
 
-/// Java: `PithMath.dct2(double[]) → double[]`.
+/// Java: `SillstoneMath.dct2(double[]) → double[]`.
 ///
 /// # Safety
 ///
 /// `env` must be a live JNIEnv; `x` a live array.
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_dct2(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_dct2(
     env: RawEnv,
     _class: JClass,
     x: JDoubleArray,
@@ -254,14 +254,14 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_dct2(
     unsafe { run_flat_alloc(env, x, core_dct2) }
 }
 
-/// Java: `PithMath.idct2(double[]) → double[]` — the orthonormal
+/// Java: `SillstoneMath.idct2(double[]) → double[]` — the orthonormal
 /// DCT-III.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_idct2(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_idct2(
     env: RawEnv,
     _class: JClass,
     x: JDoubleArray,
@@ -269,14 +269,14 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_idct2(
     unsafe { run_flat_alloc(env, x, idct2) }
 }
 
-/// Java: `PithMath.dct3(double[]) → double[]` — the first-class
+/// Java: `SillstoneMath.dct3(double[]) → double[]` — the first-class
 /// forward DCT-III.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_dct3(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_dct3(
     env: RawEnv,
     _class: JClass,
     x: JDoubleArray,
@@ -284,9 +284,9 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_dct3(
     unsafe { run_flat_alloc(env, x, core_dct3) }
 }
 
-/// Java: `PithMath.dst1(double[]) -> double[]` - orthonormal DST-I.
+/// Java: `SillstoneMath.dst1(double[]) -> double[]` - orthonormal DST-I.
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_dst1(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_dst1(
     env: RawEnv,
     _class: JClass,
     x: JDoubleArray,
@@ -294,9 +294,9 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_dst1(
     unsafe { run_flat_alloc(env, x, crate::dst::dst1_orthonormal) }
 }
 
-/// Java: `PithMath.dst2(double[]) -> double[]` - orthonormal DST-II.
+/// Java: `SillstoneMath.dst2(double[]) -> double[]` - orthonormal DST-II.
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_dst2(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_dst2(
     env: RawEnv,
     _class: JClass,
     x: JDoubleArray,
@@ -304,9 +304,9 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_dst2(
     unsafe { run_flat_alloc(env, x, crate::dst::dst2_orthonormal) }
 }
 
-/// Java: `PithMath.dst3(double[]) -> double[]` - orthonormal DST-III.
+/// Java: `SillstoneMath.dst3(double[]) -> double[]` - orthonormal DST-III.
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_dst3(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_dst3(
     env: RawEnv,
     _class: JClass,
     x: JDoubleArray,
@@ -314,13 +314,13 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_dst3(
     unsafe { run_flat_alloc(env, x, crate::dst::dst3_orthonormal) }
 }
 
-/// Java: `PithMath.dct2_2d(double[], int w, int h) → double[]`.
+/// Java: `SillstoneMath.dct2_2d(double[], int w, int h) → double[]`.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_dct22d(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_dct22d(
     env: RawEnv,
     _class: JClass,
     data: JDoubleArray,
@@ -341,14 +341,14 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_dct22d(
 
 // -- FFT ----------------------------------------------------------------
 
-/// Java: `PithMath.fft(double[]) → double[]` (radix-2; the complex
+/// Java: `SillstoneMath.fft(double[]) → double[]` (radix-2; the complex
 /// count must be a power of two — pre-validated in Java).
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_fft(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_fft(
     env: RawEnv,
     _class: JClass,
     x: JDoubleArray,
@@ -364,13 +364,13 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_fft(
     unsafe { run_flat_alloc(env, x, flat_kernel) }
 }
 
-/// Java: `PithMath.ifft(double[]) → double[]`.
+/// Java: `SillstoneMath.ifft(double[]) → double[]`.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_ifft(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_ifft(
     env: RawEnv,
     _class: JClass,
     x: JDoubleArray,
@@ -386,14 +386,14 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_ifft(
     unsafe { run_flat_alloc(env, x, flat_kernel) }
 }
 
-/// Java: `PithMath.fftReal(double[]) → double[]` (power-of-two real
+/// Java: `SillstoneMath.fftReal(double[]) → double[]` (power-of-two real
 /// length, pre-validated in Java).
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_fftReal(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_fftReal(
     env: RawEnv,
     _class: JClass,
     x: JDoubleArray,
@@ -407,14 +407,14 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_fftReal(
     unsafe { run_flat_alloc(env, x, flat_kernel) }
 }
 
-/// Java: `PithMath.fftN(double[]) → double[]` — the arbitrary-length
+/// Java: `SillstoneMath.fftN(double[]) → double[]` — the arbitrary-length
 /// (Bluestein) forward DFT over interleaved pairs.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_fftN(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_fftN(
     env: RawEnv,
     _class: JClass,
     x: JDoubleArray,
@@ -432,14 +432,14 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_fftN(
 
 // -- 3×3 linalg -----------------------------------------------------------
 
-/// Java: `PithMath.ifftN(double[]) → double[]` — the arbitrary-length
+/// Java: `SillstoneMath.ifftN(double[]) → double[]` — the arbitrary-length
 /// inverse.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_ifftN(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_ifftN(
     env: RawEnv,
     _class: JClass,
     x: JDoubleArray,
@@ -455,14 +455,14 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_ifftN(
     unsafe { run_flat_alloc(env, x, flat_kernel) }
 }
 
-/// Java: `PithMath.solve3(double[] a, double[] b) → double[]`; a
+/// Java: `SillstoneMath.solve3(double[] a, double[] b) → double[]`; a
 /// singular system is a `NULL` return.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_solve3(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_solve3(
     env: RawEnv,
     _class: JClass,
     a: JDoubleArray,
@@ -481,13 +481,13 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_solve3(
     }
 }
 
-/// Java: `PithMath.det3(double[]) → double`.
+/// Java: `SillstoneMath.det3(double[]) → double`.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_det3(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_det3(
     env: RawEnv,
     _class: JClass,
     m: JDoubleArray,
@@ -495,13 +495,13 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_det3(
     unsafe { run_flat_scalar(env, m, |v| (v.len() == 9).then(|| det3(&matrix3(v)))) }
 }
 
-/// Java: `PithMath.inverse3(double[]) → double[]`; singular is `NULL`.
+/// Java: `SillstoneMath.inverse3(double[]) → double[]`; singular is `NULL`.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_inverse3(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_inverse3(
     env: RawEnv,
     _class: JClass,
     m: JDoubleArray,
@@ -516,13 +516,13 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_inverse3(
     }
 }
 
-/// Java: `PithMath.transpose3(double[]) → double[]`.
+/// Java: `SillstoneMath.transpose3(double[]) → double[]`.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_transpose3(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_transpose3(
     env: RawEnv,
     _class: JClass,
     m: JDoubleArray,
@@ -536,13 +536,13 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_transpose3(
     unsafe { run_flat_alloc(env, m, kernel) }
 }
 
-/// Java: `PithMath.mat3Mul(double[] a, double[] b) → double[]`.
+/// Java: `SillstoneMath.mat3Mul(double[] a, double[] b) → double[]`.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_mat3Mul(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_mat3Mul(
     env: RawEnv,
     _class: JClass,
     a: JDoubleArray,
@@ -557,13 +557,13 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_mat3Mul(
     unsafe { run_pair_alloc(env, a, b, kernel) }
 }
 
-/// Java: `PithMath.mat3MulVec(double[] m, double[] v) → double[]`.
+/// Java: `SillstoneMath.mat3MulVec(double[] m, double[] v) → double[]`.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_mat3MulVec(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_mat3MulVec(
     env: RawEnv,
     _class: JClass,
     m: JDoubleArray,
@@ -578,13 +578,13 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_mat3MulVec(
     unsafe { run_pair_alloc(env, m, v, kernel) }
 }
 
-/// Java: `PithMath.median(double[]) → double`.
+/// Java: `SillstoneMath.median(double[]) → double`.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_median(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_median(
     env: RawEnv,
     _class: JClass,
     x: JDoubleArray,
@@ -594,13 +594,13 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_median(
 
 // -- Tier-1 ops -----------------------------------------------------------
 
-/// Java: `PithMath.conv(double[] a, double[] b) → double[]`.
+/// Java: `SillstoneMath.conv(double[] a, double[] b) → double[]`.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_conv(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_conv(
     env: RawEnv,
     _class: JClass,
     a: JDoubleArray,
@@ -609,13 +609,13 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_conv(
     unsafe { run_pair_alloc(env, a, b, convolve) }
 }
 
-/// Java: `PithMath.corr(double[] a, double[] b) → double[]`.
+/// Java: `SillstoneMath.corr(double[] a, double[] b) → double[]`.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_corr(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_corr(
     env: RawEnv,
     _class: JClass,
     a: JDoubleArray,
@@ -624,13 +624,13 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_corr(
     unsafe { run_pair_alloc(env, a, b, correlate) }
 }
 
-/// Java: `PithMath.mean(double[]) → double`.
+/// Java: `SillstoneMath.mean(double[]) → double`.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_mean(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_mean(
     env: RawEnv,
     _class: JClass,
     x: JDoubleArray,
@@ -638,13 +638,13 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_mean(
     unsafe { run_flat_scalar(env, x, mean) }
 }
 
-/// Java: `PithMath.variance(double[]) → double` (sample form).
+/// Java: `SillstoneMath.variance(double[]) → double` (sample form).
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_variance(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_variance(
     env: RawEnv,
     _class: JClass,
     x: JDoubleArray,
@@ -652,14 +652,14 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_variance(
     unsafe { run_flat_scalar(env, x, variance) }
 }
 
-/// Java: `PithMath.covariance(double[] a, double[] b) → double`
+/// Java: `SillstoneMath.covariance(double[] a, double[] b) → double`
 /// (sample form; length mismatches are a Java-side pre-validation).
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_covariance(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_covariance(
     env: RawEnv,
     _class: JClass,
     a: JDoubleArray,
@@ -668,14 +668,14 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_covariance(
     unsafe { run_pair_scalar(env, a, b, covariance) }
 }
 
-/// Java: `PithMath.lagrange(double[] xs, double[] ys, double x) →
+/// Java: `SillstoneMath.lagrange(double[] xs, double[] ys, double x) →
 /// double`; duplicated nodes are a `NaN` return.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_lagrange(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_lagrange(
     env: RawEnv,
     _class: JClass,
     xs: JDoubleArray,
@@ -692,13 +692,13 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_lagrange(
     unsafe { run_pair_scalar(env, xs, ys, kernel) }
 }
 
-/// Java: `PithMath.dtw(double[] a, double[] b) → double`.
+/// Java: `SillstoneMath.dtw(double[] a, double[] b) → double`.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_dtw(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_dtw(
     env: RawEnv,
     _class: JClass,
     a: JDoubleArray,
@@ -707,16 +707,16 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_dtw(
     unsafe { run_pair_scalar(env, a, b, dtw_distance) }
 }
 
-/// Java: `PithMath.ransacLine(double[] xs, double[] ys, double
+/// Java: `SillstoneMath.ransacLine(double[] xs, double[] ys, double
 /// threshold, int iterations, long seed) → double[]` — a fresh
 /// `[slope, intercept, inlierCount]`, or `NULL` when no model was
 /// found.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_ransacLine(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_ransacLine(
     env: RawEnv,
     _class: JClass,
     xs: JDoubleArray,
@@ -744,13 +744,13 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_ransacLine(
 
 // -- Complex arithmetic ---------------------------------------------------
 
-/// Java: `PithMath.complexMul(double[] z, double[] w) → double[]`.
+/// Java: `SillstoneMath.complexMul(double[] z, double[] w) → double[]`.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_complexMul(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_complexMul(
     env: RawEnv,
     _class: JClass,
     z: JDoubleArray,
@@ -767,13 +767,13 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_complexMul(
     unsafe { run_pair_alloc(env, z, w, kernel) }
 }
 
-/// Java: `PithMath.complexDiv(double[] z, double[] w) → double[]`.
+/// Java: `SillstoneMath.complexDiv(double[] z, double[] w) → double[]`.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_complexDiv(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_complexDiv(
     env: RawEnv,
     _class: JClass,
     z: JDoubleArray,
@@ -791,14 +791,14 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_complexDiv(
     unsafe { run_pair_alloc(env, z, w, kernel) }
 }
 
-/// Java: `PithMath.dct3_2d(double[] data, int w, int h) → double[]` —
+/// Java: `SillstoneMath.dct3_2d(double[] data, int w, int h) → double[]` —
 /// the exact inverse of `dct2_2d`.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_dct32d(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_dct32d(
     env: RawEnv,
     _class: JClass,
     data: JDoubleArray,
@@ -817,13 +817,13 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_dct32d(
     unsafe { write_array(env, &buf) }
 }
 
-/// Java: `PithMath.complexExp(double[] z) → double[]`.
+/// Java: `SillstoneMath.complexExp(double[] z) → double[]`.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_complexExp(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_complexExp(
     env: RawEnv,
     _class: JClass,
     z: JDoubleArray,
@@ -838,13 +838,13 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_complexExp(
     unsafe { run_flat_alloc(env, z, kernel) }
 }
 
-/// Java: `PithMath.complexSqrt(double[] z) → double[]`.
+/// Java: `SillstoneMath.complexSqrt(double[] z) → double[]`.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_complexSqrt(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_complexSqrt(
     env: RawEnv,
     _class: JClass,
     z: JDoubleArray,
@@ -859,14 +859,14 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_complexSqrt(
     unsafe { run_flat_alloc(env, z, kernel) }
 }
 
-/// Java: `PithMath.complexLog(double[] z) → double[]` — the principal
+/// Java: `SillstoneMath.complexLog(double[] z) → double[]` — the principal
 /// `[ln|z|, arg z]`; `z = 0` surfaces as `NULL` (domain refusal).
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_complexLog(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_complexLog(
     env: RawEnv,
     _class: JClass,
     z: JDoubleArray,
@@ -881,13 +881,13 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_complexLog(
     unsafe { run_flat_alloc(env, z, kernel) }
 }
 
-/// Java: `PithMath.complexArg(double[] z) → double`.
+/// Java: `SillstoneMath.complexArg(double[] z) → double`.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_complexArg(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_complexArg(
     env: RawEnv,
     _class: JClass,
     z: JDoubleArray,
@@ -897,13 +897,13 @@ pub unsafe extern "system" fn Java_sillstone_math_PithMath_complexArg(
     unsafe { run_flat_scalar(env, z, kernel) }
 }
 
-/// Java: `PithMath.complexPowi(double[] z, int n) → double[]`.
+/// Java: `SillstoneMath.complexPowi(double[] z, int n) → double[]`.
 ///
 /// # Safety
 ///
-/// See [`Java_sillstone_math_PithMath_dct2`].
+/// See [`Java_io_github_sillstone_SillstoneMath_dct2`].
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_sillstone_math_PithMath_complexPowi(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneMath_complexPowi(
     env: RawEnv,
     _class: JClass,
     z: JDoubleArray,
@@ -930,4 +930,592 @@ fn matrix3(flat: &[f64]) -> [[f64; 3]; 3] {
 /// Flattens a matrix back to row-major `f64`s.
 fn flat3(m: &[[f64; 3]; 3]) -> Vec<f64> {
     m.iter().flat_map(|row| row.iter().copied()).collect()
+}
+
+// Deprecated pre-rename JNI exports: the symbols Java classes compiled against the
+// suite's old class names resolve. Each one forwards to its canonical
+// `io.github.sillstone` export unchanged.
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_dct2`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_dct2`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_dct2`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_dct2(
+    env: RawEnv,
+    class: JClass,
+    x: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_dct2(env, class, x) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_idct2`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_idct2`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_idct2`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_idct2(
+    env: RawEnv,
+    class: JClass,
+    x: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_idct2(env, class, x) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_dct3`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_dct3`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_dct3`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_dct3(
+    env: RawEnv,
+    class: JClass,
+    x: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_dct3(env, class, x) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_dst1`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_dst1`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_dst1`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_dst1(
+    env: RawEnv,
+    class: JClass,
+    x: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_dst1(env, class, x) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_dst2`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_dst2`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_dst2`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_dst2(
+    env: RawEnv,
+    class: JClass,
+    x: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_dst2(env, class, x) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_dst3`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_dst3`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_dst3`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_dst3(
+    env: RawEnv,
+    class: JClass,
+    x: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_dst3(env, class, x) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_dct22d`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_dct22d`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_dct22d`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_dct22d(
+    env: RawEnv,
+    class: JClass,
+    data: JDoubleArray,
+    w: i32,
+    h: i32,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_dct22d(env, class, data, w, h) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_fft`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_fft`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_fft`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_fft(
+    env: RawEnv,
+    class: JClass,
+    x: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_fft(env, class, x) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_ifft`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_ifft`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_ifft`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_ifft(
+    env: RawEnv,
+    class: JClass,
+    x: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_ifft(env, class, x) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_fftReal`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_fftReal`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_fftReal`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_fftReal(
+    env: RawEnv,
+    class: JClass,
+    x: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_fftReal(env, class, x) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_fftN`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_fftN`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_fftN`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_fftN(
+    env: RawEnv,
+    class: JClass,
+    x: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_fftN(env, class, x) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_ifftN`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_ifftN`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_ifftN`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_ifftN(
+    env: RawEnv,
+    class: JClass,
+    x: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_ifftN(env, class, x) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_solve3`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_solve3`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_solve3`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_solve3(
+    env: RawEnv,
+    class: JClass,
+    a: JDoubleArray,
+    b: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_solve3(env, class, a, b) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_det3`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_det3`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_det3`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_det3(
+    env: RawEnv,
+    class: JClass,
+    m: JDoubleArray,
+) -> f64 {
+    unsafe { Java_io_github_sillstone_SillstoneMath_det3(env, class, m) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_inverse3`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_inverse3`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_inverse3`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_inverse3(
+    env: RawEnv,
+    class: JClass,
+    m: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_inverse3(env, class, m) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_transpose3`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_transpose3`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_transpose3`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_transpose3(
+    env: RawEnv,
+    class: JClass,
+    m: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_transpose3(env, class, m) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_mat3Mul`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_mat3Mul`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_mat3Mul`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_mat3Mul(
+    env: RawEnv,
+    class: JClass,
+    a: JDoubleArray,
+    b: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_mat3Mul(env, class, a, b) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_mat3MulVec`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_mat3MulVec`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_mat3MulVec`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_mat3MulVec(
+    env: RawEnv,
+    class: JClass,
+    m: JDoubleArray,
+    v: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_mat3MulVec(env, class, m, v) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_median`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_median`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_median`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_median(
+    env: RawEnv,
+    class: JClass,
+    x: JDoubleArray,
+) -> f64 {
+    unsafe { Java_io_github_sillstone_SillstoneMath_median(env, class, x) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_conv`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_conv`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_conv`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_conv(
+    env: RawEnv,
+    class: JClass,
+    a: JDoubleArray,
+    b: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_conv(env, class, a, b) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_corr`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_corr`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_corr`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_corr(
+    env: RawEnv,
+    class: JClass,
+    a: JDoubleArray,
+    b: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_corr(env, class, a, b) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_mean`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_mean`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_mean`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_mean(
+    env: RawEnv,
+    class: JClass,
+    x: JDoubleArray,
+) -> f64 {
+    unsafe { Java_io_github_sillstone_SillstoneMath_mean(env, class, x) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_variance`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_variance`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_variance`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_variance(
+    env: RawEnv,
+    class: JClass,
+    x: JDoubleArray,
+) -> f64 {
+    unsafe { Java_io_github_sillstone_SillstoneMath_variance(env, class, x) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_covariance`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_covariance`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_covariance`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_covariance(
+    env: RawEnv,
+    class: JClass,
+    a: JDoubleArray,
+    b: JDoubleArray,
+) -> f64 {
+    unsafe { Java_io_github_sillstone_SillstoneMath_covariance(env, class, a, b) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_lagrange`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_lagrange`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_lagrange`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_lagrange(
+    env: RawEnv,
+    class: JClass,
+    xs: JDoubleArray,
+    ys: JDoubleArray,
+    x: f64,
+) -> f64 {
+    unsafe { Java_io_github_sillstone_SillstoneMath_lagrange(env, class, xs, ys, x) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_dtw`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_dtw`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_dtw`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_dtw(
+    env: RawEnv,
+    class: JClass,
+    a: JDoubleArray,
+    b: JDoubleArray,
+) -> f64 {
+    unsafe { Java_io_github_sillstone_SillstoneMath_dtw(env, class, a, b) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_ransacLine`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_ransacLine`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_ransacLine`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_ransacLine(
+    env: RawEnv,
+    class: JClass,
+    xs: JDoubleArray,
+    ys: JDoubleArray,
+    threshold: f64,
+    iterations: i32,
+    seed: i64,
+) -> JDoubleArray {
+    unsafe {
+        Java_io_github_sillstone_SillstoneMath_ransacLine(
+            env, class, xs, ys, threshold, iterations, seed,
+        )
+    }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_complexMul`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_complexMul`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_complexMul`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_complexMul(
+    env: RawEnv,
+    class: JClass,
+    z: JDoubleArray,
+    w: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_complexMul(env, class, z, w) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_complexDiv`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_complexDiv`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_complexDiv`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_complexDiv(
+    env: RawEnv,
+    class: JClass,
+    z: JDoubleArray,
+    w: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_complexDiv(env, class, z, w) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_dct32d`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_dct32d`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_dct32d`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_dct32d(
+    env: RawEnv,
+    class: JClass,
+    data: JDoubleArray,
+    w: i32,
+    h: i32,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_dct32d(env, class, data, w, h) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_complexExp`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_complexExp`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_complexExp`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_complexExp(
+    env: RawEnv,
+    class: JClass,
+    z: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_complexExp(env, class, z) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_complexSqrt`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_complexSqrt`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_complexSqrt`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_complexSqrt(
+    env: RawEnv,
+    class: JClass,
+    z: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_complexSqrt(env, class, z) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_complexLog`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_complexLog`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_complexLog`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_complexLog(
+    env: RawEnv,
+    class: JClass,
+    z: JDoubleArray,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_complexLog(env, class, z) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_complexArg`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_complexArg`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_complexArg`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_complexArg(
+    env: RawEnv,
+    class: JClass,
+    z: JDoubleArray,
+) -> f64 {
+    unsafe { Java_io_github_sillstone_SillstoneMath_complexArg(env, class, z) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneMath_complexPowi`]: the export for the
+/// pre-rename `sillstone.math.PithMath` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneMath_complexPowi`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneMath_complexPowi`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_sillstone_math_PithMath_complexPowi(
+    env: RawEnv,
+    class: JClass,
+    z: JDoubleArray,
+    n: i32,
+) -> JDoubleArray {
+    unsafe { Java_io_github_sillstone_SillstoneMath_complexPowi(env, class, z, n) }
 }

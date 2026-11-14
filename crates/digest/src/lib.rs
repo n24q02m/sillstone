@@ -1,11 +1,11 @@
-//! The shared vocabulary of the `pith` suite: the one error type, the
+//! The shared vocabulary of the `sillstone` suite: the one error type, the
 //! fixed-width digest value, the Hamming distance between digests, and
 //! the closed sets of names that appear in on-disk records. Also the
 //! computational primitives every modality crate shares: SHA-256, the
 //! checksums (CRC-32, Adler-32, FNV-1a 64), splitmix64 and the bit
 //! reader.
 //!
-//! The foundation crate of the zero-dependency `pith` suite. Every other
+//! The foundation crate of the zero-dependency `sillstone` suite. Every other
 //! crate builds on these types and nothing builds beneath them: this
 //! crate has an empty `[dependencies]` table, enforced by
 //! `scripts/check-zero-deps.py`.
@@ -24,6 +24,8 @@
 extern crate alloc;
 
 mod bitreader;
+pub mod blake2b;
+pub mod blake3;
 mod checksums;
 mod digest;
 mod distance;
@@ -31,11 +33,9 @@ mod error;
 mod names;
 mod sha1;
 mod sha256;
+pub mod sha3;
 mod sha512;
 mod splitmix64;
-pub mod blake2b;
-pub mod blake3;
-pub mod sha3;
 
 pub mod base64;
 pub mod ffi;
@@ -59,6 +59,8 @@ mod ffi_jni;
 
 pub use crate::base64::{base64_decode, base64_encode};
 pub use crate::bitreader::BitReader;
+pub use crate::blake2b::{blake2b, blake2b_512, blake2b_into};
+pub use crate::blake3::{Hasher as Blake3Hasher, blake3, blake3_keyed, blake3_xof};
 pub use crate::checksums::{adler32, crc32, fnv1a64};
 pub use crate::crc32c::crc32c;
 pub use crate::digest::{Digest, Read};
@@ -68,11 +70,9 @@ pub use crate::hmac::{hmac_sha1, hmac_sha256, hmac_sha512};
 pub use crate::murmur3::murmur3_x64_128;
 pub use crate::names::{Algorithm, Format};
 pub use crate::sha1::sha1;
+pub use crate::sha3::{sha3_256, sha3_512};
 pub use crate::sha256::sha256;
 pub use crate::sha512::sha512;
-pub use crate::blake2b::{blake2b, blake2b_512, blake2b_into};
-pub use crate::blake3::{blake3, blake3_keyed, blake3_xof, Hasher as Blake3Hasher};
-pub use crate::sha3::{sha3_256, sha3_512};
 pub use crate::splitmix64::SplitMix64;
 pub use crate::xoshiro::Xoshiro256StarStar;
 pub use crate::xxh64::xxh64;

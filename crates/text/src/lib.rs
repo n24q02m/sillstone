@@ -1,7 +1,7 @@
 //! Text fingerprints: canonicalisation, word-3-shingles and a 128-word
 //! MinHash signature (design spec §4, tier-2 text lane).
 //!
-//! Part of the `pith` suite: every crate in the suite builds without a
+//! Part of the `sillstone` suite: every crate in the suite builds without a
 //! single registry package.
 //!
 //! # Pipeline
@@ -50,8 +50,8 @@ pub mod ffi;
 // nameable in Rust.
 #[cfg(all(not(test), feature = "std"))]
 mod ffi_jni;
-pub mod reference;
 pub mod ngram;
+pub mod reference;
 pub mod tlsh;
 pub use ngram::{ngram_jaccard, ngrams};
 pub use tlsh::{Tlsh, tlsh, tlsh_distance};

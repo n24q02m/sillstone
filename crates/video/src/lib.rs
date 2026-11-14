@@ -1,7 +1,7 @@
 //! Video fingerprints: mp4 demux → H.264 decode → fixed-rate frame
 //! sampling → per-frame pHash chain → MinHash (spec §4.2).
 //!
-//! Part of the `pith` suite: every crate in the suite builds without a
+//! Part of the `sillstone` suite: every crate in the suite builds without a
 //! single registry package.
 //!
 //! # Pipeline

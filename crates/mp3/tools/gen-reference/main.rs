@@ -1,6 +1,6 @@
 //! Regenerates and verifies `reference.json` â€” the hex-exact decoded
 //! PCM vectors for every conformance fixture, shared byte-for-byte across
-//! the pith suite's Python, Node and Go SDKs.
+//! the sillstone suite's Python, Node and Go SDKs.
 //!
 //! Usage:
 //!
@@ -97,10 +97,10 @@ fn generate(fixtures_dir: &Path) -> Result<String, String> {
     let files = fixture_files(fixtures_dir)?;
     let mut doc = String::new();
     doc.push_str("{\n");
-    doc.push_str("  \"schema\": \"pith-mp3/reference-vectors-v1\",\n");
+    doc.push_str("  \"schema\": \"sillstone-mp3/reference-vectors-v1\",\n");
     doc.push_str(
         "  \"note\": \"Decoded-PCM vectors per conformance fixture. pcm_sha256 is \
-             SHA-256 (pith-digest) over the interleaved i32 samples in \
+             SHA-256 (sillstone-digest) over the interleaved i32 samples in \
              little-endian byte order; pcm_head_hex carries the first 64 of \
              those bytes.\",\n",
     );
@@ -269,7 +269,7 @@ mod tests {
         let a = generate(&root().join(FIXTURES_DIR)).unwrap();
         let b = generate(&root().join(FIXTURES_DIR)).unwrap();
         assert_eq!(a, b);
-        assert!(a.starts_with("{\n  \"schema\": \"pith-mp3/reference-vectors-v1\""));
+        assert!(a.starts_with("{\n  \"schema\": \"sillstone-mp3/reference-vectors-v1\""));
         assert!(a.ends_with("  ]\n}\n"));
         // Every fixture appears exactly once.
         for f in fixture_files(&root().join(FIXTURES_DIR)).unwrap() {

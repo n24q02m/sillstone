@@ -1,5 +1,5 @@
 //! Regenerates and verifies `reference.json`: the hex-exact decoded-plane
-//! digests of the pith suite's H.264 lane. One vector per conformance
+//! digests of the sillstone suite's H.264 lane. One vector per conformance
 //! fixture under `tests/fixtures/`, in deterministic (sorted) corpus
 //! order, pinning the aggregate SHA-256 over every decoded frame's
 //! `y || cb || cr` planes in presentation order.
@@ -103,8 +103,8 @@ pub(crate) fn fixture_names(root: &Path) -> Vec<String> {
 pub(crate) fn reference_json(root: &Path) -> String {
     let mut out = String::new();
     out.push_str("{\n");
-    out.push_str("  \"suite\": \"pith\",\n");
-    out.push_str("  \"crate\": \"pith-h264\",\n");
+    out.push_str("  \"suite\": \"sillstone\",\n");
+    out.push_str("  \"crate\": \"sillstone-h264\",\n");
     out.push_str("  \"format_version\": 1,\n");
     out.push_str("  \"generator\": \"cargo run --bin gen-reference -- gen\",\n");
     out.push_str("  \"vectors\": [\n");

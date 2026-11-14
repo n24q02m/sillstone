@@ -2,7 +2,7 @@
 //! (ctypes), Node (koffi) and Go (cgo) SDKs bind through.
 //!
 //! The suite's FFI convention, defined by this module and mirrored by
-//! every `pith-*` cdylib:
+//! every `sillstone-*` cdylib:
 //!
 //! * one flat set of `#[unsafe(no_mangle)] pub unsafe extern "C"`
 //!   functions — raw pointers plus lengths, no structs across the
@@ -10,7 +10,7 @@
 //! * every function returns a status code (see the constants below),
 //!   never a `Result`, never a panic: the normalizer has no panic
 //!   path on validated input, and invalid UTF-8 is rejected —
-//!   [`PITH_E_REJECTED`] — before the core ever sees it;
+//!   [`SILLSTONE_E_REJECTED`] — before the core ever sees it;
 //! * the operations hand ownership to the caller and ship a matching
 //!   [`sillstone_unicode_free`]: the buffer is handed out as a boxed slice
 //!   together with its exact length, and released by reconstructing
@@ -31,19 +31,19 @@
 use crate::{NormalizationForm, casefold, casefold_simple, is_normalized, nfc, nfd, nfkc, nfkd};
 
 /// Status: success.
-pub const PITH_OK: i32 = 0;
+pub const SILLSTONE_OK: i32 = 0;
 /// Status: a caller argument is invalid — a null pointer.
-pub const PITH_E_INVALID: i32 = -1;
+pub const SILLSTONE_E_INVALID: i32 = -1;
 /// Status: the core refused the input: the bytes are not valid UTF-8
 /// (a rejection, never a panic).
-pub const PITH_E_REJECTED: i32 = -2;
+pub const SILLSTONE_E_REJECTED: i32 = -2;
 
 /// Normalizes `len` bytes at `data` to Unicode Normalization Form C
 /// (canonical composition) and hands the UTF-8 result to the caller.
 ///
 /// On success the function allocates a buffer, writes its address
 /// through `out`, its length through `out_len`, and returns
-/// [`PITH_OK`]; the caller owns the buffer and must release it with
+/// [`SILLSTONE_OK`]; the caller owns the buffer and must release it with
 /// [`sillstone_unicode_free`], passing back the same pointer *and* the
 /// length that came back through `out_len`. Empty input is valid and
 /// produces an empty (zero-length) buffer.
@@ -121,8 +121,8 @@ pub unsafe extern "C" fn sillstone_unicode_nfkd(
 /// ([`NormalizationForm::code`]).
 ///
 /// On success writes `1` (already normalized) or `0` through `out` and
-/// returns [`PITH_OK`]. An out-of-range `form` is [`PITH_E_INVALID`];
-/// bytes that are not valid UTF-8 are [`PITH_E_REJECTED`].
+/// returns [`SILLSTONE_OK`]. An out-of-range `form` is [`SILLSTONE_E_INVALID`];
+/// bytes that are not valid UTF-8 are [`SILLSTONE_E_REJECTED`].
 ///
 /// # Safety
 ///
@@ -136,18 +136,18 @@ pub unsafe extern "C" fn sillstone_unicode_is_normalized(
     out: *mut u8,
 ) -> i32 {
     if data.is_null() || out.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let Some(form) = NormalizationForm::from_code(form) else {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     };
     let bytes = unsafe { core::slice::from_raw_parts(data, len) };
     match core::str::from_utf8(bytes) {
         Ok(text) => {
             unsafe { *out = u8::from(is_normalized(form, text)) };
-            PITH_OK
+            SILLSTONE_OK
         }
-        Err(_) => PITH_E_REJECTED,
+        Err(_) => SILLSTONE_E_REJECTED,
     }
 }
 
@@ -204,40 +204,40 @@ pub unsafe extern "C" fn sillstone_unicode_free(ptr: *mut u8, len: usize) {
 }
 
 /// The safe core of [`sillstone_unicode_nfc`]: validate the bytes as UTF-8,
-/// then normalize. Invalid UTF-8 maps to [`PITH_E_REJECTED`].
+/// then normalize. Invalid UTF-8 maps to [`SILLSTONE_E_REJECTED`].
 fn nfc_bytes(bytes: &[u8]) -> Result<Vec<u8>, i32> {
-    let text = core::str::from_utf8(bytes).map_err(|_| PITH_E_REJECTED)?;
+    let text = core::str::from_utf8(bytes).map_err(|_| SILLSTONE_E_REJECTED)?;
     Ok(nfc(text).into_bytes())
 }
 
 /// The safe core of [`sillstone_unicode_nfd`]: validate the bytes as UTF-8,
-/// then normalize. Invalid UTF-8 maps to [`PITH_E_REJECTED`].
+/// then normalize. Invalid UTF-8 maps to [`SILLSTONE_E_REJECTED`].
 fn nfd_bytes(bytes: &[u8]) -> Result<Vec<u8>, i32> {
-    let text = core::str::from_utf8(bytes).map_err(|_| PITH_E_REJECTED)?;
+    let text = core::str::from_utf8(bytes).map_err(|_| SILLSTONE_E_REJECTED)?;
     Ok(nfd(text).into_bytes())
 }
 
 /// The safe core of [`sillstone_unicode_nfkc`].
 fn nfkc_bytes(bytes: &[u8]) -> Result<Vec<u8>, i32> {
-    let text = core::str::from_utf8(bytes).map_err(|_| PITH_E_REJECTED)?;
+    let text = core::str::from_utf8(bytes).map_err(|_| SILLSTONE_E_REJECTED)?;
     Ok(nfkc(text).into_bytes())
 }
 
 /// The safe core of [`sillstone_unicode_nfkd`].
 fn nfkd_bytes(bytes: &[u8]) -> Result<Vec<u8>, i32> {
-    let text = core::str::from_utf8(bytes).map_err(|_| PITH_E_REJECTED)?;
+    let text = core::str::from_utf8(bytes).map_err(|_| SILLSTONE_E_REJECTED)?;
     Ok(nfkd(text).into_bytes())
 }
 
 /// The safe core of [`sillstone_unicode_casefold`].
 fn casefold_bytes(bytes: &[u8]) -> Result<Vec<u8>, i32> {
-    let text = core::str::from_utf8(bytes).map_err(|_| PITH_E_REJECTED)?;
+    let text = core::str::from_utf8(bytes).map_err(|_| SILLSTONE_E_REJECTED)?;
     Ok(casefold(text).into_bytes())
 }
 
 /// The safe core of [`sillstone_unicode_casefold_simple`].
 fn casefold_simple_bytes(bytes: &[u8]) -> Result<Vec<u8>, i32> {
-    let text = core::str::from_utf8(bytes).map_err(|_| PITH_E_REJECTED)?;
+    let text = core::str::from_utf8(bytes).map_err(|_| SILLSTONE_E_REJECTED)?;
     Ok(casefold_simple(text).into_bytes())
 }
 
@@ -258,7 +258,7 @@ unsafe fn normalize(
     core: fn(&[u8]) -> Result<Vec<u8>, i32>,
 ) -> i32 {
     if data.is_null() || out.is_null() || out_len.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let bytes = unsafe { core::slice::from_raw_parts(data, len) };
     match core(bytes) {
@@ -271,7 +271,7 @@ unsafe fn normalize(
                 *out = ptr.cast::<u8>();
                 *out_len = len;
             }
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(status) => status,
     }
@@ -288,7 +288,7 @@ pub unsafe extern "C" fn sillstone_unicode_grapheme_count(
     out_count: *mut usize,
 ) -> i32 {
     if (len > 0 && data.is_null()) || out_count.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let bytes = if len == 0 {
         &[][..]
@@ -297,11 +297,11 @@ pub unsafe extern "C" fn sillstone_unicode_grapheme_count(
     };
     let s = match core::str::from_utf8(bytes) {
         Ok(s) => s,
-        Err(_) => return PITH_E_REJECTED,
+        Err(_) => return SILLSTONE_E_REJECTED,
     };
     let count = crate::graphemes(s).count();
     unsafe { *out_count = count };
-    PITH_OK
+    SILLSTONE_OK
 }
 
 /// Returns the Unicode General Category of code point `cp` as a numeric enum tag.
@@ -315,25 +315,39 @@ pub unsafe extern "C" fn sillstone_unicode_char_category(
     out_cat: *mut u8,
 ) -> i32 {
     if out_cat.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let c = match char::from_u32(cp) {
         Some(c) => c,
-        None => return PITH_E_INVALID,
+        None => return SILLSTONE_E_INVALID,
     };
     let cat = crate::char_category(c);
     unsafe { *out_cat = cat as u8 };
-    PITH_OK
+    SILLSTONE_OK
 }
+
+// Deprecated pre-rename aliases: the `PITH_*` names the suite shipped before
+// it became `sillstone`. Each one is the same value as its `SILLSTONE_*` twin.
+
+/// Deprecated alias of [`SILLSTONE_OK`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_OK`")]
+pub const PITH_OK: i32 = SILLSTONE_OK;
+/// Deprecated alias of [`SILLSTONE_E_INVALID`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_INVALID`")]
+pub const PITH_E_INVALID: i32 = SILLSTONE_E_INVALID;
+/// Deprecated alias of [`SILLSTONE_E_REJECTED`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_REJECTED`")]
+pub const PITH_E_REJECTED: i32 = SILLSTONE_E_REJECTED;
 
 #[cfg(test)]
 mod tests {
     use super::{
-        PITH_E_INVALID, PITH_E_REJECTED, PITH_OK, casefold_bytes, casefold_simple_bytes, nfc_bytes,
-        nfd_bytes, nfkc_bytes, nfkd_bytes, sillstone_unicode_casefold, sillstone_unicode_casefold_simple,
-        sillstone_unicode_free, sillstone_unicode_is_normalized, sillstone_unicode_nfc, sillstone_unicode_nfd,
-        sillstone_unicode_char_category, sillstone_unicode_grapheme_count, sillstone_unicode_nfkc,
-        sillstone_unicode_nfkd,
+        SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_OK, casefold_bytes,
+        casefold_simple_bytes, nfc_bytes, nfd_bytes, nfkc_bytes, nfkd_bytes,
+        sillstone_unicode_casefold, sillstone_unicode_casefold_simple,
+        sillstone_unicode_char_category, sillstone_unicode_free, sillstone_unicode_grapheme_count,
+        sillstone_unicode_is_normalized, sillstone_unicode_nfc, sillstone_unicode_nfd,
+        sillstone_unicode_nfkc, sillstone_unicode_nfkd,
     };
 
     /// Every buffer-handed-out export, for the shared-contract loops.
@@ -361,7 +375,7 @@ mod tests {
         let mut out_len: usize = 0;
         let status =
             unsafe { sillstone_unicode_nfc(input.as_ptr(), input.len(), &mut out, &mut out_len) };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(out_len, want_nfc.len());
         assert_eq!(
             unsafe { core::slice::from_raw_parts(out, out_len) },
@@ -371,7 +385,7 @@ mod tests {
 
         let status =
             unsafe { sillstone_unicode_nfd(input.as_ptr(), input.len(), &mut out, &mut out_len) };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(out_len, want_nfd.len());
         assert_eq!(
             unsafe { core::slice::from_raw_parts(out, out_len) },
@@ -392,7 +406,7 @@ mod tests {
         let mut out_len: usize = 0;
         let status =
             unsafe { sillstone_unicode_nfc(input.as_ptr(), input.len(), &mut out, &mut out_len) };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(out_len, want_nfc.len());
         assert_eq!(
             unsafe { core::slice::from_raw_parts(out, out_len) },
@@ -402,7 +416,7 @@ mod tests {
 
         let status =
             unsafe { sillstone_unicode_nfd(input.as_ptr(), input.len(), &mut out, &mut out_len) };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(out_len, input.len());
         assert_eq!(unsafe { core::slice::from_raw_parts(out, out_len) }, &input);
         unsafe { sillstone_unicode_free(out, out_len) };
@@ -417,7 +431,7 @@ mod tests {
             let mut out: *mut u8 = core::ptr::null_mut();
             let mut out_len: usize = 0;
             let status = unsafe { op(b"".as_ptr(), 0, &mut out, &mut out_len) };
-            assert_eq!(status, PITH_OK);
+            assert_eq!(status, SILLSTONE_OK);
             assert_eq!(out_len, 0);
             // A zero-length read off the handed-out pointer is legal.
             assert!(unsafe { core::slice::from_raw_parts(out, out_len) }.is_empty());
@@ -425,7 +439,7 @@ mod tests {
         }
     }
 
-    /// Null pointers are [`PITH_E_INVALID`] for both operations; a
+    /// Null pointers are [`SILLSTONE_E_INVALID`] for both operations; a
     /// null buffer is a legal free.
     #[test]
     fn ffi_rejects_null_pointers() {
@@ -435,7 +449,7 @@ mod tests {
 
         for op in BUFFER_OPS {
             let null_data = unsafe { op(core::ptr::null(), 0, &mut out, &mut out_len) };
-            assert_eq!(null_data, PITH_E_INVALID);
+            assert_eq!(null_data, SILLSTONE_E_INVALID);
 
             let null_out = unsafe {
                 op(
@@ -445,17 +459,17 @@ mod tests {
                     &mut out_len,
                 )
             };
-            assert_eq!(null_out, PITH_E_INVALID);
+            assert_eq!(null_out, SILLSTONE_E_INVALID);
 
             let null_out_len =
                 unsafe { op(text.as_ptr(), text.len(), &mut out, core::ptr::null_mut()) };
-            assert_eq!(null_out_len, PITH_E_INVALID);
+            assert_eq!(null_out_len, SILLSTONE_E_INVALID);
         }
 
         unsafe { sillstone_unicode_free(core::ptr::null_mut(), 0) };
     }
 
-    /// Invalid UTF-8 is [`PITH_E_REJECTED`] for both operations — a
+    /// Invalid UTF-8 is [`SILLSTONE_E_REJECTED`] for both operations — a
     /// status, never a panic and never a crash.
     #[test]
     fn ffi_rejects_invalid_utf8() {
@@ -464,7 +478,7 @@ mod tests {
             let mut out: *mut u8 = core::ptr::null_mut();
             let mut out_len: usize = 0;
             let status = unsafe { op(bad.as_ptr(), bad.len(), &mut out, &mut out_len) };
-            assert_eq!(status, PITH_E_REJECTED);
+            assert_eq!(status, SILLSTONE_E_REJECTED);
         }
     }
 
@@ -475,22 +489,25 @@ mod tests {
     fn safe_cores_mirror_the_exports() {
         assert_eq!(nfc_bytes(b"\xe1\xb8\x8a"), Ok(b"\xe1\xb8\x8a".to_vec()));
         assert_eq!(nfd_bytes(b"\xe1\xb8\x8a"), Ok(b"D\xcc\x87".to_vec()));
-        assert_eq!(nfc_bytes(b"\xff\xfe"), Err(PITH_E_REJECTED));
-        assert_eq!(nfd_bytes(b"\xff\xfe"), Err(PITH_E_REJECTED));
+        assert_eq!(nfc_bytes(b"\xff\xfe"), Err(SILLSTONE_E_REJECTED));
+        assert_eq!(nfd_bytes(b"\xff\xfe"), Err(SILLSTONE_E_REJECTED));
         assert_eq!(nfc_bytes(b""), Ok(Vec::new()));
         assert_eq!(nfd_bytes(b""), Ok(Vec::new()));
         // Tier-1 cores: compatibility forms and both folding flavors.
         assert_eq!(nfkc_bytes(b"\xef\xac\x81"), Ok(b"fi".to_vec()));
         assert_eq!(nfkd_bytes(b"\xef\xac\x81"), Ok(b"fi".to_vec()));
-        assert_eq!(nfkc_bytes(b"\xff\xfe"), Err(PITH_E_REJECTED));
-        assert_eq!(nfkd_bytes(b"\xff\xfe"), Err(PITH_E_REJECTED));
+        assert_eq!(nfkc_bytes(b"\xff\xfe"), Err(SILLSTONE_E_REJECTED));
+        assert_eq!(nfkd_bytes(b"\xff\xfe"), Err(SILLSTONE_E_REJECTED));
         assert_eq!(casefold_bytes(b"\xc3\x9f"), Ok(b"ss".to_vec()));
         assert_eq!(
             casefold_simple_bytes(b"\xe1\xba\x9e"),
             Ok(b"\xc3\x9f".to_vec())
         );
-        assert_eq!(casefold_bytes(b"\xff\xfe"), Err(PITH_E_REJECTED));
-        assert_eq!(casefold_simple_bytes(b"\xff\xfe"), Err(PITH_E_REJECTED));
+        assert_eq!(casefold_bytes(b"\xff\xfe"), Err(SILLSTONE_E_REJECTED));
+        assert_eq!(
+            casefold_simple_bytes(b"\xff\xfe"),
+            Err(SILLSTONE_E_REJECTED)
+        );
         assert_eq!(nfkc_bytes(b""), Ok(Vec::new()));
         assert_eq!(nfkd_bytes(b""), Ok(Vec::new()));
         assert_eq!(casefold_bytes(b""), Ok(Vec::new()));
@@ -517,7 +534,7 @@ mod tests {
             let mut out: *mut u8 = core::ptr::null_mut();
             let mut out_len: usize = 0;
             let status = unsafe { op(input.as_ptr(), input.len(), &mut out, &mut out_len) };
-            assert_eq!(status, PITH_OK);
+            assert_eq!(status, SILLSTONE_OK);
             assert_eq!(unsafe { core::slice::from_raw_parts(out, out_len) }, want);
             unsafe { sillstone_unicode_free(out, out_len) };
         }
@@ -535,7 +552,7 @@ mod tests {
         let status = unsafe {
             sillstone_unicode_casefold(sharp_s.as_ptr(), sharp_s.len(), &mut out, &mut out_len)
         };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(unsafe { core::slice::from_raw_parts(out, out_len) }, b"ss");
         unsafe { sillstone_unicode_free(out, out_len) };
 
@@ -547,7 +564,7 @@ mod tests {
                 &mut out_len,
             )
         };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(
             unsafe { core::slice::from_raw_parts(out, out_len) },
             &sharp_s
@@ -557,8 +574,8 @@ mod tests {
 
     /// `sillstone_unicode_is_normalized`: every form code answers the exact
     /// slow-path truth on pinned inputs, out-of-range codes are
-    /// [`PITH_E_INVALID`], invalid UTF-8 is [`PITH_E_REJECTED`], and a
-    /// null argument is [`PITH_E_INVALID`].
+    /// [`SILLSTONE_E_INVALID`], invalid UTF-8 is [`SILLSTONE_E_REJECTED`], and a
+    /// null argument is [`SILLSTONE_E_INVALID`].
     #[test]
     fn ffi_is_normalized_answers_exact_truth() {
         let ligature: [u8; 3] = [0xef, 0xac, 0x81]; // ﬁ: NFC/NFD yes, NFKC/NFKD no
@@ -578,24 +595,27 @@ mod tests {
             (3, &ligature[..], false),
         ] {
             let mut out: u8 = 0xff;
-            let status =
-                unsafe { sillstone_unicode_is_normalized(form, bytes.as_ptr(), bytes.len(), &mut out) };
-            assert_eq!(status, PITH_OK, "form {form}");
+            let status = unsafe {
+                sillstone_unicode_is_normalized(form, bytes.as_ptr(), bytes.len(), &mut out)
+            };
+            assert_eq!(status, SILLSTONE_OK, "form {form}");
             assert_eq!(out, u8::from(want), "form {form}");
         }
 
         let mut out: u8 = 0xff;
         let status = unsafe { sillstone_unicode_is_normalized(0, composed.as_ptr(), 2, &mut out) };
-        assert_eq!(status, PITH_E_INVALID);
+        assert_eq!(status, SILLSTONE_E_INVALID);
         let status = unsafe { sillstone_unicode_is_normalized(5, composed.as_ptr(), 2, &mut out) };
-        assert_eq!(status, PITH_E_INVALID);
-        let status = unsafe { sillstone_unicode_is_normalized(1, b"\xff\xfe".as_ptr(), 2, &mut out) };
-        assert_eq!(status, PITH_E_REJECTED);
-        let status = unsafe { sillstone_unicode_is_normalized(1, core::ptr::null(), 0, &mut out) };
-        assert_eq!(status, PITH_E_INVALID);
+        assert_eq!(status, SILLSTONE_E_INVALID);
         let status =
-            unsafe { sillstone_unicode_is_normalized(1, composed.as_ptr(), 2, core::ptr::null_mut()) };
-        assert_eq!(status, PITH_E_INVALID);
+            unsafe { sillstone_unicode_is_normalized(1, b"\xff\xfe".as_ptr(), 2, &mut out) };
+        assert_eq!(status, SILLSTONE_E_REJECTED);
+        let status = unsafe { sillstone_unicode_is_normalized(1, core::ptr::null(), 0, &mut out) };
+        assert_eq!(status, SILLSTONE_E_INVALID);
+        let status = unsafe {
+            sillstone_unicode_is_normalized(1, composed.as_ptr(), 2, core::ptr::null_mut())
+        };
+        assert_eq!(status, SILLSTONE_E_INVALID);
     }
 
     /// Counts extended grapheme clusters, not scalar values or bytes: a base
@@ -608,12 +628,15 @@ mod tests {
             let status = unsafe { sillstone_unicode_grapheme_count(bytes.as_ptr(), bytes.len(), &mut n) };
             (status, n)
         };
-        assert_eq!(count(b""), (PITH_OK, 0));
-        assert_eq!(count(b"abc"), (PITH_OK, 3));
-        assert_eq!(count("e\u{301}".as_bytes()), (PITH_OK, 1));
-        assert_eq!(count(b"\r\n"), (PITH_OK, 1));
+        assert_eq!(count(b""), (SILLSTONE_OK, 0));
+        assert_eq!(count(b"abc"), (SILLSTONE_OK, 3));
+        assert_eq!(count("e\u{301}".as_bytes()), (SILLSTONE_OK, 1));
+        assert_eq!(count(b"\r\n"), (SILLSTONE_OK, 1));
         // man + ZWJ + woman + ZWJ + girl
-        assert_eq!(count("\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}".as_bytes()), (PITH_OK, 1));
+        assert_eq!(
+            count("\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}".as_bytes()),
+            (SILLSTONE_OK, 1)
+        );
     }
 
     /// The error paths of the grapheme counter leave the output untouched:
@@ -623,16 +646,17 @@ mod tests {
         let mut n: usize = 7;
         let bad = [0xff, 0xfe];
         let status = unsafe { sillstone_unicode_grapheme_count(bad.as_ptr(), bad.len(), &mut n) };
-        assert_eq!(status, PITH_E_REJECTED);
+        assert_eq!(status, SILLSTONE_E_REJECTED);
         assert_eq!(n, 7);
         let status = unsafe { sillstone_unicode_grapheme_count(core::ptr::null(), 1, &mut n) };
-        assert_eq!(status, PITH_E_INVALID);
-        let status = unsafe { sillstone_unicode_grapheme_count(b"a".as_ptr(), 1, core::ptr::null_mut()) };
-        assert_eq!(status, PITH_E_INVALID);
+        assert_eq!(status, SILLSTONE_E_INVALID);
+        let status =
+            unsafe { sillstone_unicode_grapheme_count(b"a".as_ptr(), 1, core::ptr::null_mut()) };
+        assert_eq!(status, SILLSTONE_E_INVALID);
         assert_eq!(n, 7);
         // len == 0 with a null data pointer is the legal empty input.
         let status = unsafe { sillstone_unicode_grapheme_count(core::ptr::null(), 0, &mut n) };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(n, 0);
     }
 
@@ -645,11 +669,11 @@ mod tests {
             let status = unsafe { sillstone_unicode_char_category(cp, &mut out) };
             (status, out)
         };
-        assert_eq!(cat('A' as u32), (PITH_OK, GeneralCategory::Lu as u8));
-        assert_eq!(cat('a' as u32), (PITH_OK, GeneralCategory::Ll as u8));
-        assert_eq!(cat('5' as u32), (PITH_OK, GeneralCategory::Nd as u8));
-        assert_eq!(cat(0x0301), (PITH_OK, GeneralCategory::Mn as u8));
-        assert_eq!(cat(0x0000), (PITH_OK, GeneralCategory::Cc as u8));
+        assert_eq!(cat('A' as u32), (SILLSTONE_OK, GeneralCategory::Lu as u8));
+        assert_eq!(cat('a' as u32), (SILLSTONE_OK, GeneralCategory::Ll as u8));
+        assert_eq!(cat('5' as u32), (SILLSTONE_OK, GeneralCategory::Nd as u8));
+        assert_eq!(cat(0x0301), (SILLSTONE_OK, GeneralCategory::Mn as u8));
+        assert_eq!(cat(0x0000), (SILLSTONE_OK, GeneralCategory::Cc as u8));
     }
 
     /// A surrogate or out-of-range code point and a null out pointer are
@@ -659,10 +683,23 @@ mod tests {
         let mut out: u8 = 0xAB;
         for cp in [0xD800u32, 0xDFFF, 0x11_0000, u32::MAX] {
             let status = unsafe { sillstone_unicode_char_category(cp, &mut out) };
-            assert_eq!(status, PITH_E_INVALID, "cp {cp:#x}");
+            assert_eq!(status, SILLSTONE_E_INVALID, "cp {cp:#x}");
         }
         let status = unsafe { sillstone_unicode_char_category('A' as u32, core::ptr::null_mut()) };
-        assert_eq!(status, PITH_E_INVALID);
+        assert_eq!(status, SILLSTONE_E_INVALID);
         assert_eq!(out, 0xAB);
+    }
+}
+
+#[cfg(test)]
+mod deprecated_alias_tests {
+    #![allow(deprecated)]
+    use super::*;
+
+    #[test]
+    fn pith_aliases_equal_their_sillstone_twins() {
+        assert_eq!(PITH_OK, SILLSTONE_OK);
+        assert_eq!(PITH_E_INVALID, SILLSTONE_E_INVALID);
+        assert_eq!(PITH_E_REJECTED, SILLSTONE_E_REJECTED);
     }
 }

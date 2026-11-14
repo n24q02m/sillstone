@@ -2,8 +2,8 @@
 //! 1/2/4/8/16-bit depths, all five row filters and Adam7 interlacing,
 //! into the suite's shared [`Image`] buffers.
 //!
-//! Part of the `pith` zero-dependency hashing suite: every crate depends
-//! only on other `pith-*` crates plus `std`, so the whole suite resolves
+//! Part of the `sillstone` zero-dependency hashing suite: every crate depends
+//! only on other `sillstone-*` crates plus `std`, so the whole suite resolves
 //! without a single registry package.
 //!
 //! Decode produces `u8` pixels for PNG files coded at 8 bits (and for the

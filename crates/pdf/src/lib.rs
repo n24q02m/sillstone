@@ -1,6 +1,6 @@
 //! PDF text extraction across classic xref, xref streams, cmap and CID fonts.
 //!
-//! Part of the `pith` zero-dependency hashing suite: this crate depends
+//! Part of the `sillstone` zero-dependency hashing suite: this crate depends
 //! only on `sillstone-digest` and `sillstone-inflate`, so the whole suite resolves
 //! without a single registry package.
 //!
@@ -66,9 +66,9 @@ mod object;
 mod tables;
 mod xref;
 
+pub use acroform::{AcroForm, FieldType, FormField};
 pub use document::{Document, Error, Result};
 pub use object::{Obj, Ref, decode_stream};
-pub use acroform::{AcroForm, FieldType, FormField};
 
 /// Extract all text from a PDF byte buffer (pages joined by `\x0c`).
 ///

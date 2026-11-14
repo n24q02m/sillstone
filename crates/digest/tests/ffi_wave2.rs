@@ -18,11 +18,11 @@ fn sha3_exports_match_the_library() {
     unsafe {
         assert_eq!(
             ffi::sillstone_digest_sha3_256(DATA.as_ptr(), DATA.len(), out32.as_mut_ptr()),
-            ffi::PITH_OK
+            ffi::SILLSTONE_OK
         );
         assert_eq!(
             ffi::sillstone_digest_sha3_512(DATA.as_ptr(), DATA.len(), out64.as_mut_ptr()),
-            ffi::PITH_OK
+            ffi::SILLSTONE_OK
         );
     }
     assert_eq!(out32, *sha3_256(DATA).unwrap().as_bytes());
@@ -33,7 +33,7 @@ fn sha3_exports_match_the_library() {
     unsafe {
         assert_eq!(
             ffi::sillstone_digest_sha3_256(null(), 0, empty.as_mut_ptr()),
-            ffi::PITH_OK
+            ffi::SILLSTONE_OK
         );
     }
     assert_eq!(empty, *sha3_256(b"").unwrap().as_bytes());
@@ -41,19 +41,19 @@ fn sha3_exports_match_the_library() {
     unsafe {
         assert_eq!(
             ffi::sillstone_digest_sha3_256(DATA.as_ptr(), 1, null_mut()),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
         assert_eq!(
             ffi::sillstone_digest_sha3_256(null(), 1, out32.as_mut_ptr()),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
         assert_eq!(
             ffi::sillstone_digest_sha3_512(DATA.as_ptr(), 1, null_mut()),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
         assert_eq!(
             ffi::sillstone_digest_sha3_512(null(), 1, out64.as_mut_ptr()),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
     }
 }
@@ -71,7 +71,7 @@ fn blake2b_exports_match_the_library() {
                 keyed.as_mut_ptr(),
                 keyed.len()
             ),
-            ffi::PITH_OK
+            ffi::SILLSTONE_OK
         );
     }
     assert_eq!(keyed[..], blake2b(DATA, KEY, 40).unwrap()[..]);
@@ -80,7 +80,7 @@ fn blake2b_exports_match_the_library() {
     unsafe {
         assert_eq!(
             ffi::sillstone_digest_blake2b_512(DATA.as_ptr(), DATA.len(), full.as_mut_ptr()),
-            ffi::PITH_OK
+            ffi::SILLSTONE_OK
         );
     }
     assert_eq!(full[..], blake2b(DATA, b"", 64).unwrap()[..]);
@@ -89,25 +89,25 @@ fn blake2b_exports_match_the_library() {
         // Null out, null data with length, null key with key length.
         assert_eq!(
             ffi::sillstone_digest_blake2b(DATA.as_ptr(), 1, null(), 0, null_mut(), 32),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
         assert_eq!(
             ffi::sillstone_digest_blake2b(null(), 1, null(), 0, full.as_mut_ptr(), 32),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
         assert_eq!(
             ffi::sillstone_digest_blake2b(DATA.as_ptr(), 1, null(), 4, full.as_mut_ptr(), 32),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
         // The core refuses a zero or oversized output and an oversized key.
         assert_eq!(
             ffi::sillstone_digest_blake2b(DATA.as_ptr(), 1, null(), 0, full.as_mut_ptr(), 0),
-            ffi::PITH_E_REJECTED
+            ffi::SILLSTONE_E_REJECTED
         );
         let mut big = [0u8; 65];
         assert_eq!(
             ffi::sillstone_digest_blake2b(DATA.as_ptr(), 1, null(), 0, big.as_mut_ptr(), 65),
-            ffi::PITH_E_REJECTED
+            ffi::SILLSTONE_E_REJECTED
         );
         assert_eq!(
             ffi::sillstone_digest_blake2b(
@@ -118,11 +118,11 @@ fn blake2b_exports_match_the_library() {
                 full.as_mut_ptr(),
                 32
             ),
-            ffi::PITH_E_REJECTED
+            ffi::SILLSTONE_E_REJECTED
         );
         assert_eq!(
             ffi::sillstone_digest_blake2b_512(DATA.as_ptr(), 1, null_mut()),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
     }
 }
@@ -135,7 +135,7 @@ fn blake3_exports_match_the_library() {
     unsafe {
         assert_eq!(
             ffi::sillstone_digest_blake3(DATA.as_ptr(), DATA.len(), plain.as_mut_ptr()),
-            ffi::PITH_OK
+            ffi::SILLSTONE_OK
         );
         assert_eq!(
             ffi::sillstone_digest_blake3_keyed(
@@ -144,7 +144,7 @@ fn blake3_exports_match_the_library() {
                 DATA.len(),
                 keyed.as_mut_ptr()
             ),
-            ffi::PITH_OK
+            ffi::SILLSTONE_OK
         );
         assert_eq!(
             ffi::sillstone_digest_blake3_xof(
@@ -153,7 +153,7 @@ fn blake3_exports_match_the_library() {
                 xof.as_mut_ptr(),
                 xof.len()
             ),
-            ffi::PITH_OK
+            ffi::SILLSTONE_OK
         );
     }
     assert_eq!(plain, *blake3(DATA).unwrap().as_bytes());
@@ -165,31 +165,31 @@ fn blake3_exports_match_the_library() {
     unsafe {
         assert_eq!(
             ffi::sillstone_digest_blake3(DATA.as_ptr(), 1, null_mut()),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
         assert_eq!(
             ffi::sillstone_digest_blake3(null(), 1, plain.as_mut_ptr()),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
         assert_eq!(
             ffi::sillstone_digest_blake3_keyed(null(), DATA.as_ptr(), 1, keyed.as_mut_ptr()),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
         assert_eq!(
             ffi::sillstone_digest_blake3_keyed(KEY.as_ptr(), DATA.as_ptr(), 1, null_mut()),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
         assert_eq!(
             ffi::sillstone_digest_blake3_keyed(KEY.as_ptr(), null(), 1, keyed.as_mut_ptr()),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
         assert_eq!(
             ffi::sillstone_digest_blake3_xof(DATA.as_ptr(), 1, null_mut(), 8),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
         assert_eq!(
             ffi::sillstone_digest_blake3_xof(null(), 1, xof.as_mut_ptr(), 8),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
     }
 }
@@ -201,11 +201,11 @@ fn blake3_xof_with_no_output_is_an_accepted_no_op() {
     unsafe {
         assert_eq!(
             ffi::sillstone_digest_blake3_xof(DATA.as_ptr(), DATA.len(), null_mut(), 0),
-            ffi::PITH_OK
+            ffi::SILLSTONE_OK
         );
         assert_eq!(
             ffi::sillstone_digest_blake3_xof(null(), 0, null_mut(), 0),
-            ffi::PITH_OK
+            ffi::SILLSTONE_OK
         );
     }
 }
@@ -225,7 +225,7 @@ fn hmac_exports_match_the_library() {
                 DATA.len(),
                 o1.as_mut_ptr()
             ),
-            ffi::PITH_OK
+            ffi::SILLSTONE_OK
         );
         assert_eq!(
             ffi::sillstone_digest_hmac_sha256(
@@ -235,7 +235,7 @@ fn hmac_exports_match_the_library() {
                 DATA.len(),
                 o256.as_mut_ptr()
             ),
-            ffi::PITH_OK
+            ffi::SILLSTONE_OK
         );
         assert_eq!(
             ffi::sillstone_digest_hmac_sha512(
@@ -245,7 +245,7 @@ fn hmac_exports_match_the_library() {
                 DATA.len(),
                 o512.as_mut_ptr()
             ),
-            ffi::PITH_OK
+            ffi::SILLSTONE_OK
         );
     }
     assert_eq!(o1, *hmac_sha1(key, DATA).unwrap().as_bytes());
@@ -256,7 +256,7 @@ fn hmac_exports_match_the_library() {
     unsafe {
         assert_eq!(
             ffi::sillstone_digest_hmac_sha512(null(), 0, null(), 0, o512.as_mut_ptr()),
-            ffi::PITH_OK
+            ffi::SILLSTONE_OK
         );
     }
     assert_eq!(o512, *hmac_sha512(b"", b"").as_bytes());
@@ -264,19 +264,19 @@ fn hmac_exports_match_the_library() {
     unsafe {
         assert_eq!(
             ffi::sillstone_digest_hmac_sha1(key.as_ptr(), 4, DATA.as_ptr(), 1, null_mut()),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
         assert_eq!(
             ffi::sillstone_digest_hmac_sha1(null(), 4, DATA.as_ptr(), 1, o1.as_mut_ptr()),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
         assert_eq!(
             ffi::sillstone_digest_hmac_sha256(key.as_ptr(), 4, null(), 1, o256.as_mut_ptr()),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
         assert_eq!(
             ffi::sillstone_digest_hmac_sha512(null(), 1, DATA.as_ptr(), 1, o512.as_mut_ptr()),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
     }
 }

@@ -52,8 +52,8 @@
 //! ## Describe stream ([`describe_stream`])
 //!
 //! `u8` format code (the `sillstone_digest::Format` declaration order, the
-//! `PITH_HASH_FORMAT_*` constants in [`crate::ffi`]) · `u8` modality
-//! code (the [`Modality`] declaration order, `PITH_HASH_MODALITY_*`)
+//! `SILLSTONE_HASH_FORMAT_*` constants in [`crate::ffi`]) · `u8` modality
+//! code (the [`Modality`] declaration order, `SILLSTONE_HASH_MODALITY_*`)
 //! · 32-byte tier-1 digest · the signature stream · the facts block
 //! for the modality, all big-endian:
 //!
@@ -251,7 +251,7 @@ pub fn describe_stream(desc: &Description) -> Vec<u8> {
 }
 
 /// The `sillstone_digest::Format` declaration-order wire code — the same
-/// number the `PITH_HASH_FORMAT_*` constants in [`crate::ffi`] name.
+/// number the `SILLSTONE_HASH_FORMAT_*` constants in [`crate::ffi`] name.
 #[must_use]
 pub fn format_code(format: sillstone_digest::Format) -> u8 {
     match format {
@@ -270,7 +270,7 @@ pub fn format_code(format: sillstone_digest::Format) -> u8 {
 }
 
 /// The [`Modality`] declaration-order wire code — the same number the
-/// `PITH_HASH_MODALITY_*` constants in [`crate::ffi`] name.
+/// `SILLSTONE_HASH_MODALITY_*` constants in [`crate::ffi`] name.
 #[must_use]
 pub fn modality_code(modality: Modality) -> u8 {
     match modality {

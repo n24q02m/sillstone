@@ -3,7 +3,7 @@
 //! (ctypes), Node (koffi) and Go (cgo) SDKs bind through.
 //!
 //! The suite's FFI convention, defined by this module and mirrored by
-//! every `pith-*` cdylib:
+//! every `sillstone-*` cdylib:
 //!
 //! * one flat set of `#[unsafe(no_mangle)] pub unsafe extern "C"`
 //!   functions — raw pointers plus lengths, no structs across the
@@ -12,7 +12,7 @@
 //!   never a `Result`, never a panic: the panicking preconditions of
 //!   the core (`fft`'s power-of-two length, `dct2_2d`'s geometry,
 //!   empty inputs) are pre-validated here and reported as
-//!   [`PITH_E_INVALID`] instead;
+//!   [`SILLSTONE_E_INVALID`] instead;
 //! * an operation either hands ownership of a freshly allocated
 //!   buffer to the caller (with [`sillstone_math_free`]) or writes a
 //!   scalar through a caller-provided out-slot ([`sillstone_math_det3`],
@@ -42,14 +42,14 @@ use crate::solve3::solve3;
 use crate::stats::{covariance, mean, variance};
 
 /// Status: success.
-pub const PITH_OK: i32 = 0;
+pub const SILLSTONE_OK: i32 = 0;
 /// Status: a caller argument is invalid — a null pointer, an empty
 /// input, an odd or non-power-of-two complex count, a non-power-of-two
 /// real length, or a length that disagrees with the declared geometry.
-pub const PITH_E_INVALID: i32 = -1;
+pub const SILLSTONE_E_INVALID: i32 = -1;
 /// Status: the core refused the input — a singular matrix for
 /// [`sillstone_math_solve3`] or [`sillstone_math_inverse3`].
-pub const PITH_E_REJECTED: i32 = -2;
+pub const SILLSTONE_E_REJECTED: i32 = -2;
 
 /// Hands a freshly allocated result to the caller: the buffer address
 /// through `out`, its size in bytes through `out_len`, ownership
@@ -67,14 +67,14 @@ unsafe fn hand_out(out: *mut *mut f64, out_len: *mut usize, result: Vec<f64>) ->
         *out = ptr.cast::<f64>();
         *out_len = bytes;
     }
-    PITH_OK
+    SILLSTONE_OK
 }
 
-/// Null-guard shared by every export: [`PITH_E_INVALID`] when a data
+/// Null-guard shared by every export: [`SILLSTONE_E_INVALID`] when a data
 /// pointer or an out-slot is missing.
 fn null_status(input: *const f64, out: *mut *mut f64, out_len: *mut usize) -> Option<i32> {
     if input.is_null() || out.is_null() || out_len.is_null() {
-        return Some(PITH_E_INVALID);
+        return Some(SILLSTONE_E_INVALID);
     }
     None
 }
@@ -82,7 +82,7 @@ fn null_status(input: *const f64, out: *mut *mut f64, out_len: *mut usize) -> Op
 /// The scalar-out variant of [`null_status`].
 fn null_status_scalar(input: *const f64, out: *mut f64) -> Option<i32> {
     if input.is_null() || out.is_null() {
-        return Some(PITH_E_INVALID);
+        return Some(SILLSTONE_E_INVALID);
     }
     None
 }
@@ -103,16 +103,16 @@ unsafe fn run_scalar(
     // SAFETY: the caller guarantees `out` is null or points to one writable
     // `f64`; `as_mut` turns the null case into `None` at the point of use.
     let Some(slot) = (unsafe { out.as_mut() }) else {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     };
     if input.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let x = unsafe { core::slice::from_raw_parts(input, in_len) };
     match kernel(x) {
         Ok(value) => {
             *slot = value;
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(status) => status,
     }
@@ -135,7 +135,7 @@ unsafe fn run_alloc(
     kernel: fn(&[f64]) -> Result<Vec<f64>, i32>,
 ) -> i32 {
     if input.is_null() || out.is_null() || out_len.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let x = unsafe { core::slice::from_raw_parts(input, in_len) };
     match kernel(x) {
@@ -167,7 +167,7 @@ fn flat_complex(cs: &[Complex]) -> Vec<f64> {
 fn complex_kernel(flat: &[f64], kernel: fn(&mut [Complex])) -> Result<Vec<f64>, i32> {
     let half = flat.len() / 2;
     if flat.len() % 2 != 0 || !half.is_power_of_two() {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let mut buf: Vec<Complex> = flat
         .chunks_exact(2)
@@ -181,7 +181,7 @@ fn complex_kernel(flat: &[f64], kernel: fn(&mut [Complex])) -> Result<Vec<f64>, 
 /// bug: the transform of nothing is not a vector the kit uses.
 fn dct2_core(x: &[f64]) -> Result<Vec<f64>, i32> {
     if x.is_empty() {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     Ok(dct2(x))
 }
@@ -189,7 +189,7 @@ fn dct2_core(x: &[f64]) -> Result<Vec<f64>, i32> {
 /// The safe core of [`sillstone_math_idct2`].
 fn idct2_core(x: &[f64]) -> Result<Vec<f64>, i32> {
     if x.is_empty() {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     Ok(idct2(x))
 }
@@ -199,7 +199,7 @@ fn idct2_core(x: &[f64]) -> Result<Vec<f64>, i32> {
 /// transform on a private copy of the caller's read-only buffer.
 fn dct2_2d_core(data: &[f64], w: usize, h: usize) -> Result<Vec<f64>, i32> {
     if w == 0 || h == 0 || Some(data.len()) != w.checked_mul(h) {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let mut buf = data.to_vec();
     dct2_2d(&mut buf, w, h);
@@ -220,30 +220,30 @@ fn ifft_core(flat: &[f64]) -> Result<Vec<f64>, i32> {
 /// real length, expanded to the full `2n` interleaved spectrum.
 fn fft_real_core(x: &[f64]) -> Result<Vec<f64>, i32> {
     if x.is_empty() || !x.len().is_power_of_two() {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     Ok(flat_complex(&fft_real(x)))
 }
 
 /// The safe core of [`sillstone_math_solve3`]: 9 row-major matrix entries
 /// followed by the 3 right-hand side entries. A singular system is
-/// [`PITH_E_REJECTED`] — data, not a caller bug.
+/// [`SILLSTONE_E_REJECTED`] — data, not a caller bug.
 fn solve3_core(flat: &[f64]) -> Result<Vec<f64>, i32> {
     if flat.len() != 12 {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let a = mat3(&flat[..9]);
     let b = [flat[9], flat[10], flat[11]];
     match solve3(&a, &b) {
         Some(x) => Ok(x.to_vec()),
-        None => Err(PITH_E_REJECTED),
+        None => Err(SILLSTONE_E_REJECTED),
     }
 }
 
 /// The safe core of [`sillstone_math_det3`].
 fn det3_core(flat: &[f64]) -> Result<f64, i32> {
     if flat.len() != 9 {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     Ok(det3(&mat3(flat)))
 }
@@ -251,17 +251,17 @@ fn det3_core(flat: &[f64]) -> Result<f64, i32> {
 /// The safe core of [`sillstone_math_inverse3`]; singular is rejected.
 fn inverse3_core(flat: &[f64]) -> Result<Vec<f64>, i32> {
     if flat.len() != 9 {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     inverse3(&mat3(flat))
         .map(|m| mat3_flat(&m))
-        .ok_or(PITH_E_REJECTED)
+        .ok_or(SILLSTONE_E_REJECTED)
 }
 
 /// The safe core of [`sillstone_math_transpose3`].
 fn transpose3_core(flat: &[f64]) -> Result<Vec<f64>, i32> {
     if flat.len() != 9 {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     Ok(mat3_flat(&transpose3(&mat3(flat))))
 }
@@ -270,7 +270,7 @@ fn transpose3_core(flat: &[f64]) -> Result<Vec<f64>, i32> {
 /// packed back to back.
 fn mat3_mul_core(flat: &[f64]) -> Result<Vec<f64>, i32> {
     if flat.len() != 18 {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     Ok(mat3_flat(&mat3_mul(&mat3(&flat[..9]), &mat3(&flat[9..]))))
 }
@@ -279,7 +279,7 @@ fn mat3_mul_core(flat: &[f64]) -> Result<Vec<f64>, i32> {
 /// the 3-element vector.
 fn mat3_mul_vec_core(flat: &[f64]) -> Result<Vec<f64>, i32> {
     if flat.len() != 12 {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let v = [flat[9], flat[10], flat[11]];
     Ok(mat3_mul_vec(&mat3(&flat[..9]), &v).to_vec())
@@ -287,9 +287,9 @@ fn mat3_mul_vec_core(flat: &[f64]) -> Result<Vec<f64>, i32> {
 
 /// The safe core of [`sillstone_math_median`]: the same lower-middle order
 /// statistic as the core's `median`, without mutating the caller's
-/// buffer. An empty input is [`PITH_E_INVALID`].
+/// buffer. An empty input is [`SILLSTONE_E_INVALID`].
 fn median_core(x: &[f64]) -> Result<f64, i32> {
-    median_copy(x).ok_or(PITH_E_INVALID)
+    median_copy(x).ok_or(SILLSTONE_E_INVALID)
 }
 
 // -- Tier-1 cores ------------------------------------------------------
@@ -299,7 +299,7 @@ fn median_core(x: &[f64]) -> Result<f64, i32> {
 /// two.
 fn fft_n_core(flat: &[f64]) -> Result<Vec<f64>, i32> {
     if flat.len() % 2 != 0 || flat.is_empty() {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let mut buf: Vec<Complex> = flat
         .chunks_exact(2)
@@ -312,7 +312,7 @@ fn fft_n_core(flat: &[f64]) -> Result<Vec<f64>, i32> {
 /// The safe core of [`sillstone_math_dct3`].
 fn dct3_core(x: &[f64]) -> Result<Vec<f64>, i32> {
     if x.is_empty() {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     Ok(dct3(x))
 }
@@ -321,7 +321,7 @@ fn dct3_core(x: &[f64]) -> Result<Vec<f64>, i32> {
 /// [`dct2_2d_core`].
 fn dct3_2d_core(data: &[f64], w: usize, h: usize) -> Result<Vec<f64>, i32> {
     if w == 0 || h == 0 || Some(data.len()) != w.checked_mul(h) {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let mut buf = data.to_vec();
     dct3_2d(&mut buf, w, h);
@@ -331,7 +331,7 @@ fn dct3_2d_core(data: &[f64], w: usize, h: usize) -> Result<Vec<f64>, i32> {
 /// The safe core of [`sillstone_math_ifft_n`].
 fn ifft_n_core(flat: &[f64]) -> Result<Vec<f64>, i32> {
     if flat.len() % 2 != 0 || flat.is_empty() {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let mut buf: Vec<Complex> = flat
         .chunks_exact(2)
@@ -349,7 +349,7 @@ fn packed_pair_core(
     op: fn(&[f64], &[f64]) -> Vec<f64>,
 ) -> Result<Vec<f64>, i32> {
     if a_len == 0 || flat.len() <= a_len {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let (a, b) = flat.split_at(a_len);
     Ok(op(a, b))
@@ -357,53 +357,53 @@ fn packed_pair_core(
 
 /// The safe core of [`sillstone_math_mean`].
 fn mean_core(x: &[f64]) -> Result<f64, i32> {
-    mean(x).ok_or(PITH_E_INVALID)
+    mean(x).ok_or(SILLSTONE_E_INVALID)
 }
 
 /// The safe core of [`sillstone_math_var`]: fewer than two observations is
 /// a caller bug.
 fn var_core(x: &[f64]) -> Result<f64, i32> {
     if x.len() < 2 {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
-    variance(x).ok_or(PITH_E_INVALID)
+    variance(x).ok_or(SILLSTONE_E_INVALID)
 }
 
 /// The safe core of [`sillstone_math_cov`]: one packed buffer split into
 /// two equal-length halves, each of at least two observations.
 fn cov_core(flat: &[f64]) -> Result<f64, i32> {
     if flat.len() % 2 != 0 || flat.len() < 4 {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let (a, b) = flat.split_at(flat.len() / 2);
-    covariance(a, b).ok_or(PITH_E_INVALID)
+    covariance(a, b).ok_or(SILLSTONE_E_INVALID)
 }
 
 /// The safe core of [`sillstone_math_lagrange`]: `points` packed as
 /// interleaved `(x, y)` pairs plus the evaluation abscissa. Duplicated
-/// abscissae are [`PITH_E_REJECTED`] — degenerate data, not a bug.
+/// abscissae are [`SILLSTONE_E_REJECTED`] — degenerate data, not a bug.
 fn lagrange_core(packed: &[f64], x: f64) -> Result<f64, i32> {
     if packed.len() % 2 != 0 || packed.is_empty() {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let points: Vec<(f64, f64)> = packed.chunks_exact(2).map(|p| (p[0], p[1])).collect();
-    lagrange_eval(&points, x).ok_or(PITH_E_REJECTED)
+    lagrange_eval(&points, x).ok_or(SILLSTONE_E_REJECTED)
 }
 
 /// The safe core of [`sillstone_math_dtw`]: packed sequences split at
 /// `a_len`, both non-empty.
 fn dtw_core(packed: &[f64], a_len: usize) -> Result<f64, i32> {
     if a_len == 0 || packed.len() <= a_len {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let (a, b) = packed.split_at(a_len);
-    dtw_distance(a, b).ok_or(PITH_E_INVALID)
+    dtw_distance(a, b).ok_or(SILLSTONE_E_INVALID)
 }
 
 /// The safe core of [`sillstone_math_ransac_line`]: points packed as
 /// interleaved `(x, y)` pairs. Configuration errors are
-/// [`PITH_E_INVALID`]; a run that found no model at all (every sample
-/// degenerate) is [`PITH_E_REJECTED`].
+/// [`SILLSTONE_E_INVALID`]; a run that found no model at all (every sample
+/// degenerate) is [`SILLSTONE_E_REJECTED`].
 #[allow(clippy::too_many_arguments)]
 fn ransac_core(
     packed: &[f64],
@@ -412,15 +412,15 @@ fn ransac_core(
     seed: u64,
 ) -> Result<Vec<f64>, i32> {
     if packed.len() < 4 || packed.len() % 2 != 0 {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let points: Vec<(f64, f64)> = packed.chunks_exact(2).map(|p| (p[0], p[1])).collect();
     if points.len() < 2 || iterations == 0 || threshold.is_nan() || threshold <= 0.0 {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     ransac_line(&points, threshold, iterations, seed)
         .map(|fit| vec![fit.slope, fit.intercept, fit.inliers as f64])
-        .ok_or(PITH_E_REJECTED)
+        .ok_or(SILLSTONE_E_REJECTED)
 }
 
 /// The safe core of the unary complex ops ([`sillstone_math_complex_exp`],
@@ -428,7 +428,7 @@ fn ransac_core(
 /// pair out.
 fn complex_unary_core(flat: &[f64], op: fn(Complex) -> Complex) -> Result<Vec<f64>, i32> {
     if flat.len() != 2 {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let z = op(Complex::new(flat[0], flat[1]));
     Ok(vec![z.re, z.im])
@@ -441,10 +441,10 @@ fn complex_mul_core(flat: &[f64]) -> Result<Vec<f64>, i32> {
 }
 
 /// The safe core of [`sillstone_math_complex_div`]: a zero denominator is
-/// [`PITH_E_REJECTED`] — the domain refusal, like a singular matrix.
+/// [`SILLSTONE_E_REJECTED`] — the domain refusal, like a singular matrix.
 fn complex_div_core(flat: &[f64]) -> Result<Vec<f64>, i32> {
     if flat.len() == 4 && flat[2] == 0.0 && flat[3] == 0.0 {
-        return Err(PITH_E_REJECTED);
+        return Err(SILLSTONE_E_REJECTED);
     }
     complex_binary_core(flat, |a, b| a / b)
 }
@@ -453,7 +453,7 @@ fn complex_div_core(flat: &[f64]) -> Result<Vec<f64>, i32> {
 /// [`sillstone_math_complex_div`]): exactly two interleaved pairs in.
 fn complex_binary_core(flat: &[f64], op: fn(Complex, Complex) -> Complex) -> Result<Vec<f64>, i32> {
     if flat.len() != 4 {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let z = op(
         Complex::new(flat[0], flat[1]),
@@ -465,7 +465,7 @@ fn complex_binary_core(flat: &[f64], op: fn(Complex, Complex) -> Complex) -> Res
 /// The safe core of [`sillstone_math_complex_powi`].
 fn complex_powi_core(flat: &[f64], n: usize) -> Result<Vec<f64>, i32> {
     if flat.len() != 2 || n > i32::MAX as usize {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let z = Complex::new(flat[0], flat[1]).powi(n as i32);
     Ok(vec![z.re, z.im])
@@ -474,7 +474,7 @@ fn complex_powi_core(flat: &[f64], n: usize) -> Result<Vec<f64>, i32> {
 /// The safe core of [`sillstone_math_complex_arg`].
 fn complex_arg_core(flat: &[f64]) -> Result<f64, i32> {
     if flat.len() != 2 {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     Ok(Complex::new(flat[0], flat[1]).arg())
 }
@@ -484,7 +484,7 @@ fn complex_arg_core(flat: &[f64]) -> Result<f64, i32> {
 /// `input` points at the samples; on success a freshly allocated
 /// buffer of the same length is written through `out` with its size in
 /// bytes through `out_len`, and the caller owns it (release with
-/// [`sillstone_math_free`]). An empty input is [`PITH_E_INVALID`].
+/// [`sillstone_math_free`]). An empty input is [`SILLSTONE_E_INVALID`].
 ///
 /// # Safety
 ///
@@ -535,7 +535,7 @@ pub unsafe extern "C" fn sillstone_math_dct2_2d(
     out_len: *mut usize,
 ) -> i32 {
     if input.is_null() || out.is_null() || out_len.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let x = unsafe { core::slice::from_raw_parts(input, in_len) };
     match dct2_2d_core(x, w, h) {
@@ -549,7 +549,7 @@ pub unsafe extern "C" fn sillstone_math_dct2_2d(
 ///
 /// The complex count must be a non-zero power of two (`in_len` even
 /// and `in_len / 2` a power of two) — anything else is
-/// [`PITH_E_INVALID`], mirroring the core's panicking precondition.
+/// [`SILLSTONE_E_INVALID`], mirroring the core's panicking precondition.
 ///
 /// # Safety
 ///
@@ -604,7 +604,7 @@ pub unsafe extern "C" fn sillstone_math_fft_real(
 /// `input` carries 12 `f64`s: the row-major `A` followed by `b`. On
 /// success `out` receives a fresh 3-element (24-byte) buffer. A
 /// singular (or scale-relative near-singular, `|pivot| <= ε·s`) system
-/// is [`PITH_E_REJECTED`] — ordinary RANSAC data, not a caller bug.
+/// is [`SILLSTONE_E_REJECTED`] — ordinary RANSAC data, not a caller bug.
 ///
 /// # Safety
 ///
@@ -629,20 +629,20 @@ pub unsafe extern "C" fn sillstone_math_solve3(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sillstone_math_det3(input: *const f64, in_len: usize, out: *mut f64) -> i32 {
     if input.is_null() || out.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let x = unsafe { core::slice::from_raw_parts(input, in_len) };
     match det3_core(x) {
         Ok(value) => {
             unsafe { *out = value };
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(status) => status,
     }
 }
 
 /// Inverse of the row-major 3×3 matrix in `input` (9 `f64`s), as a
-/// fresh 9-element buffer. Singular input is [`PITH_E_REJECTED`].
+/// fresh 9-element buffer. Singular input is [`SILLSTONE_E_REJECTED`].
 ///
 /// # Safety
 ///
@@ -708,7 +708,7 @@ pub unsafe extern "C" fn sillstone_math_mat3_mul_vec(
 /// Median of `in_len` `f64`s — the core's lower-middle order statistic
 /// (never the mean of the two middles), written through the scalar
 /// `out` slot without touching the caller's buffer. An empty input is
-/// [`PITH_E_INVALID`].
+/// [`SILLSTONE_E_INVALID`].
 ///
 /// # Safety
 ///
@@ -717,13 +717,13 @@ pub unsafe extern "C" fn sillstone_math_mat3_mul_vec(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sillstone_math_median(input: *const f64, in_len: usize, out: *mut f64) -> i32 {
     if input.is_null() || out.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let x = unsafe { core::slice::from_raw_parts(input, in_len) };
     match median_core(x) {
         Ok(value) => {
             unsafe { *out = value };
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(status) => status,
     }
@@ -781,7 +781,7 @@ pub unsafe extern "C" fn sillstone_math_dct3_2d(
     out_len: *mut usize,
 ) -> i32 {
     if input.is_null() || out.is_null() || out_len.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let x = unsafe { core::slice::from_raw_parts(input, in_len) };
     match dct3_2d_core(x, w, h) {
@@ -808,7 +808,7 @@ pub unsafe extern "C" fn sillstone_math_ifft_n(
 /// Full-support linear convolution of the packed operands: `input`
 /// carries `a` (`a_len` elements) followed by `b`; the fresh result
 /// holds `a_len + b_len − 1` samples. Empty operands and `a_len == 0`
-/// are [`PITH_E_INVALID`].
+/// are [`SILLSTONE_E_INVALID`].
 ///
 /// # Safety
 ///
@@ -857,7 +857,7 @@ pub unsafe extern "C" fn sillstone_math_corr(
 }
 
 /// Arithmetic mean of `in_len` `f64`s, through the scalar `out` slot.
-/// An empty input is [`PITH_E_INVALID`].
+/// An empty input is [`SILLSTONE_E_INVALID`].
 ///
 /// # Safety
 ///
@@ -869,7 +869,7 @@ pub unsafe extern "C" fn sillstone_math_mean(input: *const f64, in_len: usize, o
 }
 
 /// Sample variance (the `n − 1` denominator) of `in_len` `f64`s.
-/// Fewer than two observations is [`PITH_E_INVALID`].
+/// Fewer than two observations is [`SILLSTONE_E_INVALID`].
 ///
 /// # Safety
 ///
@@ -882,7 +882,7 @@ pub unsafe extern "C" fn sillstone_math_var(input: *const f64, in_len: usize, ou
 /// Sample covariance of two equal-length series packed back to back
 /// in `input` (each half at least two observations), through the
 /// scalar `out` slot. A zero-mean-cut layout (`in_len` odd) or short
-/// halves is [`PITH_E_INVALID`].
+/// halves is [`SILLSTONE_E_INVALID`].
 ///
 /// # Safety
 ///
@@ -894,7 +894,7 @@ pub unsafe extern "C" fn sillstone_math_cov(input: *const f64, in_len: usize, ou
 
 /// Evaluates the Lagrange interpolant through the packed `(x, y)`
 /// pairs in `input` at the abscissa `x`, through the scalar `out`
-/// slot. Duplicated abscissae are [`PITH_E_REJECTED`].
+/// slot. Duplicated abscissae are [`SILLSTONE_E_REJECTED`].
 ///
 /// # Safety
 ///
@@ -914,7 +914,7 @@ pub unsafe extern "C" fn sillstone_math_lagrange(
     match lagrange_core(pts, x) {
         Ok(value) => {
             unsafe { *out = value };
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(status) => status,
     }
@@ -922,7 +922,7 @@ pub unsafe extern "C" fn sillstone_math_lagrange(
 
 /// DTW distance between the packed sequences `a` (`a_len` elements)
 /// followed by `b`, through the scalar `out` slot. Empty operands are
-/// [`PITH_E_INVALID`].
+/// [`SILLSTONE_E_INVALID`].
 ///
 /// # Safety
 ///
@@ -941,7 +941,7 @@ pub unsafe extern "C" fn sillstone_math_dtw(
     match dtw_core(x, a_len) {
         Ok(value) => {
             unsafe { *out = value };
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(status) => status,
     }
@@ -953,8 +953,8 @@ pub unsafe extern "C" fn sillstone_math_dtw(
 /// 3-element result carries `[slope, intercept, inlier_count]`.
 ///
 /// Degenerate configuration (`in_len < 4`, odd, zero iterations,
-/// `threshold ≤ 0`) is [`PITH_E_INVALID`]; a run that found no model
-/// at all is [`PITH_E_REJECTED`]. Seeded runs replay bit-for-bit on
+/// `threshold ≤ 0`) is [`SILLSTONE_E_INVALID`]; a run that found no model
+/// at all is [`SILLSTONE_E_REJECTED`]. Seeded runs replay bit-for-bit on
 /// every platform.
 ///
 /// # Safety
@@ -1051,16 +1051,16 @@ pub unsafe extern "C" fn sillstone_math_complex_sqrt(
 }
 
 /// The safe core of [`sillstone_math_complex_log`]: `z = 0` is
-/// [`PITH_E_REJECTED`] (outside the principal-branch domain).
+/// [`SILLSTONE_E_REJECTED`] (outside the principal-branch domain).
 fn complex_log_core(flat: &[f64]) -> Result<Vec<f64>, i32> {
     if flat.len() == 2 && flat[0] == 0.0 && flat[1] == 0.0 {
-        return Err(PITH_E_REJECTED);
+        return Err(SILLSTONE_E_REJECTED);
     }
     complex_unary_core(flat, Complex::ln)
 }
 
 /// Principal natural logarithm `[ln|z|, arg z]` of the interleaved
-/// pair in `input`; `z = 0` is [`PITH_E_REJECTED`] (domain refusal).
+/// pair in `input`; `z = 0` is [`SILLSTONE_E_REJECTED`] (domain refusal).
 ///
 /// # Safety
 ///
@@ -1138,54 +1138,56 @@ pub unsafe extern "C" fn sillstone_math_free(ptr: *mut f64, len: usize) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sillstone_math_dst1(data: *const f64, len: usize, out: *mut f64) -> i32 {
     if data.is_null() || out.is_null() || len == 0 {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let in_slice = unsafe { core::slice::from_raw_parts(data, len) };
     let res = crate::dst::dst1_orthonormal(in_slice);
     unsafe {
         core::ptr::copy_nonoverlapping(res.as_ptr(), out, len);
     }
-    PITH_OK
+    SILLSTONE_OK
 }
 
 /// Computes orthonormal DST-II into caller-provided out buffer of length `len` f64 elements.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sillstone_math_dst2(data: *const f64, len: usize, out: *mut f64) -> i32 {
     if data.is_null() || out.is_null() || len == 0 {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let in_slice = unsafe { core::slice::from_raw_parts(data, len) };
     let res = crate::dst::dst2_orthonormal(in_slice);
     unsafe {
         core::ptr::copy_nonoverlapping(res.as_ptr(), out, len);
     }
-    PITH_OK
+    SILLSTONE_OK
 }
 
 /// Computes orthonormal DST-III into caller-provided out buffer of length `len` f64 elements.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sillstone_math_dst3(data: *const f64, len: usize, out: *mut f64) -> i32 {
     if data.is_null() || out.is_null() || len == 0 {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let in_slice = unsafe { core::slice::from_raw_parts(data, len) };
     let res = crate::dst::dst3_orthonormal(in_slice);
     unsafe {
         core::ptr::copy_nonoverlapping(res.as_ptr(), out, len);
     }
-    PITH_OK
+    SILLSTONE_OK
 }
 
 /// Computes trapezoidal numerical integration over uniformly spaced samples `y` with spacing `dx`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sillstone_math_trapezoid_samples(y: *const f64, len: usize, dx: f64, out: *mut f64) -> i32 {
     if y.is_null() || out.is_null() || len == 0 {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let slice = unsafe { core::slice::from_raw_parts(y, len) };
     if len == 1 {
-        unsafe { *out = 0.0; }
-        return PITH_OK;
+        unsafe {
+            *out = 0.0;
+        }
+        return SILLSTONE_OK;
     }
     let mut sum = 0.5 * (slice[0] + slice[len - 1]);
     for &val in &slice[1..len - 1] {
@@ -1194,19 +1196,19 @@ pub unsafe extern "C" fn sillstone_math_trapezoid_samples(y: *const f64, len: us
     unsafe {
         *out = sum * dx;
     }
-    PITH_OK
+    SILLSTONE_OK
 }
 
 /// Computes Simpson's 1/3 numerical integration over uniformly spaced samples `y` with spacing `dx`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sillstone_math_simpson_samples(y: *const f64, len: usize, dx: f64, out: *mut f64) -> i32 {
     if y.is_null() || out.is_null() || len < 3 {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let slice = unsafe { core::slice::from_raw_parts(y, len) };
     let n = len - 1;
     if n % 2 != 0 {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let mut sum = slice[0] + slice[n];
     for i in 1..n {
@@ -1219,18 +1221,32 @@ pub unsafe extern "C" fn sillstone_math_simpson_samples(y: *const f64, len: usiz
     unsafe {
         *out = sum * (dx / 3.0);
     }
-    PITH_OK
+    SILLSTONE_OK
 }
+
+// Deprecated pre-rename aliases: the `PITH_*` names the suite shipped before
+// it became `sillstone`. Each one is the same value as its `SILLSTONE_*` twin.
+
+/// Deprecated alias of [`SILLSTONE_OK`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_OK`")]
+pub const PITH_OK: i32 = SILLSTONE_OK;
+/// Deprecated alias of [`SILLSTONE_E_INVALID`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_INVALID`")]
+pub const PITH_E_INVALID: i32 = SILLSTONE_E_INVALID;
+/// Deprecated alias of [`SILLSTONE_E_REJECTED`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_REJECTED`")]
+pub const PITH_E_REJECTED: i32 = SILLSTONE_E_REJECTED;
 
 #[cfg(test)]
 mod tests {
     use super::{
-        PITH_E_INVALID, PITH_E_REJECTED, PITH_OK, dct2_core, det3_core, fft_core, fft_real_core,
-        flat_complex, ifft_core, inverse3_core, mat3_mul_core, mat3_mul_vec_core, median_core,
-        sillstone_math_dct2, sillstone_math_dct2_2d, sillstone_math_det3, sillstone_math_fft, sillstone_math_fft_real,
-        sillstone_math_free, sillstone_math_idct2, sillstone_math_ifft, sillstone_math_inverse3, sillstone_math_mat3_mul,
-        sillstone_math_mat3_mul_vec, sillstone_math_median, sillstone_math_solve3, sillstone_math_transpose3,
-        solve3_core, transpose3_core,
+        SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_OK, dct2_core, det3_core, fft_core,
+        fft_real_core, flat_complex, ifft_core, inverse3_core, mat3_mul_core, mat3_mul_vec_core,
+        median_core, sillstone_math_dct2, sillstone_math_dct2_2d, sillstone_math_det3,
+        sillstone_math_fft, sillstone_math_fft_real, sillstone_math_free, sillstone_math_idct2,
+        sillstone_math_ifft, sillstone_math_inverse3, sillstone_math_mat3_mul,
+        sillstone_math_mat3_mul_vec, sillstone_math_median, sillstone_math_solve3,
+        sillstone_math_transpose3, solve3_core, transpose3_core,
     };
     use crate::{dct2, dct2_2d, fft_real, idct2, inverse3, mat3_mul, mat3_mul_vec, transpose3};
 
@@ -1245,7 +1261,7 @@ mod tests {
         let mut out: *mut f64 = core::ptr::null_mut();
         let mut out_len: usize = 0;
         let status = op(input.as_ptr(), input.len(), &mut out, &mut out_len);
-        if status != PITH_OK {
+        if status != SILLSTONE_OK {
             return (status, Vec::new());
         }
         let count = out_len / core::mem::size_of::<f64>();
@@ -1270,33 +1286,41 @@ mod tests {
         let c8: Vec<f64> = (0..16).map(|i| (i as f64) * 0.25 - 1.5).collect();
         let m64: Vec<f64> = (0..64).map(|i| ((i % 7) as f64) - 2.0).collect();
 
-        let (status, got) = call_alloc(|i, n, o, l| unsafe { sillstone_math_dct2(i, n, o, l) }, &x8);
-        assert_eq!(status, PITH_OK);
+        let (status, got) =
+            call_alloc(|i, n, o, l| unsafe { sillstone_math_dct2(i, n, o, l) }, &x8);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(got, dct2(&x8));
 
-        let (status, got) = call_alloc(|i, n, o, l| unsafe { sillstone_math_idct2(i, n, o, l) }, &x8);
-        assert_eq!(status, PITH_OK);
+        let (status, got) = call_alloc(
+            |i, n, o, l| unsafe { sillstone_math_idct2(i, n, o, l) },
+            &x8,
+        );
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(got, idct2(&x8));
 
         let (status, got) = call_alloc(
             |i, n, o, l| unsafe { sillstone_math_dct2_2d(i, n, 8, 8, o, l) },
             &m64,
         );
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         let mut want = m64.clone();
         dct2_2d(&mut want, 8, 8);
         assert_eq!(got, want);
 
         let (status, got) = call_alloc(|i, n, o, l| unsafe { sillstone_math_fft(i, n, o, l) }, &c8);
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(got.len(), c8.len());
 
-        let (status, got) = call_alloc(|i, n, o, l| unsafe { sillstone_math_ifft(i, n, o, l) }, &c8);
-        assert_eq!(status, PITH_OK);
+        let (status, got) =
+            call_alloc(|i, n, o, l| unsafe { sillstone_math_ifft(i, n, o, l) }, &c8);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(got.len(), c8.len());
 
-        let (status, got) = call_alloc(|i, n, o, l| unsafe { sillstone_math_fft_real(i, n, o, l) }, &x8);
-        assert_eq!(status, PITH_OK);
+        let (status, got) = call_alloc(
+            |i, n, o, l| unsafe { sillstone_math_fft_real(i, n, o, l) },
+            &x8,
+        );
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(got, flat_complex(&fft_real(&x8)));
 
         let system: Vec<f64> = [2.0, 1.0, -1.0, -3.0, -1.0, 2.0, -2.0, 1.0, 2.0]
@@ -1307,26 +1331,31 @@ mod tests {
             |i, n, o, l| unsafe { sillstone_math_solve3(i, n, o, l) },
             &system,
         );
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(got.len(), 3);
 
         let inv = [2.0, 0.0, 1.0, 0.0, 3.0, 0.0, 1.0, 0.0, 2.0];
         let m = super::mat3(&inv);
-        let (status, got) =
-            call_alloc(|i, n, o, l| unsafe { sillstone_math_inverse3(i, n, o, l) }, &inv);
-        assert_eq!(status, PITH_OK);
+        let (status, got) = call_alloc(
+            |i, n, o, l| unsafe { sillstone_math_inverse3(i, n, o, l) },
+            &inv,
+        );
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(got, super::mat3_flat(&inverse3(&m).unwrap()));
 
         let (status, got) = call_alloc(
             |i, n, o, l| unsafe { sillstone_math_transpose3(i, n, o, l) },
             &inv,
         );
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(got, super::mat3_flat(&transpose3(&m)));
 
         let ab: Vec<f64> = inv.iter().copied().chain(inv.iter().copied()).collect();
-        let (status, got) = call_alloc(|i, n, o, l| unsafe { sillstone_math_mat3_mul(i, n, o, l) }, &ab);
-        assert_eq!(status, PITH_OK);
+        let (status, got) = call_alloc(
+            |i, n, o, l| unsafe { sillstone_math_mat3_mul(i, n, o, l) },
+            &ab,
+        );
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(got, super::mat3_flat(&mat3_mul(&m, &m)));
 
         let mv: Vec<f64> = inv.iter().copied().chain([1.0, 2.0, 3.0]).collect();
@@ -1334,7 +1363,7 @@ mod tests {
             |i, n, o, l| unsafe { sillstone_math_mat3_mul_vec(i, n, o, l) },
             &mv,
         );
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(got, mat3_mul_vec(&m, &[1.0, 2.0, 3.0]).to_vec());
     }
 
@@ -1357,7 +1386,7 @@ mod tests {
         .map(|h| f64::from_bits(u64::from_str_radix(h, 16).unwrap()))
         .collect();
         let (status, got) = call_scalar(|i, n, o| unsafe { sillstone_math_det3(i, n, o) }, &input);
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(
             got.to_bits(),
             u64::from_str_radix("c073200000000000", 16).unwrap()
@@ -1420,17 +1449,17 @@ mod tests {
             |i, n, o| unsafe { sillstone_math_median(i, n, o) },
             &[1.0, 2.0, 3.0, 4.0],
         );
-        assert_eq!((status, got), (PITH_OK, 2.0));
+        assert_eq!((status, got), (SILLSTONE_OK, 2.0));
 
         let nan = f64::from_bits(0x7ff8000000000000);
         let (status, got) = call_scalar(
             |i, n, o| unsafe { sillstone_math_median(i, n, o) },
             &[1.0, nan, 2.0, 3.0],
         );
-        assert_eq!((status, got), (PITH_OK, 2.0));
+        assert_eq!((status, got), (SILLSTONE_OK, 2.0));
         assert_eq!(got.to_bits(), 0x4000000000000000);
 
-        assert_eq!(median_core(&[]), Err(PITH_E_INVALID));
+        assert_eq!(median_core(&[]), Err(SILLSTONE_E_INVALID));
     }
 
     /// Every refusal path returns a status code, never a panic: null
@@ -1444,50 +1473,60 @@ mod tests {
         // Null data pointer, every signature shape.
         assert_eq!(
             unsafe { sillstone_math_dct2(core::ptr::null(), 0, &mut out, &mut out_len) },
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             unsafe { sillstone_math_dct2_2d(core::ptr::null(), 0, 1, 1, &mut out, &mut out_len) },
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             unsafe { sillstone_math_det3(core::ptr::null(), 0, &mut slot) },
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             unsafe { sillstone_math_median(core::ptr::null(), 0, &mut slot) },
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
 
         let x8 = [0.5, -1.25, 2.0, 3.75, -0.125, 1.5, -2.5, 0.75];
 
         // Null out / out_len slots.
         assert_eq!(
-            unsafe { sillstone_math_dct2(x8.as_ptr(), x8.len(), core::ptr::null_mut(), &mut out_len) },
-            PITH_E_INVALID
+            unsafe {
+                sillstone_math_dct2(x8.as_ptr(), x8.len(), core::ptr::null_mut(), &mut out_len)
+            },
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             unsafe { sillstone_math_dct2(x8.as_ptr(), x8.len(), &mut out, core::ptr::null_mut()) },
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             unsafe { sillstone_math_det3(x8.as_ptr(), 8, core::ptr::null_mut()) },
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
 
         // fft/ifft: odd element count (6 = 3 pairs, 3 not a power of
         // two) and zero pairs.
         assert_eq!(
-            call_alloc(|i, n, o, l| unsafe { sillstone_math_fft(i, n, o, l) }, &[0.0; 6]).0,
-            PITH_E_INVALID
+            call_alloc(
+                |i, n, o, l| unsafe { sillstone_math_fft(i, n, o, l) },
+                &[0.0; 6]
+            )
+            .0,
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             call_alloc(|i, n, o, l| unsafe { sillstone_math_fft(i, n, o, l) }, &[]).0,
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
-            call_alloc(|i, n, o, l| unsafe { sillstone_math_fft(i, n, o, l) }, &[0.0; 7]).0,
-            PITH_E_INVALID
+            call_alloc(
+                |i, n, o, l| unsafe { sillstone_math_fft(i, n, o, l) },
+                &[0.0; 7]
+            )
+            .0,
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             call_alloc(
@@ -1495,7 +1534,7 @@ mod tests {
                 &[0.0; 6]
             )
             .0,
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
 
         // fft_real: non-power-of-two and empty.
@@ -1505,21 +1544,29 @@ mod tests {
                 &[0.0; 3]
             )
             .0,
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
-            call_alloc(|i, n, o, l| unsafe { sillstone_math_fft_real(i, n, o, l) }, &[]).0,
-            PITH_E_INVALID
+            call_alloc(
+                |i, n, o, l| unsafe { sillstone_math_fft_real(i, n, o, l) },
+                &[]
+            )
+            .0,
+            SILLSTONE_E_INVALID
         );
 
         // Empty inputs.
         assert_eq!(
             call_alloc(|i, n, o, l| unsafe { sillstone_math_dct2(i, n, o, l) }, &[]).0,
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
-            call_alloc(|i, n, o, l| unsafe { sillstone_math_idct2(i, n, o, l) }, &[]).0,
-            PITH_E_INVALID
+            call_alloc(
+                |i, n, o, l| unsafe { sillstone_math_idct2(i, n, o, l) },
+                &[]
+            )
+            .0,
+            SILLSTONE_E_INVALID
         );
 
         // dct2_2d geometry.
@@ -1529,7 +1576,7 @@ mod tests {
                 &x8
             )
             .0,
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             call_alloc(
@@ -1537,7 +1584,7 @@ mod tests {
                 &x8
             )
             .0,
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
 
         // Length mismatches.
@@ -1547,11 +1594,11 @@ mod tests {
                 &[0.0; 11]
             )
             .0,
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             call_scalar(|i, n, o| unsafe { sillstone_math_det3(i, n, o) }, &[0.0; 8]).0,
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             call_alloc(
@@ -1559,7 +1606,7 @@ mod tests {
                 &[0.0; 8]
             )
             .0,
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             call_alloc(
@@ -1567,7 +1614,7 @@ mod tests {
                 &[0.0; 8]
             )
             .0,
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             call_alloc(
@@ -1575,7 +1622,7 @@ mod tests {
                 &[0.0; 17]
             )
             .0,
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             call_alloc(
@@ -1583,7 +1630,7 @@ mod tests {
                 &[0.0; 13]
             )
             .0,
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
 
         // Singular systems are rejected, not crashed on.
@@ -1593,7 +1640,7 @@ mod tests {
                 &[0.0; 12]
             )
             .0,
-            PITH_E_REJECTED
+            SILLSTONE_E_REJECTED
         );
         assert_eq!(
             call_alloc(
@@ -1601,7 +1648,7 @@ mod tests {
                 &[0.0; 9]
             )
             .0,
-            PITH_E_REJECTED
+            SILLSTONE_E_REJECTED
         );
 
         // A null buffer is a legal free.
@@ -1615,9 +1662,9 @@ mod tests {
     fn safe_cores_reject_and_compose() {
         let x8 = [0.5, -1.25, 2.0, 3.75, -0.125, 1.5, -2.5, 0.75];
         assert_eq!(dct2_core(&x8).unwrap(), dct2(&x8));
-        assert_eq!(dct2_core(&[]), Err(PITH_E_INVALID));
-        assert_eq!(ifft_core(&[0.0; 6]), Err(PITH_E_INVALID));
-        assert_eq!(fft_real_core(&[0.0; 3]), Err(PITH_E_INVALID));
+        assert_eq!(dct2_core(&[]), Err(SILLSTONE_E_INVALID));
+        assert_eq!(ifft_core(&[0.0; 6]), Err(SILLSTONE_E_INVALID));
+        assert_eq!(fft_real_core(&[0.0; 3]), Err(SILLSTONE_E_INVALID));
 
         // idct2(dct2(x)) round-trips through the cores.
         let fwd = dct2_core(&x8).unwrap();
@@ -1629,8 +1676,21 @@ mod tests {
         assert_eq!(mat3_mul_core(&[0.0; 18]).unwrap().len(), 9);
         assert_eq!(mat3_mul_vec_core(&[0.0; 12]).unwrap().len(), 3);
         assert_eq!(transpose3_core(&[0.0; 9]).unwrap().len(), 9);
-        assert_eq!(inverse3_core(&[0.0; 9]), Err(PITH_E_REJECTED));
-        assert_eq!(solve3_core(&[0.0; 12]), Err(PITH_E_REJECTED));
+        assert_eq!(inverse3_core(&[0.0; 9]), Err(SILLSTONE_E_REJECTED));
+        assert_eq!(solve3_core(&[0.0; 12]), Err(SILLSTONE_E_REJECTED));
         assert_eq!(det3_core(&[0.0; 9]), Ok(0.0));
+    }
+}
+
+#[cfg(test)]
+mod deprecated_alias_tests {
+    #![allow(deprecated)]
+    use super::*;
+
+    #[test]
+    fn pith_aliases_equal_their_sillstone_twins() {
+        assert_eq!(PITH_OK, SILLSTONE_OK);
+        assert_eq!(PITH_E_INVALID, SILLSTONE_E_INVALID);
+        assert_eq!(PITH_E_REJECTED, SILLSTONE_E_REJECTED);
     }
 }

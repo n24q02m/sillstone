@@ -251,11 +251,11 @@ fn reference_json() -> String {
 
     let mut s = String::new();
     s.push_str("{\n");
-    s.push_str("  \"suite\": \"pith\",\n");
-    s.push_str("  \"crate\": \"pith-text\",\n");
+    s.push_str("  \"suite\": \"sillstone\",\n");
+    s.push_str("  \"crate\": \"sillstone-text\",\n");
     s.push_str("  \"format_version\": 1,\n");
     s.push_str("  \"generator\": \"cargo run --bin gen-reference -- gen\",\n");
-    s.push_str("  \"description\": \"Hex-exact tokenization, shingling and MinHash vectors for pith-text: canonical UTF-8 bytes, word and shingle counts, 128-word signature folds and Jaccard estimates (IEEE-754 bits, exact) over the committed text fixtures and inline edge inputs.\",\n");
+    s.push_str("  \"description\": \"Hex-exact tokenization, shingling and MinHash vectors for sillstone-text: canonical UTF-8 bytes, word and shingle counts, 128-word signature folds and Jaccard estimates (IEEE-754 bits, exact) over the committed text fixtures and inline edge inputs.\",\n");
     s.push_str("  \"vectors\": [\n");
     s.push_str(&vectors.join(",\n"));
     s.push_str("\n  ]\n");
@@ -382,8 +382,8 @@ mod tests {
     #[test]
     fn json_carries_suite_identity() {
         let json = reference_json();
-        assert!(json.contains("\"suite\": \"pith\""));
-        assert!(json.contains("\"crate\": \"pith-text\""));
+        assert!(json.contains("\"suite\": \"sillstone\""));
+        assert!(json.contains("\"crate\": \"sillstone-text\""));
         assert!(json.contains("\"format_version\": 1"));
         assert!(json.ends_with("}\n"));
         assert!(json.contains("\"policy\": \"exact\""));

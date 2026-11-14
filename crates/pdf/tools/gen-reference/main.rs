@@ -512,10 +512,10 @@ fn reference_json() -> String {
     let mut out = String::with_capacity(16 * 1024);
     out.push_str("{\n");
     out.push_str("  \"schema\": 1,\n");
-    out.push_str("  \"crate\": \"pith-pdf\",\n");
+    out.push_str("  \"crate\": \"sillstone-pdf\",\n");
     out.push_str(
         "  \"description\": \"hex-exact PDF text-extraction reference vectors: every \
-tests/fixtures/*.pdf document opened and extracted by pith-pdf against its .txt \
+tests/fixtures/*.pdf document opened and extracted by sillstone-pdf against its .txt \
 truth file and pinned by page count and SHA-256 text digest, plus a scan-rebuild \
 recovery vector and refusal vectors for malformed xref chains and stream objects \
 with exact error messages\",\n",

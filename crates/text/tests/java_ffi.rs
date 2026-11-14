@@ -20,7 +20,8 @@ use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 
 use sillstone_text::ffi::{
-    PITH_E_INVALID, PITH_E_REJECTED, PITH_OK, sillstone_text_fingerprint, sillstone_text_free,
+    SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_OK, sillstone_text_fingerprint,
+    sillstone_text_free,
 };
 use sillstone_text::{SIGNATURE_WORDS, jaccard_estimate};
 
@@ -90,6 +91,22 @@ struct FakeTable {
 
 // The exported symbols under test (linked from the crate's rlib).
 unsafe extern "system" {
+    fn Java_io_github_sillstone_SillstoneText_fingerprintNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        status: JIntArray,
+    ) -> JArray;
+
+    fn Java_io_github_sillstone_SillstoneText_jaccardNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        a: JArray,
+        b: JArray,
+        status: JIntArray,
+    ) -> jdouble;
+
+    // The deprecated pre-rename twins (`hash.sillstone.text.PithText`).
     fn Java_hash_sillstone_text_PithText_fingerprintNative(
         env: *mut JNIEnv,
         class: JClass,
@@ -310,7 +327,7 @@ fn c_stream(data: &[u8]) -> Vec<u8> {
     let code = unsafe {
         sillstone_text_fingerprint(data.as_ptr(), data.len(), &mut stream_ptr, &mut stream_len)
     };
-    assert_eq!(code, PITH_OK);
+    assert_eq!(code, SILLSTONE_OK);
     let stream = unsafe { std::slice::from_raw_parts(stream_ptr, stream_len) }.to_vec();
     unsafe { sillstone_text_free(stream_ptr, stream_len) };
     stream
@@ -323,11 +340,15 @@ fn jni_fingerprint_matches_the_c_export() {
     let ((stream, status), produced, _recorded) = with_fake_env(|env| unsafe {
         let data = byte_array(input.to_vec());
         let slot = status_slot();
-        let stream =
-            Java_hash_sillstone_text_PithText_fingerprintNative(env, std::ptr::null_mut(), data, slot);
+        let stream = Java_io_github_sillstone_SillstoneText_fingerprintNative(
+            env,
+            std::ptr::null_mut(),
+            data,
+            slot,
+        );
         (stream, read_status(slot))
     });
-    assert_eq!(status, PITH_OK, "status");
+    assert_eq!(status, SILLSTONE_OK, "status");
     assert!(!stream.is_null(), "stream array");
     assert_eq!(produced, expected, "stream bytes");
 }
@@ -338,11 +359,16 @@ fn jni_fingerprint_empty_input_is_the_sentinel() {
         let data = byte_array(Vec::new());
         let slot = status_slot();
         (
-            Java_hash_sillstone_text_PithText_fingerprintNative(env, std::ptr::null_mut(), data, slot),
+            Java_io_github_sillstone_SillstoneText_fingerprintNative(
+                env,
+                std::ptr::null_mut(),
+                data,
+                slot,
+            ),
             read_status(slot),
         )
     });
-    assert_eq!(status, PITH_OK, "status");
+    assert_eq!(status, SILLSTONE_OK, "status");
     assert!(!stream.is_null(), "stream array");
     assert_eq!(produced.len(), 8 + 1 + SIGNATURE_WORDS * 8);
     assert_eq!(produced[8], b'\n', "canonical empty");
@@ -355,11 +381,15 @@ fn jni_fingerprint_non_utf8_is_rejected() {
     let ((stream, status), _produced, _recorded) = with_fake_env(|env| unsafe {
         let data = byte_array(b"one \xff two".to_vec());
         let slot = status_slot();
-        let stream =
-            Java_hash_sillstone_text_PithText_fingerprintNative(env, std::ptr::null_mut(), data, slot);
+        let stream = Java_io_github_sillstone_SillstoneText_fingerprintNative(
+            env,
+            std::ptr::null_mut(),
+            data,
+            slot,
+        );
         (stream, read_status(slot))
     });
-    assert_eq!(status, PITH_E_REJECTED, "status");
+    assert_eq!(status, SILLSTONE_E_REJECTED, "status");
     assert!(stream.is_null(), "no stream on refusal");
 }
 
@@ -367,7 +397,7 @@ fn jni_fingerprint_non_utf8_is_rejected() {
 fn jni_fingerprint_null_data_is_invalid() {
     let ((stream, status), _produced, _recorded) = with_fake_env(|env| unsafe {
         let slot = status_slot();
-        let stream = Java_hash_sillstone_text_PithText_fingerprintNative(
+        let stream = Java_io_github_sillstone_SillstoneText_fingerprintNative(
             env,
             std::ptr::null_mut(),
             std::ptr::null_mut(),
@@ -375,7 +405,7 @@ fn jni_fingerprint_null_data_is_invalid() {
         );
         (stream, read_status(slot))
     });
-    assert_eq!(status, PITH_E_INVALID, "status");
+    assert_eq!(status, SILLSTONE_E_INVALID, "status");
     assert!(stream.is_null());
 }
 
@@ -385,11 +415,15 @@ fn jni_fingerprint_environment_refusing_the_array_is_rejected() {
         let data = byte_array(b"alpha beta gamma".to_vec());
         let slot = status_slot();
         with_state(|state| state.fail_new_byte_array = true);
-        let stream =
-            Java_hash_sillstone_text_PithText_fingerprintNative(env, std::ptr::null_mut(), data, slot);
+        let stream = Java_io_github_sillstone_SillstoneText_fingerprintNative(
+            env,
+            std::ptr::null_mut(),
+            data,
+            slot,
+        );
         (stream, read_status(slot))
     });
-    assert_eq!(status, PITH_E_REJECTED, "status");
+    assert_eq!(status, SILLSTONE_E_REJECTED, "status");
     assert!(stream.is_null());
 }
 
@@ -397,7 +431,7 @@ fn jni_fingerprint_environment_refusing_the_array_is_rejected() {
 fn jni_fingerprint_null_status_short_circuits() {
     let (stream, _produced, _recorded) = with_fake_env(|env| unsafe {
         let data = byte_array(b"alpha beta gamma".to_vec());
-        Java_hash_sillstone_text_PithText_fingerprintNative(
+        Java_io_github_sillstone_SillstoneText_fingerprintNative(
             env,
             std::ptr::null_mut(),
             data,
@@ -423,7 +457,7 @@ fn jni_jaccard_matches_the_safe_core() {
         let arr_a = long_array(a);
         let arr_b = long_array(b);
         let slot = status_slot();
-        let value = Java_hash_sillstone_text_PithText_jaccardNative(
+        let value = Java_io_github_sillstone_SillstoneText_jaccardNative(
             env,
             std::ptr::null_mut(),
             arr_a,
@@ -432,7 +466,7 @@ fn jni_jaccard_matches_the_safe_core() {
         );
         (value, read_status(slot))
     });
-    assert_eq!(status, PITH_OK, "status");
+    assert_eq!(status, SILLSTONE_OK, "status");
     assert_eq!(value.to_bits(), expected.to_bits(), "estimate bits");
 }
 
@@ -442,7 +476,7 @@ fn jni_jaccard_empty_operand_scores_one() {
         let arr_a = long_array(vec![1, 2, 3]);
         let arr_b = long_array(Vec::new());
         let slot = status_slot();
-        let value = Java_hash_sillstone_text_PithText_jaccardNative(
+        let value = Java_io_github_sillstone_SillstoneText_jaccardNative(
             env,
             std::ptr::null_mut(),
             arr_a,
@@ -451,7 +485,7 @@ fn jni_jaccard_empty_operand_scores_one() {
         );
         (value, read_status(slot))
     });
-    assert_eq!(status, PITH_OK, "status");
+    assert_eq!(status, SILLSTONE_OK, "status");
     assert_eq!(value.to_bits(), 0x3ff0_0000_0000_0000, "1.0 bits");
 }
 
@@ -460,7 +494,7 @@ fn jni_jaccard_null_operand_is_invalid() {
     let ((value, status), _produced, _recorded) = with_fake_env(|env| unsafe {
         let arr_b = long_array(vec![1, 2, 3]);
         let slot = status_slot();
-        let value = Java_hash_sillstone_text_PithText_jaccardNative(
+        let value = Java_io_github_sillstone_SillstoneText_jaccardNative(
             env,
             std::ptr::null_mut(),
             std::ptr::null_mut(),
@@ -469,7 +503,7 @@ fn jni_jaccard_null_operand_is_invalid() {
         );
         (value, read_status(slot))
     });
-    assert_eq!(status, PITH_E_INVALID, "status");
+    assert_eq!(status, SILLSTONE_E_INVALID, "status");
     assert_eq!(value, 0.0);
 }
 
@@ -478,7 +512,7 @@ fn jni_jaccard_null_status_short_circuits() {
     let (value, _produced, _recorded) = with_fake_env(|env| unsafe {
         let arr_a = long_array(vec![1]);
         let arr_b = long_array(vec![1]);
-        Java_hash_sillstone_text_PithText_jaccardNative(
+        Java_io_github_sillstone_SillstoneText_jaccardNative(
             env,
             std::ptr::null_mut(),
             arr_a,
@@ -494,14 +528,14 @@ fn jni_null_environment_short_circuits() {
     let ((stream, value), _produced, _recorded) = with_fake_env(|_env| unsafe {
         let slot = status_slot();
         let data = byte_array(b"alpha beta gamma".to_vec());
-        let stream = Java_hash_sillstone_text_PithText_fingerprintNative(
+        let stream = Java_io_github_sillstone_SillstoneText_fingerprintNative(
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             data,
             slot,
         );
         let arr_a = long_array(vec![1]);
-        let value = Java_hash_sillstone_text_PithText_jaccardNative(
+        let value = Java_io_github_sillstone_SillstoneText_jaccardNative(
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             arr_a,
@@ -519,7 +553,7 @@ fn jni_jaccard_null_second_operand_is_invalid() {
     let ((value, status), _produced, _recorded) = with_fake_env(|env| unsafe {
         let arr_a = long_array(vec![1, 2, 3]);
         let slot = status_slot();
-        let value = Java_hash_sillstone_text_PithText_jaccardNative(
+        let value = Java_io_github_sillstone_SillstoneText_jaccardNative(
             env,
             std::ptr::null_mut(),
             arr_a,
@@ -528,7 +562,7 @@ fn jni_jaccard_null_second_operand_is_invalid() {
         );
         (value, read_status(slot))
     });
-    assert_eq!(status, PITH_E_INVALID, "status");
+    assert_eq!(status, SILLSTONE_E_INVALID, "status");
     assert_eq!(value, 0.0);
 }
 
@@ -542,17 +576,21 @@ fn jni_array_with_a_negative_length_is_invalid() {
 
     let ((stream, status), _produced, _recorded) = with_fake_env(|env| unsafe {
         let slot = status_slot();
-        let stream =
-            Java_hash_sillstone_text_PithText_fingerprintNative(env, std::ptr::null_mut(), unknown, slot);
+        let stream = Java_io_github_sillstone_SillstoneText_fingerprintNative(
+            env,
+            std::ptr::null_mut(),
+            unknown,
+            slot,
+        );
         (stream, read_status(slot))
     });
-    assert_eq!(status, PITH_E_INVALID, "byte[] status");
+    assert_eq!(status, SILLSTONE_E_INVALID, "byte[] status");
     assert!(stream.is_null(), "no stream on refusal");
 
     let ((value, status), _produced, _recorded) = with_fake_env(|env| unsafe {
         let arr_b = long_array(vec![1, 2, 3]);
         let slot = status_slot();
-        let value = Java_hash_sillstone_text_PithText_jaccardNative(
+        let value = Java_io_github_sillstone_SillstoneText_jaccardNative(
             env,
             std::ptr::null_mut(),
             unknown,
@@ -561,6 +599,99 @@ fn jni_array_with_a_negative_length_is_invalid() {
         );
         (value, read_status(slot))
     });
-    assert_eq!(status, PITH_E_INVALID, "long[] status");
+    assert_eq!(status, SILLSTONE_E_INVALID, "long[] status");
     assert_eq!(value, 0.0);
+}
+
+/// The `fingerprintNative` export shape.
+type FingerprintExport =
+    unsafe extern "system" fn(*mut JNIEnv, JClass, JArray, JIntArray) -> JArray;
+/// The `jaccardNative` export shape.
+type JaccardExport =
+    unsafe extern "system" fn(*mut JNIEnv, JClass, JArray, JArray, JIntArray) -> jdouble;
+
+/// Runs a fingerprint `export` over `input` (a null array for `None`):
+/// the returned array's nullness, the bytes written and the status.
+fn run_fingerprint(export: FingerprintExport, input: Option<&[u8]>) -> (bool, Vec<u8>, i32) {
+    let ((is_null, status), produced, _recorded) = with_fake_env(|env| unsafe {
+        let data = input.map_or(std::ptr::null_mut(), |bytes| byte_array(bytes.to_vec()));
+        let slot = status_slot();
+        let stream = export(env, std::ptr::null_mut(), data, slot);
+        (stream.is_null(), read_status(slot))
+    });
+    (is_null, produced, status)
+}
+
+/// Runs a jaccard `export` over `a` (a null array for `None`) and `b`:
+/// the estimate's bits and the status.
+fn run_jaccard(export: JaccardExport, a: Option<Vec<i64>>, b: Vec<i64>) -> (u64, i32) {
+    let ((value, status), _produced, _recorded) = with_fake_env(|env| unsafe {
+        let arr_a = a.map_or(std::ptr::null_mut(), long_array);
+        let arr_b = long_array(b);
+        let slot = status_slot();
+        let value = export(env, std::ptr::null_mut(), arr_a, arr_b, slot);
+        (value.to_bits(), read_status(slot))
+    });
+    (value, status)
+}
+
+#[test]
+fn legacy_text_exports_match_the_canonical_ones() {
+    let input: &[u8] = b"alpha beta gamma";
+    let want = run_fingerprint(
+        Java_io_github_sillstone_SillstoneText_fingerprintNative,
+        Some(input),
+    );
+    assert_eq!(want, (false, c_stream(input), SILLSTONE_OK));
+    assert_eq!(
+        run_fingerprint(
+            Java_hash_sillstone_text_PithText_fingerprintNative,
+            Some(input)
+        ),
+        want
+    );
+    let refused = run_fingerprint(
+        Java_io_github_sillstone_SillstoneText_fingerprintNative,
+        None,
+    );
+    assert_eq!(refused, (true, Vec::new(), SILLSTONE_E_INVALID));
+    assert_eq!(
+        run_fingerprint(Java_hash_sillstone_text_PithText_fingerprintNative, None),
+        refused
+    );
+
+    let a: Vec<i64> = (0..64)
+        .map(|i| (i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) as i64)
+        .collect();
+    let b: Vec<i64> = (8..72)
+        .map(|i| (i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) as i64)
+        .collect();
+    let expected = jaccard_estimate(
+        &a.iter().map(|&w| w as u64).collect::<Vec<_>>(),
+        &b.iter().map(|&w| w as u64).collect::<Vec<_>>(),
+    );
+    let want = run_jaccard(
+        Java_io_github_sillstone_SillstoneText_jaccardNative,
+        Some(a.clone()),
+        b.clone(),
+    );
+    assert_eq!(want, (expected.to_bits(), SILLSTONE_OK));
+    assert_eq!(
+        run_jaccard(
+            Java_hash_sillstone_text_PithText_jaccardNative,
+            Some(a),
+            b.clone()
+        ),
+        want
+    );
+    let refused = run_jaccard(
+        Java_io_github_sillstone_SillstoneText_jaccardNative,
+        None,
+        b.clone(),
+    );
+    assert_eq!(refused, (0, SILLSTONE_E_INVALID));
+    assert_eq!(
+        run_jaccard(Java_hash_sillstone_text_PithText_jaccardNative, None, b),
+        refused
+    );
 }

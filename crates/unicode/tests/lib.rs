@@ -8,9 +8,9 @@
 //! tests; this file keeps the exports honest across crate boundaries.
 
 use sillstone_unicode::ffi::{
-    PITH_E_INVALID, PITH_E_REJECTED, PITH_OK, sillstone_unicode_casefold, sillstone_unicode_casefold_simple,
-    sillstone_unicode_free, sillstone_unicode_is_normalized, sillstone_unicode_nfc, sillstone_unicode_nfd,
-    sillstone_unicode_nfkc, sillstone_unicode_nfkd,
+    SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_OK, sillstone_unicode_casefold,
+    sillstone_unicode_casefold_simple, sillstone_unicode_free, sillstone_unicode_is_normalized,
+    sillstone_unicode_nfc, sillstone_unicode_nfd, sillstone_unicode_nfkc, sillstone_unicode_nfkd,
 };
 
 /// `reference.json` vector 0 through the raw FFI: NFC is a fixed
@@ -21,14 +21,16 @@ fn ffi_exports_work_across_the_crate_boundary() {
 
     let mut out: *mut u8 = core::ptr::null_mut();
     let mut out_len: usize = 0;
-    let status = unsafe { sillstone_unicode_nfc(input.as_ptr(), input.len(), &mut out, &mut out_len) };
-    assert_eq!(status, PITH_OK);
+    let status =
+        unsafe { sillstone_unicode_nfc(input.as_ptr(), input.len(), &mut out, &mut out_len) };
+    assert_eq!(status, SILLSTONE_OK);
     assert_eq!(out_len, 3);
     assert_eq!(unsafe { core::slice::from_raw_parts(out, out_len) }, &input);
     unsafe { sillstone_unicode_free(out, out_len) };
 
-    let status = unsafe { sillstone_unicode_nfd(input.as_ptr(), input.len(), &mut out, &mut out_len) };
-    assert_eq!(status, PITH_OK);
+    let status =
+        unsafe { sillstone_unicode_nfd(input.as_ptr(), input.len(), &mut out, &mut out_len) };
+    assert_eq!(status, SILLSTONE_OK);
     assert_eq!(out_len, 3);
     assert_eq!(
         unsafe { core::slice::from_raw_parts(out, out_len) },
@@ -38,17 +40,17 @@ fn ffi_exports_work_across_the_crate_boundary() {
 }
 
 /// Refusals from outside the crate: a null data pointer is
-/// [`PITH_E_INVALID`], invalid UTF-8 is [`PITH_E_REJECTED`], and a
+/// [`SILLSTONE_E_INVALID`], invalid UTF-8 is [`SILLSTONE_E_REJECTED`], and a
 /// null buffer is a legal free.
 #[test]
 fn ffi_refusals_across_the_crate_boundary() {
     let mut out: *mut u8 = core::ptr::null_mut();
     let mut out_len: usize = 0;
     let status = unsafe { sillstone_unicode_nfc(core::ptr::null(), 0, &mut out, &mut out_len) };
-    assert_eq!(status, PITH_E_INVALID);
+    assert_eq!(status, SILLSTONE_E_INVALID);
 
     let status = unsafe { sillstone_unicode_nfd(b"\xff\xfe".as_ptr(), 2, &mut out, &mut out_len) };
-    assert_eq!(status, PITH_E_REJECTED);
+    assert_eq!(status, SILLSTONE_E_REJECTED);
 
     unsafe { sillstone_unicode_free(core::ptr::null_mut(), 0) };
 }
@@ -63,7 +65,7 @@ fn ffi_tier1_exports_work_across_the_crate_boundary() {
         let mut out: *mut u8 = core::ptr::null_mut();
         let mut out_len: usize = 0;
         let status = unsafe { op(ligature.as_ptr(), ligature.len(), &mut out, &mut out_len) };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(unsafe { core::slice::from_raw_parts(out, out_len) }, b"fi");
         unsafe { sillstone_unicode_free(out, out_len) };
     }
@@ -71,9 +73,10 @@ fn ffi_tier1_exports_work_across_the_crate_boundary() {
     let sharp_s: [u8; 2] = [0xc3, 0x9f]; // LATIN SMALL LETTER SHARP S
     let mut out: *mut u8 = core::ptr::null_mut();
     let mut out_len: usize = 0;
-    let status =
-        unsafe { sillstone_unicode_casefold(sharp_s.as_ptr(), sharp_s.len(), &mut out, &mut out_len) };
-    assert_eq!(status, PITH_OK);
+    let status = unsafe {
+        sillstone_unicode_casefold(sharp_s.as_ptr(), sharp_s.len(), &mut out, &mut out_len)
+    };
+    assert_eq!(status, SILLSTONE_OK);
     assert_eq!(unsafe { core::slice::from_raw_parts(out, out_len) }, b"ss");
     unsafe { sillstone_unicode_free(out, out_len) };
 
@@ -81,7 +84,7 @@ fn ffi_tier1_exports_work_across_the_crate_boundary() {
     let status = unsafe {
         sillstone_unicode_casefold_simple(capital.as_ptr(), capital.len(), &mut out, &mut out_len)
     };
-    assert_eq!(status, PITH_OK);
+    assert_eq!(status, SILLSTONE_OK);
     assert_eq!(
         unsafe { core::slice::from_raw_parts(out, out_len) },
         &sharp_s
@@ -89,19 +92,23 @@ fn ffi_tier1_exports_work_across_the_crate_boundary() {
     unsafe { sillstone_unicode_free(out, out_len) };
 
     let mut answer: u8 = 0xff;
-    let status =
-        unsafe { sillstone_unicode_is_normalized(1, ligature.as_ptr(), ligature.len(), &mut answer) };
-    assert_eq!(status, PITH_OK);
+    let status = unsafe {
+        sillstone_unicode_is_normalized(1, ligature.as_ptr(), ligature.len(), &mut answer)
+    };
+    assert_eq!(status, SILLSTONE_OK);
     assert_eq!(answer, 1);
-    let status =
-        unsafe { sillstone_unicode_is_normalized(3, ligature.as_ptr(), ligature.len(), &mut answer) };
-    assert_eq!(status, PITH_OK);
+    let status = unsafe {
+        sillstone_unicode_is_normalized(3, ligature.as_ptr(), ligature.len(), &mut answer)
+    };
+    assert_eq!(status, SILLSTONE_OK);
     assert_eq!(answer, 0);
+    let status = unsafe {
+        sillstone_unicode_is_normalized(0, ligature.as_ptr(), ligature.len(), &mut answer)
+    };
+    assert_eq!(status, SILLSTONE_E_INVALID);
     let status =
-        unsafe { sillstone_unicode_is_normalized(0, ligature.as_ptr(), ligature.len(), &mut answer) };
-    assert_eq!(status, PITH_E_INVALID);
-    let status = unsafe { sillstone_unicode_is_normalized(2, b"\xff\xfe".as_ptr(), 2, &mut answer) };
-    assert_eq!(status, PITH_E_REJECTED);
+        unsafe { sillstone_unicode_is_normalized(2, b"\xff\xfe".as_ptr(), 2, &mut answer) };
+    assert_eq!(status, SILLSTONE_E_REJECTED);
     let status = unsafe { sillstone_unicode_is_normalized(4, core::ptr::null(), 0, &mut answer) };
-    assert_eq!(status, PITH_E_INVALID);
+    assert_eq!(status, SILLSTONE_E_INVALID);
 }

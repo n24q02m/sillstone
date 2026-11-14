@@ -2,9 +2,9 @@
 //! for the members inside (the suite's first consumer is DOCX:
 //! `word/document.xml` in a zip).
 //!
-//! Part of the `pith` suite (sillstone-hash), the company split of the `modhash`
+//! Part of the `sillstone` suite, the company split of the `modhash`
 //! zero-dependency hashing kit: the suite's only allowed dependencies are
-//! its own `pith-*` crates, so it still resolves without a single registry
+//! its own `sillstone-*` crates, so it still resolves without a single registry
 //! package. This crate reads crate `sillstone-inflate` for raw DEFLATE and
 //! `sillstone-digest` for CRC-32 verification and the shared
 //! `Error`/`Result` vocabulary.

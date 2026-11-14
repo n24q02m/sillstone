@@ -1,4 +1,4 @@
-# Fixture provenance — `pith-video`
+# Fixture provenance — `sillstone-video`
 
 All fixtures were generated **locally and offline** on 2026-10-03 with
 ffmpeg 9.0.1 (`-full_build-www.gyan.dev`, libx264 inside) on the
@@ -6,7 +6,7 @@ development machine. Video sources are ffmpeg's deterministic lavfi
 generators (`testsrc2`, `mandelbrot`, `rgbtestsrc`, `gradients`,
 `color`) — no third-party footage, no redistributed ITU/JVT conformance
 vectors (those archives are not license-clean; same gap the
-`pith-h264` lane documented).
+`sillstone-h264` lane documented).
 
 This corpus is the byte-exact copy of the upstream `modhash-video`
 fixtures (SHA-256 table below is verified by the port); regeneration

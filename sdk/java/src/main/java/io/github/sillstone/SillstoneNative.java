@@ -31,7 +31,15 @@ final class SillstoneNative {
     }
 
     private static final String RESOURCE_ROOT = "/io/github/sillstone/native/";
-    private static final String FALLBACK_RESOURCE_ROOT = "/hash/pith/native/";
+    /**
+     * The pre-rename resource root, probed only when {@link #RESOURCE_ROOT} carries no
+     * native, so a JAR repackaged with the old layout still loads.
+     *
+     * @deprecated bundle natives under {@link #RESOURCE_ROOT}; this fallback goes away
+     *     in a future major release.
+     */
+    @Deprecated
+    private static final String LEGACY_RESOURCE_ROOT = "/hash/pith/native/";
 
     /** Node-style platform id, e.g. {@code linux-x64}; the same ids the npm prebuilds use. */
     static String platformId(String osName, String osArch) {
@@ -60,7 +68,7 @@ final class SillstoneNative {
         String resource = RESOURCE_ROOT + platformId + "/" + fileName;
         InputStream in = SillstoneNative.class.getResourceAsStream(resource);
         if (in == null) {
-            resource = FALLBACK_RESOURCE_ROOT + platformId + "/" + fileName;
+            resource = LEGACY_RESOURCE_ROOT + platformId + "/" + fileName;
             in = SillstoneNative.class.getResourceAsStream(resource);
         }
         if (in == null) {

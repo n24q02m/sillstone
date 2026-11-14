@@ -1,7 +1,7 @@
 //! MPEG-1 audio decoding for Layers I, II and III.
 //!
-//! Part of the `pith` suite: every crate in the suite builds with an empty
-//! `[dependencies]` table bar the suite's own `pith-*` dependencies, so the
+//! Part of the `sillstone` suite: every crate in the suite builds with an empty
+//! `[dependencies]` table bar the suite's own `sillstone-*` dependencies, so the
 //! whole suite resolves without a single registry package.
 //!
 //! # Scope
@@ -62,8 +62,8 @@ mod crc;
 
 pub mod ffi;
 mod header;
-pub mod id3;
 mod hufftab;
+pub mod id3;
 mod layer12;
 mod layer3;
 mod synthesis;

@@ -35,7 +35,7 @@ fn decode_and_signature_of_the_fixture() {
     let status = unsafe {
         sillstone_audio::ffi::sillstone_audio_decode_wav(wav.as_ptr(), wav.len(), &mut out, &mut out_len)
     };
-    assert_eq!(status, sillstone_audio::ffi::PITH_OK);
+    assert_eq!(status, sillstone_audio::ffi::SILLSTONE_OK);
     let stream = unsafe { core::slice::from_raw_parts(out, out_len) };
     assert_eq!(&stream[..4], &44_100u32.to_be_bytes());
     assert_eq!(&stream[4..6], &1u16.to_be_bytes());
@@ -49,7 +49,7 @@ fn decode_and_signature_of_the_fixture() {
     let status = unsafe {
         sillstone_audio::ffi::sillstone_audio_signature_wav(wav.as_ptr(), wav.len(), &mut out, &mut out_len)
     };
-    assert_eq!(status, sillstone_audio::ffi::PITH_OK);
+    assert_eq!(status, sillstone_audio::ffi::SILLSTONE_OK);
     let stream = unsafe { core::slice::from_raw_parts(out, out_len) };
     assert_eq!(be32(stream, 0), 20); // frames
     assert_eq!(be32(stream, 4), 42); // peak_count
@@ -66,23 +66,26 @@ fn voices_index_and_match_end_to_end() {
 
     let mut query = Vec::new();
     for (seed, n) in [(0xBE_EF, 88_200), (0xD1_CE, 132_300)] {
-        let status =
-            unsafe { sillstone_audio::ffi::sillstone_audio_voices_pcm(seed, n, &mut out, &mut out_len) };
-        assert_eq!(status, sillstone_audio::ffi::PITH_OK);
+        let status = unsafe {
+            sillstone_audio::ffi::sillstone_audio_voices_pcm(seed, n, &mut out, &mut out_len)
+        };
+        assert_eq!(status, sillstone_audio::ffi::SILLSTONE_OK);
         query.extend_from_slice(unsafe { core::slice::from_raw_parts(out, out_len) });
         unsafe { sillstone_audio::ffi::sillstone_audio_free(out, out_len) };
     }
 
     let idx = unsafe { sillstone_audio::ffi::sillstone_audio_index_new() };
     for (seed, n) in [(0xD1_CE, 132_300), (0xF0_0D, 132_300), (0xE5_A5, 44_100)] {
-        let status =
-            unsafe { sillstone_audio::ffi::sillstone_audio_voices_pcm(seed, n, &mut out, &mut out_len) };
-        assert_eq!(status, sillstone_audio::ffi::PITH_OK);
+        let status = unsafe {
+            sillstone_audio::ffi::sillstone_audio_voices_pcm(seed, n, &mut out, &mut out_len)
+        };
+        assert_eq!(status, sillstone_audio::ffi::SILLSTONE_OK);
         let pcm = unsafe { core::slice::from_raw_parts(out, out_len) }.to_vec();
         unsafe { sillstone_audio::ffi::sillstone_audio_free(out, out_len) };
-        let status =
-            unsafe { sillstone_audio::ffi::sillstone_audio_index_add(idx, pcm.as_ptr(), pcm.len(), 1) };
-        assert_eq!(status, sillstone_audio::ffi::PITH_OK);
+        let status = unsafe {
+            sillstone_audio::ffi::sillstone_audio_index_add(idx, pcm.as_ptr(), pcm.len(), 1)
+        };
+        assert_eq!(status, sillstone_audio::ffi::SILLSTONE_OK);
     }
 
     let status = unsafe {
@@ -95,7 +98,7 @@ fn voices_index_and_match_end_to_end() {
             &mut out_len,
         )
     };
-    assert_eq!(status, sillstone_audio::ffi::PITH_OK);
+    assert_eq!(status, sillstone_audio::ffi::SILLSTONE_OK);
     let stream = unsafe { core::slice::from_raw_parts(out, out_len) };
     assert_eq!(be32(stream, 0), 106); // query_frames
     assert_eq!(be32(stream, 4), 156); // query_peak_count
@@ -121,14 +124,14 @@ fn refusals_and_null_safety() {
                 &mut out_len,
             )
         },
-        sillstone_audio::ffi::PITH_E_REJECTED
+        sillstone_audio::ffi::SILLSTONE_E_REJECTED
     );
 
     let pcm = pcm_le(&voices_samples(7, 8192));
     let idx = unsafe { sillstone_audio::ffi::sillstone_audio_index_new() };
     assert_eq!(
         unsafe { sillstone_audio::ffi::sillstone_audio_index_add(idx, pcm.as_ptr(), pcm.len(), 0) },
-        sillstone_audio::ffi::PITH_E_INVALID
+        sillstone_audio::ffi::SILLSTONE_E_INVALID
     );
     assert_eq!(
         unsafe {
@@ -141,7 +144,7 @@ fn refusals_and_null_safety() {
                 &mut out_len,
             )
         },
-        sillstone_audio::ffi::PITH_E_INVALID
+        sillstone_audio::ffi::SILLSTONE_E_INVALID
     );
     assert_eq!(
         unsafe {
@@ -153,7 +156,7 @@ fn refusals_and_null_safety() {
                 &mut out_len,
             )
         },
-        sillstone_audio::ffi::PITH_E_INVALID
+        sillstone_audio::ffi::SILLSTONE_E_INVALID
     );
 
     unsafe { sillstone_audio::ffi::sillstone_audio_index_free(idx) };

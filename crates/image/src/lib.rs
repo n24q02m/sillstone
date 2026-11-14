@@ -1,5 +1,5 @@
 //! Raw raster buffers, BMP decoding, tier-3 local features and the
-//! 64-bit pHash — the image lane of the pith hashing suite.
+//! 64-bit pHash — the image lane of the sillstone hashing suite.
 //!
 //! sillstone-image merges three crates of the upstream `modhash` kit into one
 //! dependency-free package, ported byte-compatibly (algorithms, public

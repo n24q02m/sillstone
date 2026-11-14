@@ -28,7 +28,7 @@ the SHA-256 values below.
 | `binary.gz`      | 327   | gzip(1)    | 4096 structured bytes `(i * 7919) % 256` through `gzip -9 -n` (incompressible: stored blocks inside the member) |
 | `fextra.gz`      | 44    | crafted    | FLG `FEXTRA`; subfield SI1 `'p'` SI2 `'h'` SLEN 4 data `01 02 03 04` |
 | `fname.gz`       | 45    | crafted    | FLG `FNAME`; name `payload.txt` |
-| `fcomment.gz`    | 72    | crafted    | FLG `FCOMMENT`; comment `crafted for the sillstone-inflate corpus` |
+| `fcomment.gz`    | 77    | crafted    | FLG `FCOMMENT`; comment `crafted for the sillstone-inflate corpus` |
 | `fhcrc.gz`       | 35    | crafted    | FLG `FHCRC`; CRC16 = CRC-32 of the header bytes so far, low 16 bits |
 | `all-flags.gz`   | 141   | crafted    | FLG `FTEXT\|FEXTRA\|FNAME\|FCOMMENT\|FHCRC` (`0x1f`); every optional field at once |
 
@@ -41,7 +41,7 @@ bc15328edb0fbaffbbf55f13a0c60edf48e5787af65454019cf36b7b6c77b6e3  two-members.gz
 e2aacc243952d8eadaf8a6e06a4cff69f53b2debc4ad3030c323e9583a335248  binary.gz
 35d292c486017a192f72079937ce65f62e1231f4994ee2ee6537c266724453c2  fextra.gz
 8ab4aa226956e3aebb1e79b1398997a1da5d5473094ff187ad14c4ea7f20a7de  fname.gz
-7ba9ae89526f3e726d33e670a64a23fe1b15022949e914516d2645be7a241601  fcomment.gz
+e5d9dc7c7a31df050fb1da849921a9654f8070cff8902ff14d4df49c0850025c  fcomment.gz
 62b7332faa1f0721ed6743001524fe5449ab06346932e90ea83ffafad96bdb8b  fhcrc.gz
 469fea1f6c6855ed9f0abf7adeaa46f69c5b3e721b5d89a0ad7859fc275a2f25  all-flags.gz
 ```

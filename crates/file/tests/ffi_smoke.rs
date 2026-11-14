@@ -10,8 +10,9 @@
 
 use sillstone_digest::{SplitMix64, fnv1a64, sha256};
 use sillstone_file::ffi::{
-    PITH_E_INVALID, PITH_E_REJECTED, PITH_FILE_FORMAT_PDF, PITH_OK, sillstone_file_binary_signature,
-    sillstone_file_free, sillstone_file_jaccard, sillstone_file_text_content,
+    SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_FILE_FORMAT_PDF, SILLSTONE_OK,
+    sillstone_file_binary_signature, sillstone_file_free, sillstone_file_jaccard,
+    sillstone_file_text_content,
 };
 
 /// Bytes as lowercase hex.
@@ -43,9 +44,10 @@ fn consumer_ffi_signature_stream_reproduces_the_committed_vector() {
 
     let mut out: *mut u8 = core::ptr::null_mut();
     let mut out_len: usize = 0;
-    let status =
-        unsafe { sillstone_file_binary_signature(input.as_ptr(), input.len(), &mut out, &mut out_len) };
-    assert_eq!(status, PITH_OK);
+    let status = unsafe {
+        sillstone_file_binary_signature(input.as_ptr(), input.len(), &mut out, &mut out_len)
+    };
+    assert_eq!(status, SILLSTONE_OK);
     let stream = unsafe { core::slice::from_raw_parts(out, out_len) }.to_vec();
     unsafe { sillstone_file_free(out, out_len) };
 
@@ -90,7 +92,7 @@ fn consumer_ffi_jaccard_reproduces_the_committed_bits() {
             &mut bits,
         )
     };
-    assert_eq!(status, PITH_OK);
+    assert_eq!(status, SILLSTONE_OK);
     assert_eq!(bits, 0x3fe5_5555_5555_5555);
 
     let status = unsafe {
@@ -102,11 +104,11 @@ fn consumer_ffi_jaccard_reproduces_the_committed_bits() {
             &mut bits,
         )
     };
-    assert_eq!(status, PITH_OK);
+    assert_eq!(status, SILLSTONE_OK);
     assert_eq!(bits, 0x3ff0_0000_0000_0000);
 
     let status = unsafe { sillstone_file_jaccard(b"".as_ptr(), 0, b"".as_ptr(), 0, &mut bits) };
-    assert_eq!(status, PITH_OK);
+    assert_eq!(status, SILLSTONE_OK);
     assert_eq!(bits, 0x3ff0_0000_0000_0000);
 }
 
@@ -125,12 +127,12 @@ fn consumer_ffi_text_content_extracts_and_refuses() {
         sillstone_file_text_content(
             pdf.as_ptr(),
             pdf.len(),
-            PITH_FILE_FORMAT_PDF,
+            SILLSTONE_FILE_FORMAT_PDF,
             &mut out,
             &mut out_len,
         )
     };
-    assert_eq!(status, PITH_OK);
+    assert_eq!(status, SILLSTONE_OK);
     assert_eq!(out_len, 9);
     let text = unsafe { core::slice::from_raw_parts(out, out_len) }.to_vec();
     unsafe { sillstone_file_free(out, out_len) };
@@ -144,15 +146,15 @@ fn consumer_ffi_text_content_extracts_and_refuses() {
         sillstone_file_text_content(
             gutted.as_ptr(),
             gutted.len(),
-            PITH_FILE_FORMAT_PDF,
+            SILLSTONE_FILE_FORMAT_PDF,
             &mut out,
             &mut out_len,
         )
     };
-    assert_eq!(status, PITH_E_REJECTED);
+    assert_eq!(status, SILLSTONE_E_REJECTED);
 
     let status = unsafe {
         sillstone_file_text_content(gutted.as_ptr(), gutted.len(), 99, &mut out, &mut out_len)
     };
-    assert_eq!(status, PITH_E_INVALID);
+    assert_eq!(status, SILLSTONE_E_INVALID);
 }

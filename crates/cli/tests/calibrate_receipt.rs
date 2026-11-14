@@ -10,7 +10,7 @@
 //!   committed CSV and diffs both profile runs against the README's
 //!   pinned ```receipt blocks.
 //!
-//! Set `PITH_GEN_RECEIPT=1` to (re)write the committed artifacts from a
+//! Set `SILLSTONE_GEN_RECEIPT=1` to (re)write the committed artifacts from a
 //! live run (dataset BMPs land in `lab/calibrate-receipt/dataset/`).
 
 use std::fmt::Write as _;
@@ -83,7 +83,7 @@ fn dataset(write_out: bool, dir: &Path) -> (Vec<(String, Vec<u8>)>, String) {
         }
     }
     let mut csv = String::new();
-    csv.push_str("# pith calibrate receipt dataset (R5-N1), image lane, 48x40 BMP\n");
+    csv.push_str("# sillstone calibrate receipt dataset (R5-N1), image lane, 48x40 BMP\n");
     csv.push_str("# recipe: fixture::patterned_pixels(seed, 48, 40), seeds b1..b4 = 0xA1..0xA4;\n");
     csv.push_str("#   v1 = perturb_pixels(base, seed ^ 0x100, 4, 998)\n");
     csv.push_str("#   v2 = perturb_pixels(base, seed ^ 0x200, 4, 999)\n");
@@ -131,7 +131,7 @@ fn without_version(receipt: &str) -> String {
 
 #[test]
 fn receipt_dataset_is_reproducible() {
-    let write_out = std::env::var("PITH_GEN_RECEIPT").is_ok();
+    let write_out = std::env::var("SILLSTONE_GEN_RECEIPT").is_ok();
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../curator/lab/calibrate-receipt");
     let (_, csv) = dataset(write_out, &root.join("dataset"));
     if write_out {

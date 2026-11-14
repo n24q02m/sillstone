@@ -1,9 +1,9 @@
-//! The JNI surface of `sillstone-audio`: the `Java_hash_sillstone_audio_PithAudio_*`
+//! The JNI surface of `sillstone-audio`: the `Java_io_github_sillstone_SillstoneAudio_*`
 //! exports the Java SDK (`sdk/java`) binds its `native` methods through.
 //!
 //! The C ABI of [`crate::ffi`] is untouched: JNI requires exports named
 //! `Java_<package>_<Class>_<method>`, so the Java-facing shims live here
-//! and forward every call to the existing `pith_*` C exports — same
+//! and forward every call to the existing `sillstone_*` C exports — same
 //! status codes, same refusals, no second implementation of the
 //! pipeline. The module is compiled out of the unit-test build
 //! (`#[cfg(all(not(test), feature = "std"))]` at the registration site
@@ -16,18 +16,18 @@
 //! * every export takes the JNI environment first and the receiving
 //!   class second (the methods are static), then the Java arguments;
 //! * the status code crosses back through a trailing one-element
-//!   `int[]` — the same `PITH_OK` / `PITH_E_INVALID` /
-//!   `PITH_E_REJECTED` values the C ABI returns;
+//!   `int[]` — the same `SILLSTONE_OK` / `SILLSTONE_E_INVALID` /
+//!   `SILLSTONE_E_REJECTED` values the C ABI returns;
 //! * stream results (decode facts, signature facts, match tables,
 //!   synthesized PCM) cross back as a fresh `byte[]` — null unless the
-//!   status is `PITH_OK` — and the C ABI's buffer is released with
+//!   status is `SILLSTONE_OK` — and the C ABI's buffer is released with
 //!   [`sillstone_audio_free`] before the export returns; Java never sees a
 //!   raw pointer;
 //! * the index handle crosses back as a `jlong` ([`sillstone_audio_index_new`]);
 //!   a `0` handle is the null pointer: [`sillstone_audio_index_add`] and
-//!   [`sillstone_audio_match`] map it to `PITH_E_INVALID`, and
+//!   [`sillstone_audio_match`] map it to `SILLSTONE_E_INVALID`, and
 //!   [`sillstone_audio_index_free`] ignores it (the C ABI's own rule);
-//! * a null input array maps to `PITH_E_INVALID`, mirroring the C
+//! * a null input array maps to `SILLSTONE_E_INVALID`, mirroring the C
 //!   ABI's null-pointer rule; a null environment or status array
 //!   short-circuits to a zero return without touching memory.
 //!
@@ -45,9 +45,10 @@
 use core::ffi::c_void;
 
 use crate::ffi::{
-    PITH_E_INVALID, PITH_E_REJECTED, PITH_OK, sillstone_audio_decode_wav, sillstone_audio_free,
-    sillstone_audio_index_add, sillstone_audio_index_free, sillstone_audio_index_new, sillstone_audio_match,
-    sillstone_audio_signature_pcm, sillstone_audio_signature_wav, sillstone_audio_voices_pcm,
+    SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_OK, sillstone_audio_decode_wav,
+    sillstone_audio_free, sillstone_audio_index_add, sillstone_audio_index_free,
+    sillstone_audio_index_new, sillstone_audio_match, sillstone_audio_signature_pcm,
+    sillstone_audio_signature_wav, sillstone_audio_voices_pcm,
 };
 
 /// A JNI environment handle — C-mode `JNIEnv*`, a pointer to the
@@ -140,15 +141,15 @@ unsafe fn table<'a>(env: *mut JNIEnv) -> &'a JniTable {
 ///
 /// `env` must be a live JNI environment and `array` a live `byte[]`
 /// reference for the duration of the call; a null array is
-/// [`PITH_E_INVALID`], mirroring the C ABI's null-pointer rule.
+/// [`SILLSTONE_E_INVALID`], mirroring the C ABI's null-pointer rule.
 unsafe fn java_bytes(env: *mut JNIEnv, array: JArray) -> Result<Vec<u8>, i32> {
     if array.is_null() {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let functions = unsafe { table(env) };
     let len = unsafe { (functions.get_array_length)(env, array) };
     if len < 0 {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let mut bytes = vec![0u8; len as usize];
     unsafe { (functions.get_byte_array_region)(env, array, 0, len, bytes.as_mut_ptr().cast()) };
@@ -201,7 +202,7 @@ unsafe fn stream_out(
     let mut stream_ptr: *mut u8 = core::ptr::null_mut();
     let mut stream_len: usize = 0;
     let code = produce(&mut stream_ptr, &mut stream_len);
-    if code != PITH_OK {
+    if code != SILLSTONE_OK {
         unsafe { set_status(env, status, code) };
         return core::ptr::null_mut();
     }
@@ -213,12 +214,12 @@ unsafe fn stream_out(
             // The only failure left is the environment refusing the
             // array allocation; there is no dedicated code for it, so
             // it surfaces as a rejection, never as a panic.
-            unsafe { set_status(env, status, PITH_E_REJECTED) };
+            unsafe { set_status(env, status, SILLSTONE_E_REJECTED) };
             return core::ptr::null_mut();
         }
     };
     unsafe { sillstone_audio_free(stream_ptr, stream_len) };
-    unsafe { set_status(env, status, PITH_OK) };
+    unsafe { set_status(env, status, SILLSTONE_OK) };
     array
 }
 
@@ -240,7 +241,7 @@ unsafe fn stream_out(
 // signature over the private table type would trip
 // `private_interfaces`.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_decodeWavNative(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneAudio_decodeWavNative(
     env: *mut JNIEnv,
     _class: JClass,
     data: JArray,
@@ -275,7 +276,7 @@ unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_decodeWavNative(
 // signature over the private table type would trip
 // `private_interfaces`.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_signatureWavNative(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneAudio_signatureWavNative(
     env: *mut JNIEnv,
     _class: JClass,
     data: JArray,
@@ -302,7 +303,7 @@ unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_signatureWavNative
 /// stream of interleaved little-endian i32 PCM at 44 100 Hz.
 ///
 /// `channels` must divide the byte length into whole i32 frames and be
-/// non-zero (`PITH_E_INVALID` otherwise).
+/// non-zero (`SILLSTONE_E_INVALID` otherwise).
 ///
 /// # Safety
 ///
@@ -313,7 +314,7 @@ unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_signatureWavNative
 // signature over the private table type would trip
 // `private_interfaces`.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_signaturePcmNative(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneAudio_signaturePcmNative(
     env: *mut JNIEnv,
     _class: JClass,
     data: JArray,
@@ -350,7 +351,7 @@ unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_signaturePcmNative
 // signature over the private table type would trip
 // `private_interfaces`.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_voicesPcmNative(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneAudio_voicesPcmNative(
     env: *mut JNIEnv,
     _class: JClass,
     seed: jlong,
@@ -379,7 +380,7 @@ unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_voicesPcmNative(
 // signature over the private table type would trip
 // `private_interfaces`.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_indexNewNative(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneAudio_indexNewNative(
     env: *mut JNIEnv,
     _class: JClass,
 ) -> jlong {
@@ -398,13 +399,13 @@ unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_indexNewNative(
 /// `env` must be a live JNI environment and `data`/`status` live Java
 /// array references for the duration of the call; `idx` must be a
 /// handle from indexNewNative not yet freed (`0` is
-/// [`PITH_E_INVALID`]).
+/// [`SILLSTONE_E_INVALID`]).
 //
 // Private: the JVM links the export by symbol name; a public Rust
 // signature over the private table type would trip
 // `private_interfaces`.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_indexAddNative(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneAudio_indexAddNative(
     env: *mut JNIEnv,
     _class: JClass,
     idx: jlong,
@@ -438,13 +439,13 @@ unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_indexAddNative(
 /// `env` must be a live JNI environment and `data`/`status` live Java
 /// array references for the duration of the call; `idx` must be a
 /// handle from indexNewNative not yet freed (`0` is
-/// [`PITH_E_INVALID`]).
+/// [`SILLSTONE_E_INVALID`]).
 //
 // Private: the JVM links the export by symbol name; a public Rust
 // signature over the private table type would trip
 // `private_interfaces`.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_matchNative(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneAudio_matchNative(
     env: *mut JNIEnv,
     _class: JClass,
     idx: jlong,
@@ -489,7 +490,7 @@ unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_matchNative(
 // signature over the private table type would trip
 // `private_interfaces`.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_indexFreeNative(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneAudio_indexFreeNative(
     env: *mut JNIEnv,
     _class: JClass,
     idx: jlong,
@@ -498,4 +499,159 @@ unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_indexFreeNative(
         return;
     }
     unsafe { sillstone_audio_index_free(idx as *mut _) };
+}
+
+// Deprecated pre-rename JNI exports: the symbols Java classes compiled against the
+// suite's old class names resolve. Each one forwards to its canonical
+// `io.github.sillstone` export unchanged.
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneAudio_decodeWavNative`]: the export for the
+/// pre-rename `hash.sillstone.audio.PithAudio` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneAudio_decodeWavNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneAudio_decodeWavNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_decodeWavNative(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    status: JIntArray,
+) -> JArray {
+    unsafe { Java_io_github_sillstone_SillstoneAudio_decodeWavNative(env, class, data, status) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneAudio_signatureWavNative`]: the export for the
+/// pre-rename `hash.sillstone.audio.PithAudio` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneAudio_signatureWavNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneAudio_signatureWavNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_signatureWavNative(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    status: JIntArray,
+) -> JArray {
+    unsafe { Java_io_github_sillstone_SillstoneAudio_signatureWavNative(env, class, data, status) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneAudio_signaturePcmNative`]: the export for the
+/// pre-rename `hash.sillstone.audio.PithAudio` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneAudio_signaturePcmNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneAudio_signaturePcmNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_signaturePcmNative(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    channels: jint,
+    status: JIntArray,
+) -> JArray {
+    unsafe {
+        Java_io_github_sillstone_SillstoneAudio_signaturePcmNative(
+            env, class, data, channels, status,
+        )
+    }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneAudio_voicesPcmNative`]: the export for the
+/// pre-rename `hash.sillstone.audio.PithAudio` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneAudio_voicesPcmNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneAudio_voicesPcmNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_voicesPcmNative(
+    env: *mut JNIEnv,
+    class: JClass,
+    seed: jlong,
+    n_samples: jint,
+    status: JIntArray,
+) -> JArray {
+    unsafe {
+        Java_io_github_sillstone_SillstoneAudio_voicesPcmNative(env, class, seed, n_samples, status)
+    }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneAudio_indexNewNative`]: the export for the
+/// pre-rename `hash.sillstone.audio.PithAudio` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneAudio_indexNewNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneAudio_indexNewNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_indexNewNative(
+    env: *mut JNIEnv,
+    class: JClass,
+) -> jlong {
+    unsafe { Java_io_github_sillstone_SillstoneAudio_indexNewNative(env, class) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneAudio_indexAddNative`]: the export for the
+/// pre-rename `hash.sillstone.audio.PithAudio` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneAudio_indexAddNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneAudio_indexAddNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_indexAddNative(
+    env: *mut JNIEnv,
+    class: JClass,
+    idx: jlong,
+    data: JArray,
+    channels: jint,
+    status: JIntArray,
+) {
+    unsafe {
+        Java_io_github_sillstone_SillstoneAudio_indexAddNative(
+            env, class, idx, data, channels, status,
+        )
+    }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneAudio_matchNative`]: the export for the
+/// pre-rename `hash.sillstone.audio.PithAudio` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneAudio_matchNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneAudio_matchNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_matchNative(
+    env: *mut JNIEnv,
+    class: JClass,
+    idx: jlong,
+    data: JArray,
+    channels: jint,
+    status: JIntArray,
+) -> JArray {
+    unsafe {
+        Java_io_github_sillstone_SillstoneAudio_matchNative(env, class, idx, data, channels, status)
+    }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneAudio_indexFreeNative`]: the export for the
+/// pre-rename `hash.sillstone.audio.PithAudio` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneAudio_indexFreeNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneAudio_indexFreeNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_audio_PithAudio_indexFreeNative(
+    env: *mut JNIEnv,
+    class: JClass,
+    idx: jlong,
+) {
+    unsafe { Java_io_github_sillstone_SillstoneAudio_indexFreeNative(env, class, idx) }
 }

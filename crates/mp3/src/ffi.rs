@@ -2,7 +2,7 @@
 //! (ctypes), Node (koffi) and Go (cgo) SDKs bind through.
 //!
 //! The suite's FFI convention, defined by the pilot cdylibs and
-//! mirrored by every `pith-*` cdylib:
+//! mirrored by every `sillstone-*` cdylib:
 //!
 //! * one flat set of `#[unsafe(no_mangle)] pub unsafe extern "C"`
 //!   functions — raw pointers plus lengths, no structs across the
@@ -56,16 +56,16 @@ use alloc::vec::Vec;
 use crate::{Layer, Limits, decode, decode_header};
 
 /// Status: success.
-pub const PITH_OK: i32 = 0;
+pub const SILLSTONE_OK: i32 = 0;
 /// Status: a caller argument is invalid — a null pointer.
-pub const PITH_E_INVALID: i32 = -1;
+pub const SILLSTONE_E_INVALID: i32 = -1;
 /// Status: the core decoder refused the input (malformed MPEG audio:
 /// no sync word, bad header fields, CRC mismatch, reservoir under-run,
 /// or a truncated stream).
-pub const PITH_E_REJECTED: i32 = -2;
+pub const SILLSTONE_E_REJECTED: i32 = -2;
 
 /// The canonical stream's header length in bytes.
-pub const PITH_HEADER_LEN: usize = 48;
+pub const SILLSTONE_HEADER_LEN: usize = 48;
 
 /// Appends one big-endian `u32` field to the canonical header.
 fn push_u32(out: &mut Vec<u8>, v: u32) {
@@ -103,7 +103,7 @@ unsafe fn hand_out(canonical: Vec<u8>, out: *mut *mut u8, out_len: *mut usize) {
 ///
 /// `data` points at `len` bytes of the complete file. On success the
 /// function allocates a buffer, writes its address through `out`, its
-/// length through `out_len`, and returns [`PITH_OK`]; the caller owns
+/// length through `out_len`, and returns [`SILLSTONE_OK`]; the caller owns
 /// the buffer and must release it with [`sillstone_mp3_free`], passing back
 /// the same pointer *and* length. The buffer layout is the canonical
 /// wire format documented on this module.
@@ -121,13 +121,13 @@ pub unsafe extern "C" fn sillstone_mp3_decode(
     out_len: *mut usize,
 ) -> i32 {
     if data.is_null() || out.is_null() || out_len.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let bytes = unsafe { core::slice::from_raw_parts(data, len) };
     match decode_and_serialize(bytes) {
         Ok(canonical) => {
             unsafe { hand_out(canonical, out, out_len) };
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(status) => status,
     }
@@ -152,11 +152,11 @@ pub unsafe extern "C" fn sillstone_mp3_free(ptr: *mut u8, len: usize) {
 
 /// The safe core of [`sillstone_mp3_decode`]: probe the header, decode,
 /// then serialize canonically. Any decoding failure maps to
-/// [`PITH_E_REJECTED`].
+/// [`SILLSTONE_E_REJECTED`].
 fn decode_and_serialize(bytes: &[u8]) -> Result<Vec<u8>, i32> {
-    let info = decode_header(bytes).map_err(|_| PITH_E_REJECTED)?;
-    let mp3 = decode(bytes, &Limits::default()).map_err(|_| PITH_E_REJECTED)?;
-    let mut out = Vec::with_capacity(PITH_HEADER_LEN + mp3.samples.len() * 4);
+    let info = decode_header(bytes).map_err(|_| SILLSTONE_E_REJECTED)?;
+    let mp3 = decode(bytes, &Limits::default()).map_err(|_| SILLSTONE_E_REJECTED)?;
+    let mut out = Vec::with_capacity(SILLSTONE_HEADER_LEN + mp3.samples.len() * 4);
     // First-header facts.
     push_u32(&mut out, layer_code(info.layer));
     push_u32(&mut out, info.bitrate_kbps);
@@ -169,7 +169,7 @@ fn decode_and_serialize(bytes: &[u8]) -> Result<Vec<u8>, i32> {
     push_u64(&mut out, mp3.samples.len() as u64);
     push_u32(&mut out, u32::from(mp3.vbr));
     push_u64(&mut out, mp3.samples.len() as u64 * 4);
-    debug_assert_eq!(out.len(), PITH_HEADER_LEN);
+    debug_assert_eq!(out.len(), SILLSTONE_HEADER_LEN);
     // The PCM section: interleaved i32 little-endian, the exact bytes
     // pcm_sha256 is computed over.
     for &s in &mp3.samples {
@@ -178,11 +178,27 @@ fn decode_and_serialize(bytes: &[u8]) -> Result<Vec<u8>, i32> {
     Ok(out)
 }
 
+// Deprecated pre-rename aliases: the `PITH_*` names the suite shipped before
+// it became `sillstone`. Each one is the same value as its `SILLSTONE_*` twin.
+
+/// Deprecated alias of [`SILLSTONE_OK`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_OK`")]
+pub const PITH_OK: i32 = SILLSTONE_OK;
+/// Deprecated alias of [`SILLSTONE_E_INVALID`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_INVALID`")]
+pub const PITH_E_INVALID: i32 = SILLSTONE_E_INVALID;
+/// Deprecated alias of [`SILLSTONE_E_REJECTED`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_REJECTED`")]
+pub const PITH_E_REJECTED: i32 = SILLSTONE_E_REJECTED;
+/// Deprecated alias of [`SILLSTONE_HEADER_LEN`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_HEADER_LEN`")]
+pub const PITH_HEADER_LEN: usize = SILLSTONE_HEADER_LEN;
+
 #[cfg(test)]
 mod tests {
     use super::{
-        PITH_E_INVALID, PITH_E_REJECTED, PITH_HEADER_LEN, PITH_OK, decode_and_serialize,
-        sillstone_mp3_decode, sillstone_mp3_free,
+        SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_HEADER_LEN, SILLSTONE_OK,
+        decode_and_serialize, sillstone_mp3_decode, sillstone_mp3_free,
     };
     use sillstone_digest::sha256;
 
@@ -203,7 +219,7 @@ mod tests {
         let mut out_len: usize = 0;
         let status =
             unsafe { sillstone_mp3_decode(input.as_ptr(), input.len(), &mut out, &mut out_len) };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(out_len, expected.len());
         let handed_back = unsafe { core::slice::from_raw_parts(out, out_len) };
         assert_eq!(handed_back, expected.as_slice());
@@ -222,7 +238,7 @@ mod tests {
         );
         assert_eq!(be32(36), 0);
         // The PCM section digests to the vector's recorded sha256.
-        let digest = sha256(&handed_back[PITH_HEADER_LEN..]).expect("sha256");
+        let digest = sha256(&handed_back[SILLSTONE_HEADER_LEN..]).expect("sha256");
         assert_eq!(
             digest.as_bytes(),
             &hex_bytes("e705fa74b17d29db9df451fce896f8f0f5089c821fb8f5de4217adbd409c2440")[..]
@@ -250,17 +266,21 @@ mod tests {
         let head = hex_bytes(
             "00000000000000004046000055d5ffff90490000e2d0ffff934b00003fcfffff004e000051ccffffc15300004dc6ffff4c580000d5c2ffff90bc0000b37cffff",
         );
-        assert_eq!(&canonical[PITH_HEADER_LEN..PITH_HEADER_LEN + 64], &head[..]);
+        assert_eq!(
+            &canonical[SILLSTONE_HEADER_LEN..SILLSTONE_HEADER_LEN + 64],
+            &head[..]
+        );
     }
 
-    /// Null pointers are [`PITH_E_INVALID`]; garbage input is
-    /// [`PITH_E_REJECTED`]; a null buffer is a legal free.
+    /// Null pointers are [`SILLSTONE_E_INVALID`]; garbage input is
+    /// [`SILLSTONE_E_REJECTED`]; a null buffer is a legal free.
     #[test]
     fn ffi_refusals() {
         let mut out: *mut u8 = core::ptr::null_mut();
         let mut out_len: usize = 0;
-        let null_data = unsafe { sillstone_mp3_decode(core::ptr::null(), 0, &mut out, &mut out_len) };
-        assert_eq!(null_data, PITH_E_INVALID);
+        let null_data =
+            unsafe { sillstone_mp3_decode(core::ptr::null(), 0, &mut out, &mut out_len) };
+        assert_eq!(null_data, SILLSTONE_E_INVALID);
 
         let stream = [0u8; 16];
         let null_out = unsafe {
@@ -271,11 +291,11 @@ mod tests {
                 core::ptr::null_mut(),
             )
         };
-        assert_eq!(null_out, PITH_E_INVALID);
+        assert_eq!(null_out, SILLSTONE_E_INVALID);
 
         let garbage =
             unsafe { sillstone_mp3_decode(stream.as_ptr(), stream.len(), &mut out, &mut out_len) };
-        assert_eq!(garbage, PITH_E_REJECTED);
+        assert_eq!(garbage, SILLSTONE_E_REJECTED);
 
         unsafe { sillstone_mp3_free(core::ptr::null_mut(), 0) };
     }
@@ -285,7 +305,21 @@ mod tests {
     fn safe_core_rejects_garbage() {
         assert_eq!(
             decode_and_serialize(b"not an mpeg stream"),
-            Err(PITH_E_REJECTED)
+            Err(SILLSTONE_E_REJECTED)
         );
+    }
+}
+
+#[cfg(test)]
+mod deprecated_alias_tests {
+    #![allow(deprecated)]
+    use super::*;
+
+    #[test]
+    fn pith_aliases_equal_their_sillstone_twins() {
+        assert_eq!(PITH_OK, SILLSTONE_OK);
+        assert_eq!(PITH_E_INVALID, SILLSTONE_E_INVALID);
+        assert_eq!(PITH_E_REJECTED, SILLSTONE_E_REJECTED);
+        assert_eq!(PITH_HEADER_LEN, SILLSTONE_HEADER_LEN);
     }
 }

@@ -2,7 +2,7 @@
 //! (ctypes), Node (koffi) and Go (cgo) SDKs bind through.
 //!
 //! The suite's FFI convention, defined by the pilot cdylibs and
-//! mirrored by every `pith-*` cdylib:
+//! mirrored by every `sillstone-*` cdylib:
 //!
 //! * one flat set of `#[unsafe(no_mangle)] pub unsafe extern "C"`
 //!   functions — raw pointers plus lengths, no structs across the
@@ -44,7 +44,7 @@
 //! | 64 | …   | PCM, interleaved `i32` little-endian |
 //!
 //! On a refusal the `err` out-parameter carries one of the
-//! `PITH_ERR_*` kind codes — the stable names `reference.json`
+//! `SILLSTONE_ERR_*` kind codes — the stable names `reference.json`
 //! `error_vectors` record ("bad-value", "invalid-magic", ...) as
 //! numbers, so an SDK test can assert the exact refusal kind.
 //!
@@ -64,26 +64,26 @@ use crate::{Limits, decode, decode_streaminfo};
 use sillstone_digest::Error;
 
 /// Status: success.
-pub const PITH_OK: i32 = 0;
+pub const SILLSTONE_OK: i32 = 0;
 /// Status: a caller argument is invalid — a null pointer.
-pub const PITH_E_INVALID: i32 = -1;
+pub const SILLSTONE_E_INVALID: i32 = -1;
 /// Status: the core decoder refused the input (malformed FLAC: bad
 /// magic, bad metadata block, CRC mismatch, or a truncated stream).
-pub const PITH_E_REJECTED: i32 = -2;
+pub const SILLSTONE_E_REJECTED: i32 = -2;
 
 /// Refusal kind: `Error::BadValue` (`"bad-value"` in reference.json).
-pub const PITH_ERR_BAD_VALUE: i32 = 1;
+pub const SILLSTONE_ERR_BAD_VALUE: i32 = 1;
 /// Refusal kind: `Error::InvalidMagic` (`"invalid-magic"`).
-pub const PITH_ERR_INVALID_MAGIC: i32 = 2;
+pub const SILLSTONE_ERR_INVALID_MAGIC: i32 = 2;
 /// Refusal kind: `Error::TooLarge` (`"too-large"`).
-pub const PITH_ERR_TOO_LARGE: i32 = 3;
+pub const SILLSTONE_ERR_TOO_LARGE: i32 = 3;
 /// Refusal kind: `Error::Truncated` (`"truncated"`).
-pub const PITH_ERR_TRUNCATED: i32 = 4;
+pub const SILLSTONE_ERR_TRUNCATED: i32 = 4;
 /// Refusal kind: `Error::Unsupported` (`"unsupported"`).
-pub const PITH_ERR_UNSUPPORTED: i32 = 5;
+pub const SILLSTONE_ERR_UNSUPPORTED: i32 = 5;
 
 /// The canonical stream's header length in bytes.
-pub const PITH_HEADER_LEN: usize = 64;
+pub const SILLSTONE_HEADER_LEN: usize = 64;
 
 /// Appends one big-endian `u32` field to the canonical header.
 fn push_u32(out: &mut Vec<u8>, v: u32) {
@@ -99,11 +99,11 @@ fn push_u64(out: &mut Vec<u8>, v: u64) {
 /// kebab-case names reference.json records).
 fn err_kind(e: &Error) -> i32 {
     match e {
-        Error::BadValue(_) => PITH_ERR_BAD_VALUE,
-        Error::InvalidMagic { .. } => PITH_ERR_INVALID_MAGIC,
-        Error::TooLarge { .. } => PITH_ERR_TOO_LARGE,
-        Error::Truncated { .. } => PITH_ERR_TRUNCATED,
-        Error::Unsupported(_) => PITH_ERR_UNSUPPORTED,
+        Error::BadValue(_) => SILLSTONE_ERR_BAD_VALUE,
+        Error::InvalidMagic { .. } => SILLSTONE_ERR_INVALID_MAGIC,
+        Error::TooLarge { .. } => SILLSTONE_ERR_TOO_LARGE,
+        Error::Truncated { .. } => SILLSTONE_ERR_TRUNCATED,
+        Error::Unsupported(_) => SILLSTONE_ERR_UNSUPPORTED,
     }
 }
 
@@ -135,13 +135,13 @@ unsafe fn refuse(out: *mut *mut u8, out_len: *mut usize, err: *mut i32, kind: i3
 /// `data` points at `len` bytes of the complete FLAC file. On success
 /// the function allocates a buffer, writes its address through `out`,
 /// its length through `out_len`, a zero kind through `err`, and
-/// returns [`PITH_OK`]; the caller owns the buffer and must release it
+/// returns [`SILLSTONE_OK`]; the caller owns the buffer and must release it
 /// with [`sillstone_flac_free`], passing back the same pointer *and*
 /// length. The buffer layout is the canonical wire format documented
 /// on this module.
 ///
-/// On a refusal the function returns [`PITH_E_REJECTED`], writes zero
-/// through `out`, and stores one `PITH_ERR_*` kind code through `err`.
+/// On a refusal the function returns [`SILLSTONE_E_REJECTED`], writes zero
+/// through `out`, and stores one `SILLSTONE_ERR_*` kind code through `err`.
 ///
 /// # Safety
 ///
@@ -158,16 +158,16 @@ pub unsafe extern "C" fn sillstone_flac_decode(
     err: *mut i32,
 ) -> i32 {
     if data.is_null() || out.is_null() || out_len.is_null() || err.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let bytes = unsafe { core::slice::from_raw_parts(data, len) };
     match decode_and_serialize(bytes) {
         Ok(canonical) => {
             unsafe {
                 hand_out(canonical, out, out_len);
-                *err = PITH_OK;
+                *err = SILLSTONE_OK;
             }
-            PITH_OK
+            SILLSTONE_OK
         }
         Err((status, kind)) => {
             unsafe { refuse(out, out_len, err, kind) };
@@ -195,13 +195,14 @@ pub unsafe extern "C" fn sillstone_flac_free(ptr: *mut u8, len: usize) {
 
 /// The safe core of [`sillstone_flac_decode`]: decode, read STREAMINFO,
 /// then serialize canonically. Decoding failures map to
-/// `(PITH_E_REJECTED, kind)`; the kind is the stable refusal name the
+/// `(SILLSTONE_E_REJECTED, kind)`; the kind is the stable refusal name the
 /// reference.json error vectors pin.
 fn decode_and_serialize(bytes: &[u8]) -> Result<Vec<u8>, (i32, i32)> {
-    let flac = decode(bytes, &Limits::default()).map_err(|e| (PITH_E_REJECTED, err_kind(&e)))?;
-    let si = decode_streaminfo(bytes).map_err(|e| (PITH_E_REJECTED, err_kind(&e)))?;
+    let flac =
+        decode(bytes, &Limits::default()).map_err(|e| (SILLSTONE_E_REJECTED, err_kind(&e)))?;
+    let si = decode_streaminfo(bytes).map_err(|e| (SILLSTONE_E_REJECTED, err_kind(&e)))?;
     let samples = flac.samples();
-    let mut out = Vec::with_capacity(PITH_HEADER_LEN + samples.len() * 4);
+    let mut out = Vec::with_capacity(SILLSTONE_HEADER_LEN + samples.len() * 4);
     // STREAMINFO facts (as parsed).
     push_u32(&mut out, u32::from(si.min_block_size));
     push_u32(&mut out, u32::from(si.max_block_size));
@@ -216,7 +217,7 @@ fn decode_and_serialize(bytes: &[u8]) -> Result<Vec<u8>, (i32, i32)> {
     push_u64(&mut out, flac.total_samples());
     push_u64(&mut out, samples.len() as u64);
     push_u64(&mut out, samples.len() as u64 * 4);
-    debug_assert_eq!(out.len(), PITH_HEADER_LEN);
+    debug_assert_eq!(out.len(), SILLSTONE_HEADER_LEN);
     // The PCM section: interleaved i32 little-endian, the exact bytes
     // pcm_i32_le_sha256 is computed over.
     for &s in samples {
@@ -225,11 +226,43 @@ fn decode_and_serialize(bytes: &[u8]) -> Result<Vec<u8>, (i32, i32)> {
     Ok(out)
 }
 
+// Deprecated pre-rename aliases: the `PITH_*` names the suite shipped before
+// it became `sillstone`. Each one is the same value as its `SILLSTONE_*` twin.
+
+/// Deprecated alias of [`SILLSTONE_OK`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_OK`")]
+pub const PITH_OK: i32 = SILLSTONE_OK;
+/// Deprecated alias of [`SILLSTONE_E_INVALID`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_INVALID`")]
+pub const PITH_E_INVALID: i32 = SILLSTONE_E_INVALID;
+/// Deprecated alias of [`SILLSTONE_E_REJECTED`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_REJECTED`")]
+pub const PITH_E_REJECTED: i32 = SILLSTONE_E_REJECTED;
+/// Deprecated alias of [`SILLSTONE_ERR_BAD_VALUE`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_ERR_BAD_VALUE`")]
+pub const PITH_ERR_BAD_VALUE: i32 = SILLSTONE_ERR_BAD_VALUE;
+/// Deprecated alias of [`SILLSTONE_ERR_INVALID_MAGIC`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_ERR_INVALID_MAGIC`")]
+pub const PITH_ERR_INVALID_MAGIC: i32 = SILLSTONE_ERR_INVALID_MAGIC;
+/// Deprecated alias of [`SILLSTONE_ERR_TOO_LARGE`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_ERR_TOO_LARGE`")]
+pub const PITH_ERR_TOO_LARGE: i32 = SILLSTONE_ERR_TOO_LARGE;
+/// Deprecated alias of [`SILLSTONE_ERR_TRUNCATED`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_ERR_TRUNCATED`")]
+pub const PITH_ERR_TRUNCATED: i32 = SILLSTONE_ERR_TRUNCATED;
+/// Deprecated alias of [`SILLSTONE_ERR_UNSUPPORTED`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_ERR_UNSUPPORTED`")]
+pub const PITH_ERR_UNSUPPORTED: i32 = SILLSTONE_ERR_UNSUPPORTED;
+/// Deprecated alias of [`SILLSTONE_HEADER_LEN`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_HEADER_LEN`")]
+pub const PITH_HEADER_LEN: usize = SILLSTONE_HEADER_LEN;
+
 #[cfg(test)]
 mod tests {
     use super::{
-        PITH_E_INVALID, PITH_E_REJECTED, PITH_ERR_INVALID_MAGIC, PITH_ERR_TRUNCATED,
-        PITH_HEADER_LEN, PITH_OK, decode_and_serialize, sillstone_flac_decode, sillstone_flac_free,
+        SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_ERR_INVALID_MAGIC,
+        SILLSTONE_ERR_TRUNCATED, SILLSTONE_HEADER_LEN, SILLSTONE_OK, decode_and_serialize,
+        sillstone_flac_decode, sillstone_flac_free,
     };
     use sillstone_digest::sha256;
 
@@ -264,8 +297,8 @@ mod tests {
         let status = unsafe {
             sillstone_flac_decode(flac.as_ptr(), flac.len(), &mut out, &mut out_len, &mut err)
         };
-        assert_eq!(status, PITH_OK);
-        assert_eq!(err, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
+        assert_eq!(err, SILLSTONE_OK);
         assert_eq!(out_len, expected.len());
         let handed_back = unsafe { core::slice::from_raw_parts(out, out_len) };
         assert_eq!(handed_back, expected.as_slice());
@@ -304,7 +337,7 @@ mod tests {
             44_100 * 4
         );
         // The PCM section digests to the vector's recorded sha256.
-        let digest = sha256(&handed_back[PITH_HEADER_LEN..]).expect("sha256");
+        let digest = sha256(&handed_back[SILLSTONE_HEADER_LEN..]).expect("sha256");
         assert_eq!(
             digest.as_bytes(),
             &hex_decode("2514eff527051953533d999b57bc3745386432e2a37dcc32ccab77fb67faee6f")[..]
@@ -329,24 +362,25 @@ mod tests {
                 &mut err,
             )
         };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         let canonical = unsafe { core::slice::from_raw_parts(out, out_len) };
-        let digest = sha256(&canonical[PITH_HEADER_LEN..]).expect("sha256");
+        let digest = sha256(&canonical[SILLSTONE_HEADER_LEN..]).expect("sha256");
         assert_eq!(digest.as_bytes(), &hex_decode(CONSTANT_MONO_SHA)[..]);
         unsafe { sillstone_flac_free(out, out_len) };
     }
 
-    /// Null pointers are [`PITH_E_INVALID`]; the two reference.json
-    /// error vectors are [`PITH_E_REJECTED`] with their recorded kind;
+    /// Null pointers are [`SILLSTONE_E_INVALID`]; the two reference.json
+    /// error vectors are [`SILLSTONE_E_REJECTED`] with their recorded kind;
     /// a null buffer is a legal free.
     #[test]
     fn ffi_refusals() {
         let mut out: *mut u8 = core::ptr::null_mut();
         let mut out_len: usize = 0;
         let mut err: i32 = -99;
-        let null_data =
-            unsafe { sillstone_flac_decode(core::ptr::null(), 0, &mut out, &mut out_len, &mut err) };
-        assert_eq!(null_data, PITH_E_INVALID);
+        let null_data = unsafe {
+            sillstone_flac_decode(core::ptr::null(), 0, &mut out, &mut out_len, &mut err)
+        };
+        assert_eq!(null_data, SILLSTONE_E_INVALID);
 
         let stream = [0u8; 16];
         let null_err = unsafe {
@@ -358,20 +392,20 @@ mod tests {
                 core::ptr::null_mut(),
             )
         };
-        assert_eq!(null_err, PITH_E_INVALID);
+        assert_eq!(null_err, SILLSTONE_E_INVALID);
 
         // not-a-flac-stream: recorded kind "invalid-magic".
         let bad_magic =
             unsafe { sillstone_flac_decode(b"nope".as_ptr(), 4, &mut out, &mut out_len, &mut err) };
-        assert_eq!(bad_magic, PITH_E_REJECTED);
-        assert_eq!(err, PITH_ERR_INVALID_MAGIC);
+        assert_eq!(bad_magic, SILLSTONE_E_REJECTED);
+        assert_eq!(err, SILLSTONE_ERR_INVALID_MAGIC);
         assert!(out.is_null() && out_len == 0);
 
         // headerless-stream: recorded kind "truncated".
         let short =
             unsafe { sillstone_flac_decode(b"fLaC".as_ptr(), 4, &mut out, &mut out_len, &mut err) };
-        assert_eq!(short, PITH_E_REJECTED);
-        assert_eq!(err, PITH_ERR_TRUNCATED);
+        assert_eq!(short, SILLSTONE_E_REJECTED);
+        assert_eq!(err, SILLSTONE_ERR_TRUNCATED);
 
         unsafe { sillstone_flac_free(core::ptr::null_mut(), 0) };
     }
@@ -380,18 +414,24 @@ mod tests {
     #[test]
     fn err_kinds_map_one_to_one() {
         use super::{
-            PITH_ERR_BAD_VALUE, PITH_ERR_INVALID_MAGIC, PITH_ERR_TOO_LARGE, PITH_ERR_TRUNCATED,
-            PITH_ERR_UNSUPPORTED, err_kind,
+            SILLSTONE_ERR_BAD_VALUE, SILLSTONE_ERR_INVALID_MAGIC, SILLSTONE_ERR_TOO_LARGE,
+            SILLSTONE_ERR_TRUNCATED, SILLSTONE_ERR_UNSUPPORTED, err_kind,
         };
         use sillstone_digest::Error;
-        assert_eq!(err_kind(&Error::BadValue("x")), PITH_ERR_BAD_VALUE);
+        assert_eq!(err_kind(&Error::BadValue("x")), SILLSTONE_ERR_BAD_VALUE);
         assert_eq!(
             err_kind(&Error::InvalidMagic { what: "x" }),
-            PITH_ERR_INVALID_MAGIC
+            SILLSTONE_ERR_INVALID_MAGIC
         );
-        assert_eq!(err_kind(&Error::too_large("x", 0)), PITH_ERR_TOO_LARGE);
-        assert_eq!(err_kind(&Error::truncated("x", 1, 0)), PITH_ERR_TRUNCATED);
-        assert_eq!(err_kind(&Error::Unsupported("x")), PITH_ERR_UNSUPPORTED);
+        assert_eq!(err_kind(&Error::too_large("x", 0)), SILLSTONE_ERR_TOO_LARGE);
+        assert_eq!(
+            err_kind(&Error::truncated("x", 1, 0)),
+            SILLSTONE_ERR_TRUNCATED
+        );
+        assert_eq!(
+            err_kind(&Error::Unsupported("x")),
+            SILLSTONE_ERR_UNSUPPORTED
+        );
     }
 
     /// The safe core rejects malformed input instead of panicking, and
@@ -400,10 +440,29 @@ mod tests {
     fn safe_core_shape() {
         assert_eq!(
             decode_and_serialize(b"nope"),
-            Err((PITH_E_REJECTED, PITH_ERR_INVALID_MAGIC))
+            Err((SILLSTONE_E_REJECTED, SILLSTONE_ERR_INVALID_MAGIC))
         );
         let stream = hex_decode(CONSTANT_MONO_HEX);
         let canonical = decode_and_serialize(&stream).expect("decode");
-        assert_eq!(canonical.len(), PITH_HEADER_LEN + 8 * 4);
+        assert_eq!(canonical.len(), SILLSTONE_HEADER_LEN + 8 * 4);
+    }
+}
+
+#[cfg(test)]
+mod deprecated_alias_tests {
+    #![allow(deprecated)]
+    use super::*;
+
+    #[test]
+    fn pith_aliases_equal_their_sillstone_twins() {
+        assert_eq!(PITH_OK, SILLSTONE_OK);
+        assert_eq!(PITH_E_INVALID, SILLSTONE_E_INVALID);
+        assert_eq!(PITH_E_REJECTED, SILLSTONE_E_REJECTED);
+        assert_eq!(PITH_ERR_BAD_VALUE, SILLSTONE_ERR_BAD_VALUE);
+        assert_eq!(PITH_ERR_INVALID_MAGIC, SILLSTONE_ERR_INVALID_MAGIC);
+        assert_eq!(PITH_ERR_TOO_LARGE, SILLSTONE_ERR_TOO_LARGE);
+        assert_eq!(PITH_ERR_TRUNCATED, SILLSTONE_ERR_TRUNCATED);
+        assert_eq!(PITH_ERR_UNSUPPORTED, SILLSTONE_ERR_UNSUPPORTED);
+        assert_eq!(PITH_HEADER_LEN, SILLSTONE_HEADER_LEN);
     }
 }

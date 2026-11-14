@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "crate": "pith-pdf",
-  "description": "hex-exact PDF text-extraction reference vectors: every tests/fixtures/*.pdf document opened and extracted by pith-pdf against its .txt truth file and pinned by page count and SHA-256 text digest, plus a scan-rebuild recovery vector and refusal vectors for malformed xref chains and stream objects with exact error messages",
+  "crate": "sillstone-pdf",
+  "description": "hex-exact PDF text-extraction reference vectors: every tests/fixtures/*.pdf document opened and extracted by sillstone-pdf against its .txt truth file and pinned by page count and SHA-256 text digest, plus a scan-rebuild recovery vector and refusal vectors for malformed xref chains and stream objects with exact error messages",
   "vectors": [
     {
       "name": "empty_page",
@@ -251,77 +251,77 @@
     {
       "name": "lzw_filter_refused",
       "why": "LZWDecode is a real filter this suite refuses to guess",
-      "api": "pith_pdf::decode_stream",
+      "api": "sillstone_pdf::decode_stream",
       "input": "4c5a574465636f6465",
       "error": "unsupported: LZWDecode stream filter"
     },
     {
       "name": "crypt_filter_refused",
       "why": "Crypt streams cannot be decoded without the security handler",
-      "api": "pith_pdf::decode_stream",
+      "api": "sillstone_pdf::decode_stream",
       "input": "4372797074",
       "error": "unsupported: Crypt stream filter"
     },
     {
       "name": "dct_filter_refused",
       "why": "DCTDecode (JPEG) is out of scope and named, never silently skipped",
-      "api": "pith_pdf::decode_stream",
+      "api": "sillstone_pdf::decode_stream",
       "input": "4443544465636f6465",
       "error": "unsupported: DCTDecode stream filter"
     },
     {
       "name": "filter_element_type",
       "why": "a /Filter array element that is not a name is a structural error",
-      "api": "pith_pdf::decode_stream",
+      "api": "sillstone_pdf::decode_stream",
       "input": "6e6f6e65",
       "error": "bad value: /Filter element type"
     },
     {
       "name": "filter_type",
       "why": "a /Filter that is neither name nor array is a structural error",
-      "api": "pith_pdf::decode_stream",
+      "api": "sillstone_pdf::decode_stream",
       "input": "6e6f6e65",
       "error": "bad value: /Filter type"
     },
     {
       "name": "decodeparms_type",
       "why": "a /DecodeParms that is neither dict nor array is a structural error",
-      "api": "pith_pdf::decode_stream",
+      "api": "sillstone_pdf::decode_stream",
       "input": "6e6f6e65",
       "error": "bad value: /DecodeParms type"
     },
     {
       "name": "asciihex_bad_char",
       "why": "a non-hex character inside an ASCIIHexDecode stream",
-      "api": "pith_pdf::decode_stream",
+      "api": "sillstone_pdf::decode_stream",
       "input": "41534349494865784465636f6465",
       "error": "bad value: ASCIIHex character"
     },
     {
       "name": "ascii85_bad_terminator",
       "why": "an ASCII85Decode stream whose ~ is not followed by >",
-      "api": "pith_pdf::decode_stream",
+      "api": "sillstone_pdf::decode_stream",
       "input": "415343494938354465636f6465",
       "error": "bad value: ASCII85 terminator"
     },
     {
       "name": "predictor_dimensions",
       "why": "a TIFF predictor with a non-positive /Colors dimension",
-      "api": "pith_pdf::decode_stream",
+      "api": "sillstone_pdf::decode_stream",
       "input": "466c6174654465636f6465",
       "error": "bad value: DecodeParms dimensions"
     },
     {
       "name": "tiff_predictor_bpc",
       "why": "the TIFF predictor is only implemented for 8 bits per component",
-      "api": "pith_pdf::decode_stream",
+      "api": "sillstone_pdf::decode_stream",
       "input": "466c6174654465636f6465",
       "error": "unsupported: TIFF predictor bpc != 8"
     },
     {
       "name": "predictor_value",
       "why": "predictor 9 is neither TIFF (2) nor a PNG optimum (10-15)",
-      "api": "pith_pdf::decode_stream",
+      "api": "sillstone_pdf::decode_stream",
       "input": "466c6174654465636f6465",
       "error": "bad value: Predictor value"
     }

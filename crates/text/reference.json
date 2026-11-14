@@ -1,9 +1,9 @@
 {
-  "suite": "pith",
-  "crate": "pith-text",
+  "suite": "sillstone",
+  "crate": "sillstone-text",
   "format_version": 1,
   "generator": "cargo run --bin gen-reference -- gen",
-  "description": "Hex-exact tokenization, shingling and MinHash vectors for pith-text: canonical UTF-8 bytes, word and shingle counts, 128-word signature folds and Jaccard estimates (IEEE-754 bits, exact) over the committed text fixtures and inline edge inputs.",
+  "description": "Hex-exact tokenization, shingling and MinHash vectors for sillstone-text: canonical UTF-8 bytes, word and shingle counts, 128-word signature folds and Jaccard estimates (IEEE-754 bits, exact) over the committed text fixtures and inline edge inputs.",
   "vectors": [
     {
       "name": "canon-empty",

@@ -10,7 +10,8 @@
 //! the counts from this binary are merged into all of them.
 
 use sillstone_png::ffi::{
-    PITH_E_INVALID, PITH_E_REJECTED, PITH_OK, sillstone_png_decode_canonical, sillstone_png_free,
+    SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_OK, sillstone_png_decode_canonical,
+    sillstone_png_free,
 };
 use sillstone_png::reference::canonical_bytes;
 use sillstone_png::{Limits, decode};
@@ -26,9 +27,10 @@ fn ffi_decode_reproduces_the_canonical_stream() {
 
     let mut out: *mut u8 = core::ptr::null_mut();
     let mut out_len: usize = 0;
-    let status =
-        unsafe { sillstone_png_decode_canonical(RGBA8.as_ptr(), RGBA8.len(), &mut out, &mut out_len) };
-    assert_eq!(status, PITH_OK);
+    let status = unsafe {
+        sillstone_png_decode_canonical(RGBA8.as_ptr(), RGBA8.len(), &mut out, &mut out_len)
+    };
+    assert_eq!(status, SILLSTONE_OK);
     assert_eq!(out_len, expected.len());
     let handed_back = unsafe { core::slice::from_raw_parts(out, out_len) };
     assert_eq!(handed_back, expected.as_slice());
@@ -38,7 +40,7 @@ fn ffi_decode_reproduces_the_canonical_stream() {
     unsafe { sillstone_png_free(out, out_len) };
 }
 
-/// Null pointers are `PITH_E_INVALID`; garbage input is `PITH_E_REJECTED`;
+/// Null pointers are `SILLSTONE_E_INVALID`; garbage input is `SILLSTONE_E_REJECTED`;
 /// a null buffer is a legal free.
 #[test]
 fn ffi_refusals() {
@@ -46,28 +48,46 @@ fn ffi_refusals() {
     let mut out_len: usize = 0;
     let null_data =
         unsafe { sillstone_png_decode_canonical(core::ptr::null(), 0, &mut out, &mut out_len) };
-    assert_eq!(null_data, PITH_E_INVALID);
+    assert_eq!(null_data, SILLSTONE_E_INVALID);
 
     let png = [0u8; 16];
     let null_out = unsafe {
         sillstone_png_decode_canonical(png.as_ptr(), png.len(), core::ptr::null_mut(), &mut out_len)
     };
-    assert_eq!(null_out, PITH_E_INVALID);
+    assert_eq!(null_out, SILLSTONE_E_INVALID);
 
     let null_len = unsafe {
         sillstone_png_decode_canonical(png.as_ptr(), png.len(), &mut out, core::ptr::null_mut())
     };
-    assert_eq!(null_len, PITH_E_INVALID);
+    assert_eq!(null_len, SILLSTONE_E_INVALID);
 
     let garbage =
         unsafe { sillstone_png_decode_canonical(png.as_ptr(), png.len(), &mut out, &mut out_len) };
-    assert_eq!(garbage, PITH_E_REJECTED);
+    assert_eq!(garbage, SILLSTONE_E_REJECTED);
 
     let truncated = &RGBA8[..RGBA8.len() / 2];
     let status = unsafe {
         sillstone_png_decode_canonical(truncated.as_ptr(), truncated.len(), &mut out, &mut out_len)
     };
-    assert_eq!(status, PITH_E_REJECTED);
+    assert_eq!(status, SILLSTONE_E_REJECTED);
 
     unsafe { sillstone_png_free(core::ptr::null_mut(), 0) };
+}
+
+/// The deprecated pre-rename `PITH_*` constants keep their `SILLSTONE_*` values.
+#[test]
+#[allow(deprecated)]
+fn pith_aliases_equal_their_sillstone_twins() {
+    assert_eq!(
+        sillstone_png::ffi::PITH_OK,
+        sillstone_png::ffi::SILLSTONE_OK
+    );
+    assert_eq!(
+        sillstone_png::ffi::PITH_E_INVALID,
+        sillstone_png::ffi::SILLSTONE_E_INVALID
+    );
+    assert_eq!(
+        sillstone_png::ffi::PITH_E_REJECTED,
+        sillstone_png::ffi::SILLSTONE_E_REJECTED
+    );
 }

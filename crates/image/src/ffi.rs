@@ -3,7 +3,7 @@
 //! (ctypes), Node (koffi) and Go (cgo) SDKs bind through.
 //!
 //! The suite's FFI convention, defined by this module and mirrored by
-//! every `pith-*` cdylib:
+//! every `sillstone-*` cdylib:
 //!
 //! * one flat set of `#[no_mangle] pub unsafe extern "C"` functions —
 //!   raw pointers plus lengths, no structs across the boundary;
@@ -27,26 +27,26 @@ use crate::raster::{Gray, Image, Layout, Rgb, Rgba};
 use sillstone_digest::Error;
 
 /// Status: success.
-pub const PITH_OK: i32 = 0;
+pub const SILLSTONE_OK: i32 = 0;
 /// Status: a caller argument is invalid — a null pointer, an unknown
 /// layout code, or a `len` that does not match the declared geometry.
-pub const PITH_E_INVALID: i32 = -1;
+pub const SILLSTONE_E_INVALID: i32 = -1;
 /// Status: the core pipeline refused the input. With a well-formed
 /// [`Image`] this is unreachable; the code exists so a foreign caller
 /// never has to reason about a panic.
-pub const PITH_E_REJECTED: i32 = -2;
+pub const SILLSTONE_E_REJECTED: i32 = -2;
 
 /// Layout code: one `u8` luma sample per pixel.
-pub const PITH_LAYOUT_GRAY8: u32 = 0;
+pub const SILLSTONE_LAYOUT_GRAY8: u32 = 0;
 /// Layout code: one `u16` luma sample per pixel, little-endian.
-pub const PITH_LAYOUT_GRAY16: u32 = 1;
+pub const SILLSTONE_LAYOUT_GRAY16: u32 = 1;
 /// Layout code: three `u8` samples per pixel, `R G B`.
-pub const PITH_LAYOUT_RGB8: u32 = 2;
+pub const SILLSTONE_LAYOUT_RGB8: u32 = 2;
 /// Layout code: three `u16` samples per pixel, `R G B`, little-endian.
-pub const PITH_LAYOUT_RGB16: u32 = 3;
+pub const SILLSTONE_LAYOUT_RGB16: u32 = 3;
 /// Layout code: four `u8` samples per pixel, `R G B A` (alpha ignored
 /// by the pHash luma step).
-pub const PITH_LAYOUT_RGBA8: u32 = 4;
+pub const SILLSTONE_LAYOUT_RGBA8: u32 = 4;
 
 /// Computes the 64-bit perceptual hash of a raw pixel dump.
 ///
@@ -54,9 +54,9 @@ pub const PITH_LAYOUT_RGBA8: u32 = 4;
 /// channel-interleaved dump of a `width`×`height` image — exactly the
 /// format the fixtures under `tests/fixtures/phash/` commit (little-
 /// endian for the 16-bit layouts). `layout` is one of the
-/// `PITH_LAYOUT_*` codes above. On success writes the hash through
-/// `out` and returns [`PITH_OK`]; the hash is also the return value of
-/// no error path, so `out` is only meaningful with `PITH_OK`.
+/// `SILLSTONE_LAYOUT_*` codes above. On success writes the hash through
+/// `out` and returns [`SILLSTONE_OK`]; the hash is also the return value of
+/// no error path, so `out` is only meaningful with `SILLSTONE_OK`.
 ///
 /// # Safety
 ///
@@ -73,13 +73,13 @@ pub unsafe extern "C" fn sillstone_image_phash(
     out: *mut u64,
 ) -> i32 {
     if data.is_null() || out.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let dump = unsafe { core::slice::from_raw_parts(data, len) };
     match phash_of_dump(dump, width, height, layout) {
         Ok(hash) => {
             unsafe { *out = hash };
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(status) => status,
     }
@@ -96,13 +96,13 @@ pub unsafe extern "C" fn sillstone_image_ahash(
     out: *mut u64,
 ) -> i32 {
     if data.is_null() || out.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let dump = unsafe { core::slice::from_raw_parts(data, len) };
     match ahash_of_dump(dump, width, height, layout) {
         Ok(hash) => {
             unsafe { *out = hash };
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(status) => status,
     }
@@ -119,13 +119,13 @@ pub unsafe extern "C" fn sillstone_image_dhash(
     out: *mut u64,
 ) -> i32 {
     if data.is_null() || out.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let dump = unsafe { core::slice::from_raw_parts(data, len) };
     match dhash_of_dump(dump, width, height, layout) {
         Ok(hash) => {
             unsafe { *out = hash };
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(status) => status,
     }
@@ -143,13 +143,13 @@ pub unsafe extern "C" fn sillstone_image_whash(
     out: *mut u64,
 ) -> i32 {
     if data.is_null() || out.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let dump = unsafe { core::slice::from_raw_parts(data, len) };
     match whash_of_dump(dump, width, height, layout, level) {
         Ok(hash) => {
             unsafe { *out = hash };
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(status) => status,
     }
@@ -167,13 +167,13 @@ pub unsafe extern "C" fn sillstone_image_colorhash(
     out: *mut u64,
 ) -> i32 {
     if data.is_null() || out.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let dump = unsafe { core::slice::from_raw_parts(data, len) };
     match colorhash_of_dump(dump, width, height, layout, bins) {
         Ok(hash) => {
             unsafe { *out = hash };
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(status) => status,
     }
@@ -181,45 +181,65 @@ pub unsafe extern "C" fn sillstone_image_colorhash(
 
 fn ahash_of_dump(dump: &[u8], width: u32, height: u32, layout: u32) -> Result<u64, i32> {
     match layout {
-        PITH_LAYOUT_GRAY8 => hash_8::<Gray, _>(dump, width, height, 1, image_ahash),
-        PITH_LAYOUT_GRAY16 => hash_16::<Gray, _>(dump, width, height, 1, image_ahash),
-        PITH_LAYOUT_RGB8 => hash_8::<Rgb, _>(dump, width, height, 3, image_ahash),
-        PITH_LAYOUT_RGB16 => hash_16::<Rgb, _>(dump, width, height, 3, image_ahash),
-        PITH_LAYOUT_RGBA8 => hash_8::<Rgba, _>(dump, width, height, 4, image_ahash),
-        _ => Err(PITH_E_INVALID),
+        SILLSTONE_LAYOUT_GRAY8 => hash_8::<Gray, _>(dump, width, height, 1, image_ahash),
+        SILLSTONE_LAYOUT_GRAY16 => hash_16::<Gray, _>(dump, width, height, 1, image_ahash),
+        SILLSTONE_LAYOUT_RGB8 => hash_8::<Rgb, _>(dump, width, height, 3, image_ahash),
+        SILLSTONE_LAYOUT_RGB16 => hash_16::<Rgb, _>(dump, width, height, 3, image_ahash),
+        SILLSTONE_LAYOUT_RGBA8 => hash_8::<Rgba, _>(dump, width, height, 4, image_ahash),
+        _ => Err(SILLSTONE_E_INVALID),
     }
 }
 
 fn dhash_of_dump(dump: &[u8], width: u32, height: u32, layout: u32) -> Result<u64, i32> {
     match layout {
-        PITH_LAYOUT_GRAY8 => hash_8::<Gray, _>(dump, width, height, 1, image_dhash),
-        PITH_LAYOUT_GRAY16 => hash_16::<Gray, _>(dump, width, height, 1, image_dhash),
-        PITH_LAYOUT_RGB8 => hash_8::<Rgb, _>(dump, width, height, 3, image_dhash),
-        PITH_LAYOUT_RGB16 => hash_16::<Rgb, _>(dump, width, height, 3, image_dhash),
-        PITH_LAYOUT_RGBA8 => hash_8::<Rgba, _>(dump, width, height, 4, image_dhash),
-        _ => Err(PITH_E_INVALID),
+        SILLSTONE_LAYOUT_GRAY8 => hash_8::<Gray, _>(dump, width, height, 1, image_dhash),
+        SILLSTONE_LAYOUT_GRAY16 => hash_16::<Gray, _>(dump, width, height, 1, image_dhash),
+        SILLSTONE_LAYOUT_RGB8 => hash_8::<Rgb, _>(dump, width, height, 3, image_dhash),
+        SILLSTONE_LAYOUT_RGB16 => hash_16::<Rgb, _>(dump, width, height, 3, image_dhash),
+        SILLSTONE_LAYOUT_RGBA8 => hash_8::<Rgba, _>(dump, width, height, 4, image_dhash),
+        _ => Err(SILLSTONE_E_INVALID),
     }
 }
 
 fn whash_of_dump(dump: &[u8], width: u32, height: u32, layout: u32, level: u32) -> Result<u64, i32> {
     match layout {
-        PITH_LAYOUT_GRAY8 => hash_8::<Gray, _>(dump, width, height, 1, |img| image_whash(img, level)),
-        PITH_LAYOUT_GRAY16 => hash_16::<Gray, _>(dump, width, height, 1, |img| image_whash(img, level)),
-        PITH_LAYOUT_RGB8 => hash_8::<Rgb, _>(dump, width, height, 3, |img| image_whash(img, level)),
-        PITH_LAYOUT_RGB16 => hash_16::<Rgb, _>(dump, width, height, 3, |img| image_whash(img, level)),
-        PITH_LAYOUT_RGBA8 => hash_8::<Rgba, _>(dump, width, height, 4, |img| image_whash(img, level)),
-        _ => Err(PITH_E_INVALID),
+        SILLSTONE_LAYOUT_GRAY8 => {
+            hash_8::<Gray, _>(dump, width, height, 1, |img| image_whash(img, level))
+        }
+        SILLSTONE_LAYOUT_GRAY16 => {
+            hash_16::<Gray, _>(dump, width, height, 1, |img| image_whash(img, level))
+        }
+        SILLSTONE_LAYOUT_RGB8 => {
+            hash_8::<Rgb, _>(dump, width, height, 3, |img| image_whash(img, level))
+        }
+        SILLSTONE_LAYOUT_RGB16 => {
+            hash_16::<Rgb, _>(dump, width, height, 3, |img| image_whash(img, level))
+        }
+        SILLSTONE_LAYOUT_RGBA8 => {
+            hash_8::<Rgba, _>(dump, width, height, 4, |img| image_whash(img, level))
+        }
+        _ => Err(SILLSTONE_E_INVALID),
     }
 }
 
 fn colorhash_of_dump(dump: &[u8], width: u32, height: u32, layout: u32, bins: u32) -> Result<u64, i32> {
     match layout {
-        PITH_LAYOUT_GRAY8 => hash_8::<Gray, _>(dump, width, height, 1, |img| image_colorhash(img, bins)),
-        PITH_LAYOUT_GRAY16 => hash_16::<Gray, _>(dump, width, height, 1, |img| image_colorhash(img, bins)),
-        PITH_LAYOUT_RGB8 => hash_8::<Rgb, _>(dump, width, height, 3, |img| image_colorhash(img, bins)),
-        PITH_LAYOUT_RGB16 => hash_16::<Rgb, _>(dump, width, height, 3, |img| image_colorhash(img, bins)),
-        PITH_LAYOUT_RGBA8 => hash_8::<Rgba, _>(dump, width, height, 4, |img| image_colorhash(img, bins)),
-        _ => Err(PITH_E_INVALID),
+        SILLSTONE_LAYOUT_GRAY8 => {
+            hash_8::<Gray, _>(dump, width, height, 1, |img| image_colorhash(img, bins))
+        }
+        SILLSTONE_LAYOUT_GRAY16 => {
+            hash_16::<Gray, _>(dump, width, height, 1, |img| image_colorhash(img, bins))
+        }
+        SILLSTONE_LAYOUT_RGB8 => {
+            hash_8::<Rgb, _>(dump, width, height, 3, |img| image_colorhash(img, bins))
+        }
+        SILLSTONE_LAYOUT_RGB16 => {
+            hash_16::<Rgb, _>(dump, width, height, 3, |img| image_colorhash(img, bins))
+        }
+        SILLSTONE_LAYOUT_RGBA8 => {
+            hash_8::<Rgba, _>(dump, width, height, 4, |img| image_colorhash(img, bins))
+        }
+        _ => Err(SILLSTONE_E_INVALID),
     }
 }
 
@@ -228,13 +248,14 @@ where
     F: FnOnce(&Image<L, u8>) -> Result<u64, Error>,
 {
     let Some(samples) = expected_samples(width, height, channels, 1) else {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     };
     if dump.len() != samples {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
-    let img = Image::<L, u8>::from_vec(width, height, dump.to_vec()).map_err(|_| PITH_E_INVALID)?;
-    f(&img).map_err(|_| PITH_E_REJECTED)
+    let img =
+        Image::<L, u8>::from_vec(width, height, dump.to_vec()).map_err(|_| SILLSTONE_E_INVALID)?;
+    f(&img).map_err(|_| SILLSTONE_E_REJECTED)
 }
 
 fn hash_16<L: Layout, F>(dump: &[u8], width: u32, height: u32, channels: usize, f: F) -> Result<u64, i32>
@@ -242,29 +263,31 @@ where
     F: FnOnce(&Image<L, u16>) -> Result<u64, Error>,
 {
     let Some(samples) = expected_samples(width, height, channels, 2) else {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     };
     if dump.len() != samples {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let mut pixels = Vec::with_capacity(samples / 2);
     for chunk in dump.chunks_exact(2) {
         pixels.push(u16::from_le_bytes([chunk[0], chunk[1]]));
     }
-    let img = Image::<L, u16>::from_vec(width, height, pixels).map_err(|_| PITH_E_INVALID)?;
-    f(&img).map_err(|_| PITH_E_REJECTED)
+    let img = Image::<L, u16>::from_vec(width, height, pixels).map_err(|_| SILLSTONE_E_INVALID)?;
+    f(&img).map_err(|_| SILLSTONE_E_REJECTED)
 }
 
 /// The safe core of [`sillstone_image_phash`]: validates the dump against
 /// the declared geometry and runs the pHash pipeline.
 fn phash_of_dump(dump: &[u8], width: u32, height: u32, layout: u32) -> Result<u64, i32> {
     match layout {
-        PITH_LAYOUT_GRAY8 => hash_8::<Gray, _>(dump, width, height, 1, image_phash_imagehash),
-        PITH_LAYOUT_GRAY16 => hash_16::<Gray, _>(dump, width, height, 1, image_phash_imagehash),
-        PITH_LAYOUT_RGB8 => hash_8::<Rgb, _>(dump, width, height, 3, image_phash_imagehash),
-        PITH_LAYOUT_RGB16 => hash_16::<Rgb, _>(dump, width, height, 3, image_phash_imagehash),
-        PITH_LAYOUT_RGBA8 => hash_8::<Rgba, _>(dump, width, height, 4, image_phash_imagehash),
-        _ => Err(PITH_E_INVALID),
+        SILLSTONE_LAYOUT_GRAY8 => hash_8::<Gray, _>(dump, width, height, 1, image_phash_imagehash),
+        SILLSTONE_LAYOUT_GRAY16 => {
+            hash_16::<Gray, _>(dump, width, height, 1, image_phash_imagehash)
+        }
+        SILLSTONE_LAYOUT_RGB8 => hash_8::<Rgb, _>(dump, width, height, 3, image_phash_imagehash),
+        SILLSTONE_LAYOUT_RGB16 => hash_16::<Rgb, _>(dump, width, height, 3, image_phash_imagehash),
+        SILLSTONE_LAYOUT_RGBA8 => hash_8::<Rgba, _>(dump, width, height, 4, image_phash_imagehash),
+        _ => Err(SILLSTONE_E_INVALID),
     }
 }
 
@@ -294,7 +317,7 @@ pub unsafe extern "C" fn sillstone_image_resize(
     out_len: usize,
 ) -> i32 {
     if data.is_null() || out_buf.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let r_filter = match filter {
         0 => crate::raster::ResamplingFilter::Nearest,
@@ -302,69 +325,69 @@ pub unsafe extern "C" fn sillstone_image_resize(
         2 => crate::raster::ResamplingFilter::Bilinear,
         3 => crate::raster::ResamplingFilter::Bicubic,
         4 => crate::raster::ResamplingFilter::Lanczos,
-        _ => return PITH_E_INVALID,
+        _ => return SILLSTONE_E_INVALID,
     };
 
     let channels = match layout {
-        PITH_LAYOUT_GRAY8 => 1,
-        PITH_LAYOUT_RGB8 => 3,
-        PITH_LAYOUT_RGBA8 => 4,
-        _ => return PITH_E_INVALID,
+        SILLSTONE_LAYOUT_GRAY8 => 1,
+        SILLSTONE_LAYOUT_RGB8 => 3,
+        SILLSTONE_LAYOUT_RGBA8 => 4,
+        _ => return SILLSTONE_E_INVALID,
     };
 
     // Geometry is untrusted: an overflowing `width * height * channels` is a
     // refusal, not an arithmetic panic (the cdylib aborts on panic).
     if expected_samples(in_w, in_h, channels, 1) != Some(len) {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let Some(expected_out_len) = expected_samples(out_w, out_h, channels, 1) else {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     };
     if out_len < expected_out_len {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
 
     let src_slice = unsafe { core::slice::from_raw_parts(data, len) };
     let out_slice = unsafe { core::slice::from_raw_parts_mut(out_buf, expected_out_len) };
 
     match layout {
-        PITH_LAYOUT_GRAY8 => {
+        SILLSTONE_LAYOUT_GRAY8 => {
             let img = match Image::<Gray, u8>::from_vec(in_w, in_h, src_slice.to_vec()) {
                 Ok(im) => im,
-                Err(_) => return PITH_E_REJECTED,
+                Err(_) => return SILLSTONE_E_REJECTED,
             };
             let res = match crate::raster::resize(&img, out_w, out_h, r_filter) {
                 Ok(r) => r,
-                Err(_) => return PITH_E_REJECTED,
+                Err(_) => return SILLSTONE_E_REJECTED,
             };
             out_slice.copy_from_slice(res.as_slice());
         }
-        PITH_LAYOUT_RGB8 => {
+        SILLSTONE_LAYOUT_RGB8 => {
             let img = match Image::<Rgb, u8>::from_vec(in_w, in_h, src_slice.to_vec()) {
                 Ok(im) => im,
-                Err(_) => return PITH_E_REJECTED,
+                Err(_) => return SILLSTONE_E_REJECTED,
             };
             let res = match crate::raster::resize(&img, out_w, out_h, r_filter) {
                 Ok(r) => r,
-                Err(_) => return PITH_E_REJECTED,
+                Err(_) => return SILLSTONE_E_REJECTED,
             };
             out_slice.copy_from_slice(res.as_slice());
         }
-        PITH_LAYOUT_RGBA8 => {
+        SILLSTONE_LAYOUT_RGBA8 => {
             let img = match Image::<Rgba, u8>::from_vec(in_w, in_h, src_slice.to_vec()) {
                 Ok(im) => im,
-                Err(_) => return PITH_E_REJECTED,
+                Err(_) => return SILLSTONE_E_REJECTED,
             };
             let res = match crate::raster::resize(&img, out_w, out_h, r_filter) {
                 Ok(r) => r,
-                Err(_) => return PITH_E_REJECTED,
+                Err(_) => return SILLSTONE_E_REJECTED,
             };
             out_slice.copy_from_slice(res.as_slice());
         }
-        _ => return PITH_E_INVALID,
+        _ => return SILLSTONE_E_INVALID,
     }
 
-    PITH_OK
+    SILLSTONE_OK
 }
 
 /// Crops a rectangular box `[x0, y0, x1, y1)` from an image.
@@ -383,24 +406,24 @@ pub unsafe extern "C" fn sillstone_image_crop(
     out_len: usize,
 ) -> i32 {
     if data.is_null() || out_buf.is_null() || x0 >= x1 || y0 >= y1 || x1 > in_w || y1 > in_h {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let channels = match layout {
-        PITH_LAYOUT_GRAY8 => 1,
-        PITH_LAYOUT_RGB8 => 3,
-        PITH_LAYOUT_RGBA8 => 4,
-        _ => return PITH_E_INVALID,
+        SILLSTONE_LAYOUT_GRAY8 => 1,
+        SILLSTONE_LAYOUT_RGB8 => 3,
+        SILLSTONE_LAYOUT_RGBA8 => 4,
+        _ => return SILLSTONE_E_INVALID,
     };
     // The row copies below index `src` directly, so `len` must cover the
     // whole declared geometry; a shorter buffer used to panic out of bounds.
     if expected_samples(in_w, in_h, channels, 1) != Some(len) {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let out_w = x1 - x0;
     let out_h = y1 - y0;
     let needed = (out_w as usize) * (out_h as usize) * channels;
     if out_len < needed {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
 
     let src = unsafe { core::slice::from_raw_parts(data, len) };
@@ -413,7 +436,7 @@ pub unsafe extern "C" fn sillstone_image_crop(
         dst[offset..offset + (end - start)].copy_from_slice(&src[start..end]);
         offset += end - start;
     }
-    PITH_OK
+    SILLSTONE_OK
 }
 
 /// Transposes or rotates by 90-degree steps.
@@ -430,7 +453,7 @@ pub unsafe extern "C" fn sillstone_image_transpose(
     out_len: usize,
 ) -> i32 {
     if data.is_null() || out_buf.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let t_method = match method {
         0 => crate::transform::TransposeMethod::FlipHorizontal,
@@ -440,20 +463,20 @@ pub unsafe extern "C" fn sillstone_image_transpose(
         4 => crate::transform::TransposeMethod::Rotate270,
         5 => crate::transform::TransposeMethod::Transpose,
         6 => crate::transform::TransposeMethod::Transverse,
-        _ => return PITH_E_INVALID,
+        _ => return SILLSTONE_E_INVALID,
     };
 
     let channels = match layout {
-        PITH_LAYOUT_GRAY8 => 1,
-        PITH_LAYOUT_RGB8 => 3,
-        PITH_LAYOUT_RGBA8 => 4,
-        _ => return PITH_E_INVALID,
+        SILLSTONE_LAYOUT_GRAY8 => 1,
+        SILLSTONE_LAYOUT_RGB8 => 3,
+        SILLSTONE_LAYOUT_RGBA8 => 4,
+        _ => return SILLSTONE_E_INVALID,
     };
     let Some(total_samples) = expected_samples(in_w, in_h, channels, 1) else {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     };
     if len != total_samples || out_len < total_samples {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
 
     let src = unsafe { core::slice::from_raw_parts(data, len) };
@@ -463,24 +486,24 @@ pub unsafe extern "C" fn sillstone_image_transpose(
         ($layout_ty:ty) => {{
             let img = match Image::<$layout_ty, u8>::from_vec(in_w, in_h, src.to_vec()) {
                 Ok(im) => im,
-                Err(_) => return PITH_E_REJECTED,
+                Err(_) => return SILLSTONE_E_REJECTED,
             };
             let res = match crate::transform::transpose(&img, t_method) {
                 Ok(r) => r,
-                Err(_) => return PITH_E_REJECTED,
+                Err(_) => return SILLSTONE_E_REJECTED,
             };
             dst.copy_from_slice(res.as_slice());
         }};
     }
 
     match layout {
-        PITH_LAYOUT_GRAY8 => do_transpose!(Gray),
-        PITH_LAYOUT_RGB8 => do_transpose!(Rgb),
-        PITH_LAYOUT_RGBA8 => do_transpose!(Rgba),
-        _ => return PITH_E_INVALID,
+        SILLSTONE_LAYOUT_GRAY8 => do_transpose!(Gray),
+        SILLSTONE_LAYOUT_RGB8 => do_transpose!(Rgb),
+        SILLSTONE_LAYOUT_RGBA8 => do_transpose!(Rgba),
+        _ => return SILLSTONE_E_INVALID,
     }
 
-    PITH_OK
+    SILLSTONE_OK
 }
 
 /// Rotates an image counter-clockwise by arbitrary angle.
@@ -498,17 +521,17 @@ pub unsafe extern "C" fn sillstone_image_rotate(
     out_len: usize,
 ) -> i32 {
     if data.is_null() || out_buf.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let r_filter = match filter {
         0 => crate::raster::ResamplingFilter::Nearest,
         _ => crate::raster::ResamplingFilter::Bilinear,
     };
     let _channels = match layout {
-        PITH_LAYOUT_GRAY8 => 1,
-        PITH_LAYOUT_RGB8 => 3,
-        PITH_LAYOUT_RGBA8 => 4,
-        _ => return PITH_E_INVALID,
+        SILLSTONE_LAYOUT_GRAY8 => 1,
+        SILLSTONE_LAYOUT_RGB8 => 3,
+        SILLSTONE_LAYOUT_RGBA8 => 4,
+        _ => return SILLSTONE_E_INVALID,
     };
     let src = unsafe { core::slice::from_raw_parts(data, len) };
 
@@ -516,15 +539,15 @@ pub unsafe extern "C" fn sillstone_image_rotate(
         ($layout_ty:ty) => {{
             let img = match Image::<$layout_ty, u8>::from_vec(in_w, in_h, src.to_vec()) {
                 Ok(im) => im,
-                Err(_) => return PITH_E_REJECTED,
+                Err(_) => return SILLSTONE_E_REJECTED,
             };
             let res = match crate::transform::rotate(&img, angle, expand != 0, r_filter) {
                 Ok(r) => r,
-                Err(_) => return PITH_E_REJECTED,
+                Err(_) => return SILLSTONE_E_REJECTED,
             };
             let res_bytes = res.as_slice().len();
             if out_len < res_bytes {
-                return PITH_E_INVALID;
+                return SILLSTONE_E_INVALID;
             }
             let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, res_bytes) };
             dst.copy_from_slice(res.as_slice());
@@ -532,13 +555,13 @@ pub unsafe extern "C" fn sillstone_image_rotate(
     }
 
     match layout {
-        PITH_LAYOUT_GRAY8 => do_rotate!(Gray),
-        PITH_LAYOUT_RGB8 => do_rotate!(Rgb),
-        PITH_LAYOUT_RGBA8 => do_rotate!(Rgba),
-        _ => return PITH_E_INVALID,
+        SILLSTONE_LAYOUT_GRAY8 => do_rotate!(Gray),
+        SILLSTONE_LAYOUT_RGB8 => do_rotate!(Rgb),
+        SILLSTONE_LAYOUT_RGBA8 => do_rotate!(Rgba),
+        _ => return SILLSTONE_E_INVALID,
     }
 
-    PITH_OK
+    SILLSTONE_OK
 }
 
 /// Reports the output dimensions [`sillstone_image_rotate`] produces for the same
@@ -553,17 +576,17 @@ pub unsafe extern "C" fn sillstone_image_rotate_size(
     out_h: *mut u32,
 ) -> i32 {
     if out_w.is_null() || out_h.is_null() || !angle.is_finite() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let (w, h) = crate::transform::rotated_size(in_w as usize, in_h as usize, angle, expand != 0);
     let (Ok(w), Ok(h)) = (u32::try_from(w), u32::try_from(h)) else {
-        return PITH_E_REJECTED;
+        return SILLSTONE_E_REJECTED;
     };
     unsafe {
         *out_w = w;
         *out_h = h;
     }
-    PITH_OK
+    SILLSTONE_OK
 }
 
 /// Applies built-in 2D convolution filters.
@@ -580,7 +603,7 @@ pub unsafe extern "C" fn sillstone_image_filter(
     out_len: usize,
 ) -> i32 {
     if data.is_null() || out_buf.is_null() || out_len < len {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let builtin = match filter_id {
         0 => crate::filter::BuiltinFilter::Blur,
@@ -590,7 +613,7 @@ pub unsafe extern "C" fn sillstone_image_filter(
         4 => crate::filter::BuiltinFilter::EdgeEnhance,
         5 => crate::filter::BuiltinFilter::FindEdges,
         6 => crate::filter::BuiltinFilter::Emboss,
-        _ => return PITH_E_INVALID,
+        _ => return SILLSTONE_E_INVALID,
     };
 
     let src = unsafe { core::slice::from_raw_parts(data, len) };
@@ -600,24 +623,24 @@ pub unsafe extern "C" fn sillstone_image_filter(
         ($layout_ty:ty) => {{
             let img = match Image::<$layout_ty, u8>::from_vec(in_w, in_h, src.to_vec()) {
                 Ok(im) => im,
-                Err(_) => return PITH_E_REJECTED,
+                Err(_) => return SILLSTONE_E_REJECTED,
             };
             let res = match crate::filter::apply_filter(&img, builtin) {
                 Ok(r) => r,
-                Err(_) => return PITH_E_REJECTED,
+                Err(_) => return SILLSTONE_E_REJECTED,
             };
             dst.copy_from_slice(res.as_slice());
         }};
     }
 
     match layout {
-        PITH_LAYOUT_GRAY8 => do_filter!(Gray),
-        PITH_LAYOUT_RGB8 => do_filter!(Rgb),
-        PITH_LAYOUT_RGBA8 => do_filter!(Rgba),
-        _ => return PITH_E_INVALID,
+        SILLSTONE_LAYOUT_GRAY8 => do_filter!(Gray),
+        SILLSTONE_LAYOUT_RGB8 => do_filter!(Rgb),
+        SILLSTONE_LAYOUT_RGBA8 => do_filter!(Rgba),
+        _ => return SILLSTONE_E_INVALID,
     }
 
-    PITH_OK
+    SILLSTONE_OK
 }
 
 /// Adjusts image properties: 0=brightness, 1=invert.
@@ -634,7 +657,7 @@ pub unsafe extern "C" fn sillstone_image_adjust(
     out_len: usize,
 ) -> i32 {
     if data.is_null() || out_buf.is_null() || out_len < len {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let src = unsafe { core::slice::from_raw_parts(data, len) };
     let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, len) };
@@ -643,28 +666,28 @@ pub unsafe extern "C" fn sillstone_image_adjust(
         ($layout_ty:ty) => {{
             let img = match Image::<$layout_ty, u8>::from_vec(in_w, in_h, src.to_vec()) {
                 Ok(im) => im,
-                Err(_) => return PITH_E_REJECTED,
+                Err(_) => return SILLSTONE_E_REJECTED,
             };
             let res = match op_id {
                 0 => crate::filter::adjust_brightness(&img, factor),
                 1 => crate::filter::invert(&img),
-                _ => return PITH_E_INVALID,
+                _ => return SILLSTONE_E_INVALID,
             };
             match res {
                 Ok(r) => dst.copy_from_slice(r.as_slice()),
-                Err(_) => return PITH_E_REJECTED,
+                Err(_) => return SILLSTONE_E_REJECTED,
             }
         }};
     }
 
     match layout {
-        PITH_LAYOUT_GRAY8 => do_adjust!(Gray),
-        PITH_LAYOUT_RGB8 => do_adjust!(Rgb),
-        PITH_LAYOUT_RGBA8 => do_adjust!(Rgba),
-        _ => return PITH_E_INVALID,
+        SILLSTONE_LAYOUT_GRAY8 => do_adjust!(Gray),
+        SILLSTONE_LAYOUT_RGB8 => do_adjust!(Rgb),
+        SILLSTONE_LAYOUT_RGBA8 => do_adjust!(Rgba),
+        _ => return SILLSTONE_E_INVALID,
     }
 
-    PITH_OK
+    SILLSTONE_OK
 }
 
 /// Converts between color spaces: RGB/RGBA to Gray (Pillow's integer luma),
@@ -682,7 +705,7 @@ pub unsafe extern "C" fn sillstone_image_color_convert(
     out_len: usize,
 ) -> i32 {
     if data.is_null() || out_buf.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let src = unsafe { core::slice::from_raw_parts(data, len) };
     let (Some(total_pixels), Some(total_rgb), Some(total_rgba)) = (
@@ -690,82 +713,82 @@ pub unsafe extern "C" fn sillstone_image_color_convert(
         expected_samples(in_w, in_h, 3, 1),
         expected_samples(in_w, in_h, 4, 1),
     ) else {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     };
 
-    if from_layout == PITH_LAYOUT_RGB8 && to_layout == PITH_LAYOUT_GRAY8 {
+    if from_layout == SILLSTONE_LAYOUT_RGB8 && to_layout == SILLSTONE_LAYOUT_GRAY8 {
         if out_len < total_pixels {
-            return PITH_E_INVALID;
+            return SILLSTONE_E_INVALID;
         }
         // Pillow's `convert("L")` luma (19595/38470/7471 >> 16), not the
         // BT.601 /1000 form that pHash uses: this entry point is the
         // Pillow-compatible conversion.
         if src.len() != total_rgb {
-            return PITH_E_REJECTED;
+            return SILLSTONE_E_REJECTED;
         }
         let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_pixels) };
         dst.copy_from_slice(&crate::raster::rgb_plane_to_l(src, 3, total_pixels));
-        PITH_OK
-    } else if from_layout == PITH_LAYOUT_RGBA8 && to_layout == PITH_LAYOUT_GRAY8 {
+        SILLSTONE_OK
+    } else if from_layout == SILLSTONE_LAYOUT_RGBA8 && to_layout == SILLSTONE_LAYOUT_GRAY8 {
         if out_len < total_pixels {
-            return PITH_E_INVALID;
+            return SILLSTONE_E_INVALID;
         }
         if src.len() != total_rgba {
-            return PITH_E_REJECTED;
+            return SILLSTONE_E_REJECTED;
         }
         let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_pixels) };
         dst.copy_from_slice(&crate::raster::rgb_plane_to_l(src, 4, total_pixels));
-        PITH_OK
-    } else if from_layout == PITH_LAYOUT_RGBA8 && to_layout == PITH_LAYOUT_RGB8 {
+        SILLSTONE_OK
+    } else if from_layout == SILLSTONE_LAYOUT_RGBA8 && to_layout == SILLSTONE_LAYOUT_RGB8 {
         if out_len < total_rgb {
-            return PITH_E_INVALID;
+            return SILLSTONE_E_INVALID;
         }
         let img = match Image::<Rgba, u8>::from_vec(in_w, in_h, src.to_vec()) {
             Ok(im) => im,
-            Err(_) => return PITH_E_REJECTED,
+            Err(_) => return SILLSTONE_E_REJECTED,
         };
         let rgb = img.to_rgb();
         let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_rgb) };
         dst.copy_from_slice(rgb.as_slice());
-        PITH_OK
-    } else if from_layout == PITH_LAYOUT_RGB8 && to_layout == PITH_LAYOUT_RGBA8 {
+        SILLSTONE_OK
+    } else if from_layout == SILLSTONE_LAYOUT_RGB8 && to_layout == SILLSTONE_LAYOUT_RGBA8 {
         if out_len < total_rgba {
-            return PITH_E_INVALID;
+            return SILLSTONE_E_INVALID;
         }
         let img = match Image::<Rgb, u8>::from_vec(in_w, in_h, src.to_vec()) {
             Ok(im) => im,
-            Err(_) => return PITH_E_REJECTED,
+            Err(_) => return SILLSTONE_E_REJECTED,
         };
         let rgba = img.to_rgba();
         let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_rgba) };
         dst.copy_from_slice(rgba.as_slice());
-        PITH_OK
-    } else if from_layout == PITH_LAYOUT_GRAY8 && to_layout == PITH_LAYOUT_RGB8 {
+        SILLSTONE_OK
+    } else if from_layout == SILLSTONE_LAYOUT_GRAY8 && to_layout == SILLSTONE_LAYOUT_RGB8 {
         if out_len < total_rgb {
-            return PITH_E_INVALID;
+            return SILLSTONE_E_INVALID;
         }
         let img = match Image::<Gray, u8>::from_vec(in_w, in_h, src.to_vec()) {
             Ok(im) => im,
-            Err(_) => return PITH_E_REJECTED,
+            Err(_) => return SILLSTONE_E_REJECTED,
         };
         let rgb = img.to_rgb();
         let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_rgb) };
         dst.copy_from_slice(rgb.as_slice());
-        PITH_OK
-    } else if from_layout == PITH_LAYOUT_GRAY8 && to_layout == PITH_LAYOUT_RGBA8 {
+        SILLSTONE_OK
+    } else if from_layout == SILLSTONE_LAYOUT_GRAY8 && to_layout == SILLSTONE_LAYOUT_RGBA8 {
         if out_len < total_rgba {
-            return PITH_E_INVALID;
+            return SILLSTONE_E_INVALID;
         }
         let img = match Image::<Gray, u8>::from_vec(in_w, in_h, src.to_vec()) {
             Ok(im) => im,
-            Err(_) => return PITH_E_REJECTED,
+            Err(_) => return SILLSTONE_E_REJECTED,
         };
         let rgba = img.to_rgba();
         let dst = unsafe { core::slice::from_raw_parts_mut(out_buf, total_rgba) };
         dst.copy_from_slice(rgba.as_slice());
-        PITH_OK
+        SILLSTONE_OK
     } else {
-        PITH_E_INVALID
+        SILLSTONE_E_INVALID
     }
 }
 
@@ -781,18 +804,18 @@ pub unsafe extern "C" fn sillstone_image_qoi_encode(
     out_len: *mut usize,
 ) -> i32 {
     if data.is_null() || out_ptr.is_null() || out_len.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let src = unsafe { core::slice::from_raw_parts(data, len) };
     let channels = match layout {
-        PITH_LAYOUT_RGB8 => 3,
-        PITH_LAYOUT_RGBA8 => 4,
-        _ => return PITH_E_INVALID,
+        SILLSTONE_LAYOUT_RGB8 => 3,
+        SILLSTONE_LAYOUT_RGBA8 => 4,
+        _ => return SILLSTONE_E_INVALID,
     };
 
     let encoded = match sillstone_qoi::encode(in_w, in_h, channels, 0, src) {
         Ok(enc) => enc,
-        Err(_) => return PITH_E_REJECTED,
+        Err(_) => return SILLSTONE_E_REJECTED,
     };
 
     let mut boxed = encoded.into_boxed_slice();
@@ -801,7 +824,7 @@ pub unsafe extern "C" fn sillstone_image_qoi_encode(
         *out_len = boxed.len();
     }
     core::mem::forget(boxed);
-    PITH_OK
+    SILLSTONE_OK
 }
 
 /// Decodes QOI bytes to raw image pixels.
@@ -815,19 +838,25 @@ pub unsafe extern "C" fn sillstone_image_qoi_decode(
     out_ptr: *mut *mut u8,
     out_len: *mut usize,
 ) -> i32 {
-    if data.is_null() || out_w.is_null() || out_h.is_null() || out_layout.is_null() || out_ptr.is_null() || out_len.is_null() {
-        return PITH_E_INVALID;
+    if data.is_null()
+        || out_w.is_null()
+        || out_h.is_null()
+        || out_layout.is_null()
+        || out_ptr.is_null()
+        || out_len.is_null()
+    {
+        return SILLSTONE_E_INVALID;
     }
     let src = unsafe { core::slice::from_raw_parts(data, len) };
     let (header, pixels) = match sillstone_qoi::decode(src) {
         Ok(res) => res,
-        Err(_) => return PITH_E_REJECTED,
+        Err(_) => return SILLSTONE_E_REJECTED,
     };
 
     let layout = match header.channels {
-        3 => PITH_LAYOUT_RGB8,
-        4 => PITH_LAYOUT_RGBA8,
-        _ => return PITH_E_REJECTED,
+        3 => SILLSTONE_LAYOUT_RGB8,
+        4 => SILLSTONE_LAYOUT_RGBA8,
+        _ => return SILLSTONE_E_REJECTED,
     };
 
     let mut boxed = pixels.into_boxed_slice();
@@ -839,7 +868,7 @@ pub unsafe extern "C" fn sillstone_image_qoi_decode(
         *out_len = boxed.len();
     }
     core::mem::forget(boxed);
-    PITH_OK
+    SILLSTONE_OK
 }
 
 /// Encodes raw image pixels to standard BMP format.
@@ -854,31 +883,31 @@ pub unsafe extern "C" fn sillstone_image_bmp_encode(
     out_len: *mut usize,
 ) -> i32 {
     if data.is_null() || out_ptr.is_null() || out_len.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let src = unsafe { core::slice::from_raw_parts(data, len) };
     let encoded = match layout {
-        PITH_LAYOUT_RGB8 => {
+        SILLSTONE_LAYOUT_RGB8 => {
             let img = match Image::<Rgb, u8>::from_vec(in_w, in_h, src.to_vec()) {
                 Ok(im) => im,
-                Err(_) => return PITH_E_REJECTED,
+                Err(_) => return SILLSTONE_E_REJECTED,
             };
             match crate::bmp::encode_bmp_rgb(&img) {
                 Ok(b) => b,
-                Err(_) => return PITH_E_REJECTED,
+                Err(_) => return SILLSTONE_E_REJECTED,
             }
         }
-        PITH_LAYOUT_RGBA8 => {
+        SILLSTONE_LAYOUT_RGBA8 => {
             let img = match Image::<Rgba, u8>::from_vec(in_w, in_h, src.to_vec()) {
                 Ok(im) => im,
-                Err(_) => return PITH_E_REJECTED,
+                Err(_) => return SILLSTONE_E_REJECTED,
             };
             match crate::bmp::encode_bmp_rgba(&img) {
                 Ok(b) => b,
-                Err(_) => return PITH_E_REJECTED,
+                Err(_) => return SILLSTONE_E_REJECTED,
             }
         }
-        _ => return PITH_E_INVALID,
+        _ => return SILLSTONE_E_INVALID,
     };
 
     let mut boxed = encoded.into_boxed_slice();
@@ -887,7 +916,7 @@ pub unsafe extern "C" fn sillstone_image_bmp_encode(
         *out_len = boxed.len();
     }
     core::mem::forget(boxed);
-    PITH_OK
+    SILLSTONE_OK
 }
 
 /// Frees a heap buffer allocated across FFI boundaries by sillstone image operations.
@@ -897,6 +926,35 @@ pub unsafe extern "C" fn sillstone_image_free_bytes(ptr: *mut u8, len: usize) {
         let _ = unsafe { alloc::boxed::Box::from_raw(core::ptr::slice_from_raw_parts_mut(ptr, len)) };
     }
 }
+
+// Deprecated pre-rename aliases: the `PITH_*` names the suite shipped before
+// it became `sillstone`. Each one is the same value as its `SILLSTONE_*` twin.
+
+/// Deprecated alias of [`SILLSTONE_OK`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_OK`")]
+pub const PITH_OK: i32 = SILLSTONE_OK;
+/// Deprecated alias of [`SILLSTONE_E_INVALID`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_INVALID`")]
+pub const PITH_E_INVALID: i32 = SILLSTONE_E_INVALID;
+/// Deprecated alias of [`SILLSTONE_E_REJECTED`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_REJECTED`")]
+pub const PITH_E_REJECTED: i32 = SILLSTONE_E_REJECTED;
+/// Deprecated alias of [`SILLSTONE_LAYOUT_GRAY8`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_LAYOUT_GRAY8`")]
+pub const PITH_LAYOUT_GRAY8: u32 = SILLSTONE_LAYOUT_GRAY8;
+/// Deprecated alias of [`SILLSTONE_LAYOUT_GRAY16`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_LAYOUT_GRAY16`")]
+pub const PITH_LAYOUT_GRAY16: u32 = SILLSTONE_LAYOUT_GRAY16;
+/// Deprecated alias of [`SILLSTONE_LAYOUT_RGB8`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_LAYOUT_RGB8`")]
+pub const PITH_LAYOUT_RGB8: u32 = SILLSTONE_LAYOUT_RGB8;
+/// Deprecated alias of [`SILLSTONE_LAYOUT_RGB16`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_LAYOUT_RGB16`")]
+pub const PITH_LAYOUT_RGB16: u32 = SILLSTONE_LAYOUT_RGB16;
+/// Deprecated alias of [`SILLSTONE_LAYOUT_RGBA8`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_LAYOUT_RGBA8`")]
+pub const PITH_LAYOUT_RGBA8: u32 = SILLSTONE_LAYOUT_RGBA8;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -950,7 +1008,7 @@ mod tests {
                     &mut hash,
                 )
             };
-            assert_eq!(code, PITH_OK, "{name}");
+            assert_eq!(code, SILLSTONE_OK, "{name}");
             assert_eq!(hash, *expected, "{name}");
         }
     }
@@ -958,11 +1016,11 @@ mod tests {
     /// `RawLayout` to wire code, mirroring the declaration order.
     fn wire_code(layout: RawLayout) -> u32 {
         match layout {
-            RawLayout::Gray8 => PITH_LAYOUT_GRAY8,
-            RawLayout::Gray16 => PITH_LAYOUT_GRAY16,
-            RawLayout::Rgb8 => PITH_LAYOUT_RGB8,
-            RawLayout::Rgb16 => PITH_LAYOUT_RGB16,
-            RawLayout::Rgba8 => PITH_LAYOUT_RGBA8,
+            RawLayout::Gray8 => SILLSTONE_LAYOUT_GRAY8,
+            RawLayout::Gray16 => SILLSTONE_LAYOUT_GRAY16,
+            RawLayout::Rgb8 => SILLSTONE_LAYOUT_RGB8,
+            RawLayout::Rgb16 => SILLSTONE_LAYOUT_RGB16,
+            RawLayout::Rgba8 => SILLSTONE_LAYOUT_RGBA8,
         }
     }
 
@@ -972,35 +1030,46 @@ mod tests {
         let dump = [0u8; 3 * 2 * 6]; // large enough for any 3x2 layout
         // (layout code, dump length in bytes) for a 3x2 image.
         let cases: [(u32, usize); 5] = [
-            (PITH_LAYOUT_GRAY8, 6),
-            (PITH_LAYOUT_GRAY16, 12),
-            (PITH_LAYOUT_RGB8, 18),
-            (PITH_LAYOUT_RGB16, 36),
-            (PITH_LAYOUT_RGBA8, 24),
+            (SILLSTONE_LAYOUT_GRAY8, 6),
+            (SILLSTONE_LAYOUT_GRAY16, 12),
+            (SILLSTONE_LAYOUT_RGB8, 18),
+            (SILLSTONE_LAYOUT_RGB16, 36),
+            (SILLSTONE_LAYOUT_RGBA8, 24),
         ];
         for (code, samples) in cases {
             let mut hash = 0u64;
-            let code_r = unsafe { sillstone_image_phash(dump.as_ptr(), samples, 3, 2, code, &mut hash) };
-            assert_eq!(code_r, PITH_OK, "layout {code}");
+            let code_r =
+                unsafe { sillstone_image_phash(dump.as_ptr(), samples, 3, 2, code, &mut hash) };
+            assert_eq!(code_r, SILLSTONE_OK, "layout {code}");
         }
     }
 
     /// Unknown layout codes, null pointers and length/geometry
-    /// mismatches are [`PITH_E_INVALID`], never a panic.
+    /// mismatches are [`SILLSTONE_E_INVALID`], never a panic.
     #[test]
     fn invalid_arguments_are_refused() {
         let dump = [0u8; 4];
         let mut hash = 0u64;
-        let unknown = unsafe { sillstone_image_phash(dump.as_ptr(), dump.len(), 2, 2, 99, &mut hash) };
-        assert_eq!(unknown, PITH_E_INVALID);
+        let unknown =
+            unsafe { sillstone_image_phash(dump.as_ptr(), dump.len(), 2, 2, 99, &mut hash) };
+        assert_eq!(unknown, SILLSTONE_E_INVALID);
 
-        let short =
-            unsafe { sillstone_image_phash(dump.as_ptr(), 3, 2, 2, PITH_LAYOUT_GRAY8, &mut hash) };
-        assert_eq!(short, PITH_E_INVALID);
+        let short = unsafe {
+            sillstone_image_phash(dump.as_ptr(), 3, 2, 2, SILLSTONE_LAYOUT_GRAY8, &mut hash)
+        };
+        assert_eq!(short, SILLSTONE_E_INVALID);
 
-        let null_data =
-            unsafe { sillstone_image_phash(core::ptr::null(), 0, 2, 2, PITH_LAYOUT_GRAY8, &mut hash) };
-        assert_eq!(null_data, PITH_E_INVALID);
+        let null_data = unsafe {
+            sillstone_image_phash(
+                core::ptr::null(),
+                0,
+                2,
+                2,
+                SILLSTONE_LAYOUT_GRAY8,
+                &mut hash,
+            )
+        };
+        assert_eq!(null_data, SILLSTONE_E_INVALID);
 
         let null_out = unsafe {
             sillstone_image_phash(
@@ -1008,11 +1077,11 @@ mod tests {
                 dump.len(),
                 2,
                 2,
-                PITH_LAYOUT_GRAY8,
+                SILLSTONE_LAYOUT_GRAY8,
                 core::ptr::null_mut(),
             )
         };
-        assert_eq!(null_out, PITH_E_INVALID);
+        assert_eq!(null_out, SILLSTONE_E_INVALID);
     }
 
     /// Dimensions whose sample count overflows `usize` are refused
@@ -1027,19 +1096,37 @@ mod tests {
                 0,
                 u32::MAX,
                 u32::MAX,
-                PITH_LAYOUT_RGBA8,
+                SILLSTONE_LAYOUT_RGBA8,
                 &mut hash,
             )
         };
-        assert_eq!(code, PITH_E_INVALID);
+        assert_eq!(code, SILLSTONE_E_INVALID);
     }
 
     /// The safe core agrees with the FFI wrapper on the pinned dumps.
     #[test]
     fn safe_core_matches_ffi() {
         let dump = vec![7u8; 4 * 4];
-        let via_core = phash_of_dump(&dump, 4, 4, PITH_LAYOUT_GRAY8).expect("hash");
+        let via_core = phash_of_dump(&dump, 4, 4, SILLSTONE_LAYOUT_GRAY8).expect("hash");
         let img = Image::<Gray, u8>::from_vec(4, 4, dump).expect("image");
         assert_eq!(via_core, image_phash_imagehash(&img).expect("pipeline"));
+    }
+}
+
+#[cfg(test)]
+mod deprecated_alias_tests {
+    #![allow(deprecated)]
+    use super::*;
+
+    #[test]
+    fn pith_aliases_equal_their_sillstone_twins() {
+        assert_eq!(PITH_OK, SILLSTONE_OK);
+        assert_eq!(PITH_E_INVALID, SILLSTONE_E_INVALID);
+        assert_eq!(PITH_E_REJECTED, SILLSTONE_E_REJECTED);
+        assert_eq!(PITH_LAYOUT_GRAY8, SILLSTONE_LAYOUT_GRAY8);
+        assert_eq!(PITH_LAYOUT_GRAY16, SILLSTONE_LAYOUT_GRAY16);
+        assert_eq!(PITH_LAYOUT_RGB8, SILLSTONE_LAYOUT_RGB8);
+        assert_eq!(PITH_LAYOUT_RGB16, SILLSTONE_LAYOUT_RGB16);
+        assert_eq!(PITH_LAYOUT_RGBA8, SILLSTONE_LAYOUT_RGBA8);
     }
 }

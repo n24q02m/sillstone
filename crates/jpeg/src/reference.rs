@@ -341,7 +341,7 @@ pub fn reference_json() -> String {
     let mut out = String::new();
     out.push_str("{\n");
     out.push_str("  \"schema\": 1,\n");
-    out.push_str("  \"suite\": \"pith-jpeg\",\n");
+    out.push_str("  \"suite\": \"sillstone-jpeg\",\n");
     out.push_str(
         "  \"note\": \"every f64 is its raw IEEE-754 bit pattern as 16-digit \
 lowercase hex; exact vectors must match bit-for-bit, the orthonormal-oracle \

@@ -10,10 +10,11 @@
 use std::fs;
 
 use sillstone_curator::ffi::{
-    PITH_E_INVALID, PITH_E_REJECTED, PITH_HASH_FORMAT_MP4, PITH_HASH_FORMAT_PNG,
-    PITH_HASH_MATCH_IMAGE, PITH_HASH_MATCH_TEXT, PITH_HASH_MODALITY_IMAGE, PITH_OK,
-    sillstone_curator_content_hash, sillstone_curator_describe, sillstone_curator_detect, sillstone_curator_free, sillstone_curator_match,
-    sillstone_curator_signature,
+    SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_HASH_FORMAT_MP4,
+    SILLSTONE_HASH_FORMAT_PNG, SILLSTONE_HASH_MATCH_IMAGE, SILLSTONE_HASH_MATCH_TEXT,
+    SILLSTONE_HASH_MODALITY_IMAGE, SILLSTONE_OK, sillstone_curator_content_hash,
+    sillstone_curator_describe, sillstone_curator_detect, sillstone_curator_free,
+    sillstone_curator_match, sillstone_curator_signature,
 };
 use sillstone_curator::{Signature, content_hash, signature};
 
@@ -52,15 +53,16 @@ fn ffi_image_detect_signature_describe_roundtrip() {
             &mut pending,
         )
     };
-    assert_eq!(status, PITH_OK);
-    assert_eq!(format, PITH_HASH_FORMAT_PNG);
-    assert_eq!(modality, PITH_HASH_MODALITY_IMAGE);
+    assert_eq!(status, SILLSTONE_OK);
+    assert_eq!(format, SILLSTONE_HASH_FORMAT_PNG);
+    assert_eq!(modality, SILLSTONE_HASH_MODALITY_IMAGE);
     assert_eq!(pending, 0);
 
     let mut out: *mut u8 = core::ptr::null_mut();
     let mut out_len: usize = 0;
-    let status = unsafe { sillstone_curator_signature(png.as_ptr(), png.len(), &mut out, &mut out_len) };
-    assert_eq!(status, PITH_OK);
+    let status =
+        unsafe { sillstone_curator_signature(png.as_ptr(), png.len(), &mut out, &mut out_len) };
+    assert_eq!(status, SILLSTONE_OK);
     // Image stream: tag 0 + big-endian pHash.
     assert_eq!(out_len, 9);
     let stream = unsafe { core::slice::from_raw_parts(out, out_len) };
@@ -72,14 +74,15 @@ fn ffi_image_detect_signature_describe_roundtrip() {
     assert_eq!(phash, expected_phash);
     unsafe { sillstone_curator_free(out, out_len) };
 
-    let status = unsafe { sillstone_curator_describe(png.as_ptr(), png.len(), &mut out, &mut out_len) };
-    assert_eq!(status, PITH_OK);
+    let status =
+        unsafe { sillstone_curator_describe(png.as_ptr(), png.len(), &mut out, &mut out_len) };
+    assert_eq!(status, SILLSTONE_OK);
     let stream = unsafe { core::slice::from_raw_parts(out, out_len) };
     // format code, modality code, 32-byte tier 1, 9-byte signature
     // stream, 16-byte image facts.
     assert_eq!(out_len, 2 + 32 + 9 + 16);
-    assert_eq!(stream[0], PITH_HASH_FORMAT_PNG as u8);
-    assert_eq!(stream[1], PITH_HASH_MODALITY_IMAGE as u8);
+    assert_eq!(stream[0], SILLSTONE_HASH_FORMAT_PNG as u8);
+    assert_eq!(stream[1], SILLSTONE_HASH_MODALITY_IMAGE as u8);
     unsafe { sillstone_curator_free(out, out_len) };
 
     // A null buffer is a legal free.
@@ -107,8 +110,8 @@ fn ffi_match_slots_for_two_modalities() {
             &mut matched,
         )
     };
-    assert_eq!(status, PITH_OK);
-    assert_eq!(tag, PITH_HASH_MATCH_IMAGE);
+    assert_eq!(status, SILLSTONE_OK);
+    assert_eq!(tag, SILLSTONE_HASH_MATCH_IMAGE);
     assert_eq!(slots[0], 0);
     assert_eq!(matched, 1);
 
@@ -125,8 +128,8 @@ fn ffi_match_slots_for_two_modalities() {
             &mut matched,
         )
     };
-    assert_eq!(status, PITH_OK);
-    assert_eq!(tag, PITH_HASH_MATCH_TEXT);
+    assert_eq!(status, SILLSTONE_OK);
+    assert_eq!(tag, SILLSTONE_HASH_MATCH_TEXT);
     assert_eq!(slots[0], 1.0f64.to_bits());
     assert_eq!(matched, 1);
 }
@@ -167,8 +170,8 @@ fn ffi_match_slots_for_audio_binary_video() {
             &mut matched,
         )
     };
-    assert_eq!(status, PITH_OK);
-    assert_eq!(tag, sillstone_curator::ffi::PITH_HASH_MATCH_AUDIO);
+    assert_eq!(status, SILLSTONE_OK);
+    assert_eq!(tag, sillstone_curator::ffi::SILLSTONE_HASH_MATCH_AUDIO);
     assert_eq!(matched, 1);
     let outcome = {
         let a = signature(&wav).expect("sig");
@@ -207,8 +210,8 @@ fn ffi_match_slots_for_audio_binary_video() {
             &mut matched,
         )
     };
-    assert_eq!(status, PITH_OK);
-    assert_eq!(tag, sillstone_curator::ffi::PITH_HASH_MATCH_BINARY);
+    assert_eq!(status, SILLSTONE_OK);
+    assert_eq!(tag, sillstone_curator::ffi::SILLSTONE_HASH_MATCH_BINARY);
     assert_eq!(slots[0], 1.0f64.to_bits());
     assert_eq!(matched, 1);
 
@@ -224,8 +227,8 @@ fn ffi_match_slots_for_audio_binary_video() {
             &mut matched,
         )
     };
-    assert_eq!(status, PITH_OK);
-    assert_eq!(tag, sillstone_curator::ffi::PITH_HASH_MATCH_VIDEO);
+    assert_eq!(status, SILLSTONE_OK);
+    assert_eq!(tag, sillstone_curator::ffi::SILLSTONE_HASH_MATCH_VIDEO);
     assert_eq!(matched, 1);
     assert_ne!(slots[0], 0);
 }
@@ -251,7 +254,7 @@ fn ffi_match_cross_modality_is_rejected_without_writes() {
             &mut matched,
         )
     };
-    assert_eq!(status, PITH_E_REJECTED);
+    assert_eq!(status, SILLSTONE_E_REJECTED);
     assert_eq!(tag, 7);
     assert_eq!(slots, [42; 4]);
     assert_eq!(matched, 7);
@@ -267,7 +270,7 @@ fn ffi_content_hash_writes_32_bytes() {
     let status = unsafe {
         sillstone_curator_content_hash(png.as_ptr(), png.len(), buf.as_mut_ptr(), 64, &mut out_len)
     };
-    assert_eq!(status, PITH_OK);
+    assert_eq!(status, SILLSTONE_OK);
     assert_eq!(out_len, 32);
     let expected = content_hash(&png).expect("hashes");
     assert_eq!(&buf[..32], expected.as_bytes());
@@ -275,7 +278,7 @@ fn ffi_content_hash_writes_32_bytes() {
     assert_eq!(&buf[32..], &[0; 32]);
 }
 
-/// Caller bugs are `PITH_E_INVALID`: null pointers and a capacity too
+/// Caller bugs are `SILLSTONE_E_INVALID`: null pointers and a capacity too
 /// small for the fixed wire shape.
 #[test]
 fn ffi_rejects_caller_bugs() {
@@ -293,7 +296,7 @@ fn ffi_rejects_caller_bugs() {
             &mut pending,
         )
     };
-    assert_eq!(status, PITH_E_INVALID);
+    assert_eq!(status, SILLSTONE_E_INVALID);
     let status = unsafe {
         sillstone_curator_detect(
             png.as_ptr(),
@@ -303,28 +306,31 @@ fn ffi_rejects_caller_bugs() {
             &mut pending,
         )
     };
-    assert_eq!(status, PITH_E_INVALID);
+    assert_eq!(status, SILLSTONE_E_INVALID);
 
     let mut out: *mut u8 = core::ptr::null_mut();
     let mut out_len: usize = 0;
-    let status = unsafe { sillstone_curator_signature(core::ptr::null(), 0, &mut out, &mut out_len) };
-    assert_eq!(status, PITH_E_INVALID);
+    let status =
+        unsafe { sillstone_curator_signature(core::ptr::null(), 0, &mut out, &mut out_len) };
+    assert_eq!(status, SILLSTONE_E_INVALID);
     let status = unsafe {
         sillstone_curator_signature(png.as_ptr(), png.len(), core::ptr::null_mut(), &mut out_len)
     };
-    assert_eq!(status, PITH_E_INVALID);
-    let status =
-        unsafe { sillstone_curator_describe(png.as_ptr(), png.len(), core::ptr::null_mut(), &mut out_len) };
-    assert_eq!(status, PITH_E_INVALID);
+    assert_eq!(status, SILLSTONE_E_INVALID);
+    let status = unsafe {
+        sillstone_curator_describe(png.as_ptr(), png.len(), core::ptr::null_mut(), &mut out_len)
+    };
+    assert_eq!(status, SILLSTONE_E_INVALID);
 
     let mut buf = [0u8; 8];
     let status = unsafe {
         sillstone_curator_content_hash(png.as_ptr(), png.len(), buf.as_mut_ptr(), 8, &mut out_len)
     };
-    assert_eq!(status, PITH_E_INVALID);
-    let status =
-        unsafe { sillstone_curator_content_hash(core::ptr::null(), 0, buf.as_mut_ptr(), 64, &mut out_len) };
-    assert_eq!(status, PITH_E_INVALID);
+    assert_eq!(status, SILLSTONE_E_INVALID);
+    let status = unsafe {
+        sillstone_curator_content_hash(core::ptr::null(), 0, buf.as_mut_ptr(), 64, &mut out_len)
+    };
+    assert_eq!(status, SILLSTONE_E_INVALID);
 
     let mut tag: u32 = 0;
     let mut slots = [0u64; 4];
@@ -341,7 +347,7 @@ fn ffi_rejects_caller_bugs() {
             &mut matched,
         )
     };
-    assert_eq!(status, PITH_E_INVALID);
+    assert_eq!(status, SILLSTONE_E_INVALID);
     let status = unsafe {
         sillstone_curator_match(
             png.as_ptr(),
@@ -354,10 +360,10 @@ fn ffi_rejects_caller_bugs() {
             &mut matched,
         )
     };
-    assert_eq!(status, PITH_E_INVALID);
+    assert_eq!(status, SILLSTONE_E_INVALID);
 }
 
-/// Core refusals are `PITH_E_REJECTED` — the whole `Error` surface,
+/// Core refusals are `SILLSTONE_E_REJECTED` — the whole `Error` surface,
 /// every lane — and nothing panics.
 #[test]
 fn ffi_rejects_core_refusals() {
@@ -377,7 +383,7 @@ fn ffi_rejects_core_refusals() {
             &mut out_len,
         )
     };
-    assert_eq!(status, PITH_E_REJECTED);
+    assert_eq!(status, SILLSTONE_E_REJECTED);
     let status = unsafe {
         sillstone_curator_describe(
             corrupt_png.as_ptr(),
@@ -386,7 +392,7 @@ fn ffi_rejects_core_refusals() {
             &mut out_len,
         )
     };
-    assert_eq!(status, PITH_E_REJECTED);
+    assert_eq!(status, SILLSTONE_E_REJECTED);
     let mut buf = [0u8; 32];
     let status = unsafe {
         sillstone_curator_content_hash(
@@ -397,7 +403,7 @@ fn ffi_rejects_core_refusals() {
             &mut out_len,
         )
     };
-    assert_eq!(status, PITH_E_REJECTED);
+    assert_eq!(status, SILLSTONE_E_REJECTED);
 
     // Audio(sillstone_audio::Error): a structurally valid WAV whose rate the
     // audio pipeline refuses (anything ≠ 44100 Hz).
@@ -416,9 +422,10 @@ fn ffi_rejects_core_refusals() {
     bad_wav.extend_from_slice(b"data");
     bad_wav.extend_from_slice(&4u32.to_le_bytes());
     bad_wav.extend_from_slice(&[0, 0, 0, 0]);
-    let status =
-        unsafe { sillstone_curator_signature(bad_wav.as_ptr(), bad_wav.len(), &mut out, &mut out_len) };
-    assert_eq!(status, PITH_E_REJECTED);
+    let status = unsafe {
+        sillstone_curator_signature(bad_wav.as_ptr(), bad_wav.len(), &mut out, &mut out_len)
+    };
+    assert_eq!(status, SILLSTONE_E_REJECTED);
 
     // Pdf(sillstone_pdf::Error): a PDF header over garbage.
     let corrupt_pdf: Vec<u8> = b"%PDF-1.4 garbage not a pdf".to_vec();
@@ -430,13 +437,14 @@ fn ffi_rejects_core_refusals() {
             &mut out_len,
         )
     };
-    assert_eq!(status, PITH_E_REJECTED);
+    assert_eq!(status, SILLSTONE_E_REJECTED);
 
     // The non-AVC mp4: a well-formed container whose codec the video
     // lane refuses.
     let mp4v = fixture("e_mp4v.mp4");
-    let status = unsafe { sillstone_curator_signature(mp4v.as_ptr(), mp4v.len(), &mut out, &mut out_len) };
-    assert_eq!(status, PITH_E_REJECTED);
+    let status =
+        unsafe { sillstone_curator_signature(mp4v.as_ptr(), mp4v.len(), &mut out, &mut out_len) };
+    assert_eq!(status, SILLSTONE_E_REJECTED);
     let mut format: u32 = 0;
     let mut modality: u32 = 0;
     let mut pending: u32 = 0;
@@ -449,6 +457,112 @@ fn ffi_rejects_core_refusals() {
             &mut pending,
         )
     };
-    assert_eq!(status, PITH_OK);
-    assert_eq!(format, PITH_HASH_FORMAT_MP4);
+    assert_eq!(status, SILLSTONE_OK);
+    assert_eq!(format, SILLSTONE_HASH_FORMAT_MP4);
+}
+
+/// The deprecated pre-rename `PITH_*` constants keep their `SILLSTONE_*` values.
+#[test]
+#[allow(deprecated)]
+fn pith_aliases_equal_their_sillstone_twins() {
+    assert_eq!(
+        sillstone_curator::ffi::PITH_OK,
+        sillstone_curator::ffi::SILLSTONE_OK
+    );
+    assert_eq!(
+        sillstone_curator::ffi::PITH_E_INVALID,
+        sillstone_curator::ffi::SILLSTONE_E_INVALID
+    );
+    assert_eq!(
+        sillstone_curator::ffi::PITH_E_REJECTED,
+        sillstone_curator::ffi::SILLSTONE_E_REJECTED
+    );
+    assert_eq!(
+        sillstone_curator::ffi::PITH_HASH_FORMAT_PNG,
+        sillstone_curator::ffi::SILLSTONE_HASH_FORMAT_PNG
+    );
+    assert_eq!(
+        sillstone_curator::ffi::PITH_HASH_FORMAT_JPEG,
+        sillstone_curator::ffi::SILLSTONE_HASH_FORMAT_JPEG
+    );
+    assert_eq!(
+        sillstone_curator::ffi::PITH_HASH_FORMAT_BMP,
+        sillstone_curator::ffi::SILLSTONE_HASH_FORMAT_BMP
+    );
+    assert_eq!(
+        sillstone_curator::ffi::PITH_HASH_FORMAT_ZIP,
+        sillstone_curator::ffi::SILLSTONE_HASH_FORMAT_ZIP
+    );
+    assert_eq!(
+        sillstone_curator::ffi::PITH_HASH_FORMAT_MP4,
+        sillstone_curator::ffi::SILLSTONE_HASH_FORMAT_MP4
+    );
+    assert_eq!(
+        sillstone_curator::ffi::PITH_HASH_FORMAT_MP3,
+        sillstone_curator::ffi::SILLSTONE_HASH_FORMAT_MP3
+    );
+    assert_eq!(
+        sillstone_curator::ffi::PITH_HASH_FORMAT_WAV,
+        sillstone_curator::ffi::SILLSTONE_HASH_FORMAT_WAV
+    );
+    assert_eq!(
+        sillstone_curator::ffi::PITH_HASH_FORMAT_FLAC,
+        sillstone_curator::ffi::SILLSTONE_HASH_FORMAT_FLAC
+    );
+    assert_eq!(
+        sillstone_curator::ffi::PITH_HASH_FORMAT_PDF,
+        sillstone_curator::ffi::SILLSTONE_HASH_FORMAT_PDF
+    );
+    assert_eq!(
+        sillstone_curator::ffi::PITH_HASH_FORMAT_GIF,
+        sillstone_curator::ffi::SILLSTONE_HASH_FORMAT_GIF
+    );
+    assert_eq!(
+        sillstone_curator::ffi::PITH_HASH_FORMAT_UNKNOWN,
+        sillstone_curator::ffi::SILLSTONE_HASH_FORMAT_UNKNOWN
+    );
+    assert_eq!(
+        sillstone_curator::ffi::PITH_HASH_MODALITY_IMAGE,
+        sillstone_curator::ffi::SILLSTONE_HASH_MODALITY_IMAGE
+    );
+    assert_eq!(
+        sillstone_curator::ffi::PITH_HASH_MODALITY_AUDIO,
+        sillstone_curator::ffi::SILLSTONE_HASH_MODALITY_AUDIO
+    );
+    assert_eq!(
+        sillstone_curator::ffi::PITH_HASH_MODALITY_TEXT,
+        sillstone_curator::ffi::SILLSTONE_HASH_MODALITY_TEXT
+    );
+    assert_eq!(
+        sillstone_curator::ffi::PITH_HASH_MODALITY_BINARY,
+        sillstone_curator::ffi::SILLSTONE_HASH_MODALITY_BINARY
+    );
+    assert_eq!(
+        sillstone_curator::ffi::PITH_HASH_MODALITY_VIDEO,
+        sillstone_curator::ffi::SILLSTONE_HASH_MODALITY_VIDEO
+    );
+    assert_eq!(
+        sillstone_curator::ffi::PITH_HASH_MATCH_IMAGE,
+        sillstone_curator::ffi::SILLSTONE_HASH_MATCH_IMAGE
+    );
+    assert_eq!(
+        sillstone_curator::ffi::PITH_HASH_MATCH_AUDIO,
+        sillstone_curator::ffi::SILLSTONE_HASH_MATCH_AUDIO
+    );
+    assert_eq!(
+        sillstone_curator::ffi::PITH_HASH_MATCH_TEXT,
+        sillstone_curator::ffi::SILLSTONE_HASH_MATCH_TEXT
+    );
+    assert_eq!(
+        sillstone_curator::ffi::PITH_HASH_MATCH_BINARY,
+        sillstone_curator::ffi::SILLSTONE_HASH_MATCH_BINARY
+    );
+    assert_eq!(
+        sillstone_curator::ffi::PITH_HASH_MATCH_VIDEO,
+        sillstone_curator::ffi::SILLSTONE_HASH_MATCH_VIDEO
+    );
+    assert_eq!(
+        sillstone_curator::ffi::PITH_HASH_MATCH_SLOTS,
+        sillstone_curator::ffi::SILLSTONE_HASH_MATCH_SLOTS
+    );
 }

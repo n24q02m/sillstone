@@ -2,8 +2,8 @@
 //! fixed predictors of orders 0-4, and both Rice residual methods
 //! (RFC 9639, formerly the Xiph FLAC format specification).
 //!
-//! Part of the `pith` zero-dependency hashing suite: every crate depends
-//! only on other `pith-*` crates plus `std`, so the whole suite resolves
+//! Part of the `sillstone` zero-dependency hashing suite: every crate depends
+//! only on other `sillstone-*` crates plus `std`, so the whole suite resolves
 //! without a single registry package.
 //!
 //! Deliberately outside scope (each surfaces as [`Error::Unsupported`]):

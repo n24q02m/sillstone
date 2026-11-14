@@ -1,5 +1,5 @@
 //! Regenerates and verifies `reference.json`: the hex-exact video-lane
-//! vectors of the pith suite. Per fingerprintable fixture under
+//! vectors of the sillstone suite. Per fingerprintable fixture under
 //! `tests/fixtures/` (deterministic sorted order) it pins the sampled
 //! frame-pHash chain (16-digit hex per 64-bit hash), the MinHash fold
 //! over the 128-word chain signature, the tier-1 content digest and the
@@ -339,12 +339,12 @@ fn garbage_hex(b: u8, n: usize) -> String {
 pub(crate) fn reference_json(root: &Path) -> String {
     let mut out = String::new();
     out.push_str("{\n");
-    out.push_str("  \"suite\": \"pith\",\n");
-    out.push_str("  \"crate\": \"pith-video\",\n");
+    out.push_str("  \"suite\": \"sillstone\",\n");
+    out.push_str("  \"crate\": \"sillstone-video\",\n");
     out.push_str("  \"format_version\": 1,\n");
     out.push_str("  \"generator\": \"cargo run --bin gen-reference -- gen\",\n");
     out.push_str(
-        "  \"description\": \"Hex-exact video-lane vectors for pith-video: \
+        "  \"description\": \"Hex-exact video-lane vectors for sillstone-video: \
 sampled frame-pHash chains (64-bit hex, only where the DCT threshold margins \
 clear the libm noise floor — flat sources keep their integer pins instead), \
 MinHash folds over the 128-word chain signature, tier-1 content digests, \
@@ -825,8 +825,8 @@ mod tests {
     #[test]
     fn reference_json_names_the_suite_markers() {
         let json = reference_json(Path::new(env!("CARGO_MANIFEST_DIR")));
-        assert!(json.contains("\"suite\": \"pith\""));
-        assert!(json.contains("\"crate\": \"pith-video\""));
+        assert!(json.contains("\"suite\": \"sillstone\""));
+        assert!(json.contains("\"crate\": \"sillstone-video\""));
         assert!(json.contains("\"format_version\": 1"));
         assert!(json.contains("\"frame_phashes_hex\""));
         assert!(json.contains("\"phash_hex_pinned\": true"));

@@ -236,7 +236,7 @@ fn render(vs: &[Vector], fs: &[FormVector], fds: &[FoldVector]) -> String {
     out.push_str("{\n");
     out.push_str("  \"format\": 1,\n");
     out.push_str("  \"generator\": \"cargo run --bin gen-reference -- gen\",\n");
-    out.push_str("  \"description\": \"Hex-exact NFC/NFD vectors for pith-unicode: UTF-8 bytes of the input string and of its NFC and NFD forms. Inputs are every 16th line of the UCD 15.1.0 NormalizationTest corpus (keeping only lines whose normalization changes) plus the Vietnamese decomposed/precomposed pair.\",\n");
+    out.push_str("  \"description\": \"Hex-exact NFC/NFD vectors for sillstone-unicode: UTF-8 bytes of the input string and of its NFC and NFD forms. Inputs are every 16th line of the UCD 15.1.0 NormalizationTest corpus (keeping only lines whose normalization changes) plus the Vietnamese decomposed/precomposed pair.\",\n");
     out.push_str("  \"vectors\": [\n");
     for (i, v) in vs.iter().enumerate() {
         out.push_str("    [");
@@ -373,7 +373,7 @@ mod tests {
         // The frozen prefix of the file: header + the full historical
         // section, byte-identical since tier 0.
         let prefix = format!(
-            "{{\n  \"format\": 1,\n  \"generator\": \"cargo run --bin gen-reference -- gen\",\n  \"description\": \"Hex-exact NFC/NFD vectors for pith-unicode: UTF-8 bytes of the input string and of its NFC and NFD forms. Inputs are every 16th line of the UCD 15.1.0 NormalizationTest corpus (keeping only lines whose normalization changes) plus the Vietnamese decomposed/precomposed pair.\",\n  \"vectors\": [\n{}\n",
+            "{{\n  \"format\": 1,\n  \"generator\": \"cargo run --bin gen-reference -- gen\",\n  \"description\": \"Hex-exact NFC/NFD vectors for sillstone-unicode: UTF-8 bytes of the input string and of its NFC and NFD forms. Inputs are every 16th line of the UCD 15.1.0 NormalizationTest corpus (keeping only lines whose normalization changes) plus the Vietnamese decomposed/precomposed pair.\",\n  \"vectors\": [\n{}\n",
             vs.iter()
                 .map(|v| format!(
                     "    [{}, {}, {}]",

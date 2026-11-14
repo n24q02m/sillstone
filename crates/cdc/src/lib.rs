@@ -1,7 +1,7 @@
 //! FastCDC content-defined chunking with the 16-level gear mask table.
 //!
-//! Part of the `pith` zero-dependency hashing suite: every suite crate
-//! depends only on other `pith-*` crates, so the whole suite resolves
+//! Part of the `sillstone` zero-dependency hashing suite: every suite crate
+//! depends only on other `sillstone-*` crates, so the whole suite resolves
 //! without a single third-party registry package.
 //!
 //! The algorithm is the one described by Wen Xia et al., "FastCDC: a Fast

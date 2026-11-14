@@ -12,9 +12,9 @@
 use sillstone_image::decode_bmp;
 use sillstone_image::ffi::*;
 
-const GRAY: u32 = PITH_LAYOUT_GRAY8;
-const RGB: u32 = PITH_LAYOUT_RGB8;
-const RGBA: u32 = PITH_LAYOUT_RGBA8;
+const GRAY: u32 = SILLSTONE_LAYOUT_GRAY8;
+const RGB: u32 = SILLSTONE_LAYOUT_RGB8;
+const RGBA: u32 = SILLSTONE_LAYOUT_RGBA8;
 
 fn channels(layout: u32) -> usize {
     match layout {
@@ -67,7 +67,7 @@ fn crop_refuses_a_buffer_shorter_than_the_declared_geometry() {
             out.len(),
         )
     };
-    assert_eq!(code, PITH_E_INVALID);
+    assert_eq!(code, SILLSTONE_E_INVALID);
 }
 
 /// A geometry that claims far more pixels than the buffer holds must not be
@@ -91,7 +91,7 @@ fn crop_refuses_a_geometry_that_overflows() {
             out.len(),
         )
     };
-    assert_eq!(code, PITH_E_INVALID);
+    assert_eq!(code, SILLSTONE_E_INVALID);
 }
 
 #[test]
@@ -112,7 +112,7 @@ fn resize_refuses_an_overflowing_source_geometry() {
             out.len(),
         )
     };
-    assert_eq!(code, PITH_E_INVALID);
+    assert_eq!(code, SILLSTONE_E_INVALID);
 }
 
 #[test]
@@ -133,7 +133,7 @@ fn resize_refuses_an_overflowing_target_geometry() {
             out.len(),
         )
     };
-    assert_eq!(code, PITH_E_INVALID);
+    assert_eq!(code, SILLSTONE_E_INVALID);
 }
 
 #[test]
@@ -152,7 +152,7 @@ fn transpose_refuses_an_overflowing_geometry() {
             out.len(),
         )
     };
-    assert_eq!(code, PITH_E_INVALID);
+    assert_eq!(code, SILLSTONE_E_INVALID);
 }
 
 #[test]
@@ -180,7 +180,7 @@ fn color_convert_refuses_an_overflowing_geometry() {
             )
         };
         assert!(
-            code == PITH_E_INVALID || code == PITH_E_REJECTED,
+            code == SILLSTONE_E_INVALID || code == SILLSTONE_E_REJECTED,
             "{from}->{to} returned {code}"
         );
     }
@@ -210,7 +210,7 @@ fn every_operation_refuses_a_mismatched_len() {
     };
     for (i, code) in results.iter().enumerate() {
         assert!(
-            *code == PITH_E_INVALID || *code == PITH_E_REJECTED,
+            *code == SILLSTONE_E_INVALID || *code == SILLSTONE_E_REJECTED,
             "operation {i} accepted a short buffer: {code}"
         );
     }
@@ -264,7 +264,7 @@ fn null_pointers_are_refused_everywhere() {
         ]
     };
     for (i, code) in results.iter().enumerate() {
-        assert_eq!(*code, PITH_E_INVALID, "case {i}");
+        assert_eq!(*code, SILLSTONE_E_INVALID, "case {i}");
     }
 }
 
@@ -297,7 +297,7 @@ fn unknown_codes_are_refused() {
         ]
     };
     for (i, code) in results.iter().enumerate() {
-        assert_eq!(*code, PITH_E_INVALID, "case {i}");
+        assert_eq!(*code, SILLSTONE_E_INVALID, "case {i}");
     }
 }
 
@@ -329,7 +329,7 @@ fn output_buffers_that_are_too_small_are_refused() {
         ]
     };
     for (i, code) in results.iter().enumerate() {
-        assert_eq!(*code, PITH_E_INVALID, "case {i}");
+        assert_eq!(*code, SILLSTONE_E_INVALID, "case {i}");
     }
 }
 
@@ -360,7 +360,7 @@ fn crop_refuses_empty_and_out_of_range_boxes() {
                 16,
             )
         };
-        assert_eq!(code, PITH_E_INVALID, "{x0},{y0},{x1},{y1}");
+        assert_eq!(code, SILLSTONE_E_INVALID, "{x0},{y0},{x1},{y1}");
     }
 }
 
@@ -389,7 +389,7 @@ fn crop_matches_the_row_model() {
                 out.len(),
             )
         };
-        assert_eq!(code, PITH_OK);
+        assert_eq!(code, SILLSTONE_OK);
         let mut want = Vec::new();
         for y in y0..y1 {
             for x in x0..x1 {
@@ -433,7 +433,7 @@ fn transpose_matches_the_pixel_model_for_every_method() {
                     out.len(),
                 )
             };
-            assert_eq!(code, PITH_OK, "method {id}");
+            assert_eq!(code, SILLSTONE_OK, "method {id}");
             for oy in 0..oh {
                 for ox in 0..ow {
                     let (sx, sy) = src(ox, oy, iw, ih);
@@ -477,7 +477,10 @@ fn resize_keeps_a_flat_image_flat_for_every_filter() {
                         out.len(),
                     )
                 };
-                assert_eq!(code, PITH_OK, "layout {layout} filter {filter} {ow}x{oh}");
+                assert_eq!(
+                    code, SILLSTONE_OK,
+                    "layout {layout} filter {filter} {ow}x{oh}"
+                );
                 for (i, &b) in out.iter().enumerate() {
                     let want = if layout == RGBA && i % 4 == 3 {
                         255
@@ -514,7 +517,7 @@ fn nearest_resize_to_the_same_size_is_the_identity() {
                 out.len(),
             )
         };
-        assert_eq!(code, PITH_OK);
+        assert_eq!(code, SILLSTONE_OK);
         assert_eq!(out.len(), 6 * 4 * c);
         assert_eq!(out, img);
     }
@@ -529,7 +532,7 @@ fn rotate_by_a_quarter_turn_equals_the_counter_clockwise_transpose() {
         let (mut ow, mut oh) = (0u32, 0u32);
         assert_eq!(
             unsafe { sillstone_image_rotate_size(iw, ih, 90.0, 1, &mut ow, &mut oh) },
-            PITH_OK
+            SILLSTONE_OK
         );
         assert_eq!((ow, oh), (ih, iw));
         let mut out = vec![0u8; ow as usize * oh as usize * c];
@@ -547,7 +550,7 @@ fn rotate_by_a_quarter_turn_equals_the_counter_clockwise_transpose() {
                 out.len(),
             )
         };
-        assert_eq!(code, PITH_OK);
+        assert_eq!(code, SILLSTONE_OK);
         for oy in 0..oh {
             for ox in 0..ow {
                 assert_eq!(
@@ -573,7 +576,7 @@ fn rotate_covers_zero_expand_and_both_filters() {
         let (mut ow, mut oh) = (0u32, 0u32);
         assert_eq!(
             unsafe { sillstone_image_rotate_size(6, 6, angle, expand, &mut ow, &mut oh) },
-            PITH_OK
+            SILLSTONE_OK
         );
         let mut out = vec![0u8; ow as usize * oh as usize * 3];
         let code = unsafe {
@@ -590,7 +593,7 @@ fn rotate_covers_zero_expand_and_both_filters() {
                 out.len(),
             )
         };
-        assert_eq!(code, PITH_OK, "angle {angle} expand {expand}");
+        assert_eq!(code, SILLSTONE_OK, "angle {angle} expand {expand}");
         if angle == 0.0 {
             assert_eq!(out, img);
         }
@@ -607,7 +610,7 @@ fn rotate_size_refuses_a_non_finite_angle() {
     for angle in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
         assert_eq!(
             unsafe { sillstone_image_rotate_size(4, 4, angle, 1, &mut w, &mut h) },
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
     }
 }
@@ -630,7 +633,7 @@ fn rotate_refuses_a_small_output_buffer() {
             out.len(),
         )
     };
-    assert_eq!(code, PITH_E_INVALID);
+    assert_eq!(code, SILLSTONE_E_INVALID);
 }
 
 #[test]
@@ -651,7 +654,7 @@ fn adjust_matches_the_sample_model() {
                 out.len(),
             )
         };
-        assert_eq!(code, PITH_OK);
+        assert_eq!(code, SILLSTONE_OK);
         let want: Vec<u8> = img.iter().map(|b| 255 - b).collect();
         assert_eq!(out, want, "invert, layout {layout}");
 
@@ -669,7 +672,7 @@ fn adjust_matches_the_sample_model() {
                     out.len(),
                 )
             };
-            assert_eq!(code, PITH_OK);
+            assert_eq!(code, SILLSTONE_OK);
             let want: Vec<u8> = img
                 .iter()
                 .map(|&b| (b as f64 * factor).round().clamp(0.0, 255.0) as u8)
@@ -699,7 +702,7 @@ fn every_builtin_filter_runs_and_blur_keeps_a_flat_image_flat() {
                         out.len(),
                     )
                 };
-                assert_eq!(code, PITH_OK, "layout {layout} filter {filter}");
+                assert_eq!(code, SILLSTONE_OK, "layout {layout} filter {filter}");
             }
         }
         let mut out = vec![0u8; flat.len()];
@@ -742,23 +745,23 @@ fn color_convert_follows_pillow_for_every_supported_pair() {
         )
     };
 
-    assert_eq!(run(&rgb, RGB, GRAY, &mut out), PITH_OK);
+    assert_eq!(run(&rgb, RGB, GRAY, &mut out), SILLSTONE_OK);
     assert_eq!(
         &out[..4],
         &[luma(255, 0, 0), luma(0, 255, 0), luma(0, 0, 255), 255]
     );
     assert_eq!(&out[..3], &[76, 150, 29]);
 
-    assert_eq!(run(&rgba, RGBA, GRAY, &mut out), PITH_OK);
+    assert_eq!(run(&rgba, RGBA, GRAY, &mut out), SILLSTONE_OK);
     assert_eq!(&out[..4], &[76, 150, 29, 255]);
 
-    assert_eq!(run(&rgba, RGBA, RGB, &mut out), PITH_OK);
+    assert_eq!(run(&rgba, RGBA, RGB, &mut out), SILLSTONE_OK);
     assert_eq!(
         &out[..12],
         &[255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255]
     );
 
-    assert_eq!(run(&rgb, RGB, RGBA, &mut out), PITH_OK);
+    assert_eq!(run(&rgb, RGB, RGBA, &mut out), SILLSTONE_OK);
     assert_eq!(
         &out[..16],
         &[
@@ -766,13 +769,13 @@ fn color_convert_follows_pillow_for_every_supported_pair() {
         ]
     );
 
-    assert_eq!(run(&gray, GRAY, RGB, &mut out), PITH_OK);
+    assert_eq!(run(&gray, GRAY, RGB, &mut out), SILLSTONE_OK);
     assert_eq!(
         &out[..12],
         &[0, 0, 0, 76, 76, 76, 150, 150, 150, 255, 255, 255]
     );
 
-    assert_eq!(run(&gray, GRAY, RGBA, &mut out), PITH_OK);
+    assert_eq!(run(&gray, GRAY, RGBA, &mut out), SILLSTONE_OK);
     assert_eq!(
         &out[..16],
         &[
@@ -799,7 +802,7 @@ fn color_convert_refuses_a_source_of_the_wrong_length() {
                 out.len(),
             )
         };
-        assert_eq!(code, PITH_E_REJECTED);
+        assert_eq!(code, SILLSTONE_E_REJECTED);
     }
     for (data, from, to) in [
         (&rgba[..], RGBA, RGB),
@@ -819,7 +822,7 @@ fn color_convert_refuses_a_source_of_the_wrong_length() {
                 out.len(),
             )
         };
-        assert_eq!(code, PITH_E_REJECTED, "{from}->{to}");
+        assert_eq!(code, SILLSTONE_E_REJECTED, "{from}->{to}");
     }
 }
 
@@ -833,7 +836,7 @@ fn qoi_round_trips_through_the_c_abi() {
             unsafe {
                 sillstone_image_qoi_encode(img.as_ptr(), img.len(), 9, 7, layout, &mut p, &mut n)
             },
-            PITH_OK
+            SILLSTONE_OK
         );
         assert!(!p.is_null() && n > 14);
         let encoded = unsafe { core::slice::from_raw_parts(p, n) }.to_vec();
@@ -852,7 +855,7 @@ fn qoi_round_trips_through_the_c_abi() {
                 &mut dn,
             )
         };
-        assert_eq!(code, PITH_OK);
+        assert_eq!(code, SILLSTONE_OK);
         assert_eq!((w, h, l, dn), (9, 7, layout, 9 * 7 * c));
         assert_eq!(unsafe { core::slice::from_raw_parts(dp, dn) }, &img[..]);
         unsafe {
@@ -878,7 +881,7 @@ fn qoi_decode_rejects_garbage_without_handing_out_a_buffer() {
             &mut n,
         )
     };
-    assert_eq!(code, PITH_E_REJECTED);
+    assert_eq!(code, SILLSTONE_E_REJECTED);
     assert!(p.is_null());
 }
 
@@ -893,7 +896,7 @@ fn bmp_encode_round_trips_through_the_decoder() {
             unsafe {
                 sillstone_image_bmp_encode(img.as_ptr(), img.len(), w, h, layout, &mut p, &mut n)
             },
-            PITH_OK
+            SILLSTONE_OK
         );
         let bytes = unsafe { core::slice::from_raw_parts(p, n) }.to_vec();
         unsafe { sillstone_image_free_bytes(p, n) };
@@ -932,8 +935,8 @@ fn the_other_hashes_agree_across_eight_and_sixteen_bit_dumps() {
     // of `v`: the facade's documented `>> 8` rule must not change ordering.
     let (w, h) = (16u32, 16u32);
     for (layout8, layout16, c) in [
-        (GRAY, PITH_LAYOUT_GRAY16, 1usize),
-        (RGB, PITH_LAYOUT_RGB16, 3),
+        (GRAY, SILLSTONE_LAYOUT_GRAY16, 1usize),
+        (RGB, SILLSTONE_LAYOUT_RGB16, 3),
     ] {
         let img8 = pattern(w, h, layout8);
         let mut img16 = Vec::with_capacity(img8.len() * 2);
@@ -947,37 +950,37 @@ fn the_other_hashes_agree_across_eight_and_sixteen_bit_dumps() {
             let (mut a, mut b) = (0u64, 0u64);
             assert_eq!(
                 unsafe { f(img8.as_ptr(), img8.len(), w, h, layout8, &mut a) },
-                PITH_OK
+                SILLSTONE_OK
             );
             assert_eq!(
                 unsafe { f(img16.as_ptr(), img16.len(), w, h, layout16, &mut b) },
-                PITH_OK
+                SILLSTONE_OK
             );
             assert_eq!(a, b, "layout {layout8}");
         }
         let (mut a, mut b) = (0u64, 0u64);
         assert_eq!(
             unsafe { sillstone_image_whash(img8.as_ptr(), img8.len(), w, h, layout8, 0, &mut a) },
-            PITH_OK
+            SILLSTONE_OK
         );
         assert_eq!(
             unsafe {
                 sillstone_image_whash(img16.as_ptr(), img16.len(), w, h, layout16, 0, &mut b)
             },
-            PITH_OK
+            SILLSTONE_OK
         );
         assert_eq!(a, b);
         assert_eq!(
             unsafe {
                 sillstone_image_colorhash(img8.as_ptr(), img8.len(), w, h, layout8, 3, &mut a)
             },
-            PITH_OK
+            SILLSTONE_OK
         );
         assert_eq!(
             unsafe {
                 sillstone_image_colorhash(img16.as_ptr(), img16.len(), w, h, layout16, 3, &mut b)
             },
-            PITH_OK
+            SILLSTONE_OK
         );
         assert_eq!(a, b);
     }
@@ -992,23 +995,23 @@ fn every_hash_accepts_rgba_and_is_deterministic() {
         unsafe {
             assert_eq!(
                 sillstone_image_phash(img.as_ptr(), img.len(), 16, 16, RGBA, &mut out[0]),
-                PITH_OK
+                SILLSTONE_OK
             );
             assert_eq!(
                 sillstone_image_ahash(img.as_ptr(), img.len(), 16, 16, RGBA, &mut out[1]),
-                PITH_OK
+                SILLSTONE_OK
             );
             assert_eq!(
                 sillstone_image_dhash(img.as_ptr(), img.len(), 16, 16, RGBA, &mut out[2]),
-                PITH_OK
+                SILLSTONE_OK
             );
             assert_eq!(
                 sillstone_image_whash(img.as_ptr(), img.len(), 16, 16, RGBA, 0, &mut out[3]),
-                PITH_OK
+                SILLSTONE_OK
             );
             assert_eq!(
                 sillstone_image_colorhash(img.as_ptr(), img.len(), 16, 16, RGBA, 3, &mut out[4]),
-                PITH_OK
+                SILLSTONE_OK
             );
         }
     }
@@ -1020,8 +1023,8 @@ fn hashes_refuse_a_mismatched_dump_length() {
     let img = pattern(8, 8, RGB);
     let mut hash = 0u64;
     let code = unsafe { sillstone_image_dhash(img.as_ptr(), img.len() - 1, 8, 8, RGB, &mut hash) };
-    assert_eq!(code, PITH_E_INVALID);
+    assert_eq!(code, SILLSTONE_E_INVALID);
     let code =
         unsafe { sillstone_image_whash(img.as_ptr(), img.len() + 1, 8, 8, RGB, 0, &mut hash) };
-    assert_eq!(code, PITH_E_INVALID);
+    assert_eq!(code, SILLSTONE_E_INVALID);
 }

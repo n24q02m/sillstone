@@ -1,7 +1,7 @@
 {
   "schema": 2,
-  "crate": "pith-inflate",
-  "description": "hex-exact DEFLATE/zlib/gzip reference vectors: every tests/vectors.rs corpus entry decoded by pith-inflate, raw/zlib outputs pinned by their Adler-32 digest and gzip outputs by their CRC-32",
+  "crate": "sillstone-inflate",
+  "description": "hex-exact DEFLATE/zlib/gzip reference vectors: every tests/vectors.rs corpus entry decoded by sillstone-inflate, raw/zlib outputs pinned by their Adler-32 digest and gzip outputs by their CRC-32",
   "vectors": [
     {
       "name": "empty",
@@ -237,7 +237,7 @@
     {
       "name": "gzip/fcomment",
       "file": "fcomment.gz",
-      "input": "1f8b08100000000002036372616674656420666f722074686520706974682d696e666c61746520636f72707573007373f6f7f575f50b512848acccc94f4c01007a84762710000000",
+      "input": "1f8b08100000000002036372616674656420666f72207468652073696c6c73746f6e652d696e666c61746520636f72707573007373f6f7f575f50b512848acccc94f4c01007a84762710000000",
       "plain": "46434f4d4d454e54207061796c6f6164",
       "crc32": "2776847a"
     },

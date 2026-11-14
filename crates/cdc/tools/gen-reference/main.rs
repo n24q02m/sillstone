@@ -227,7 +227,7 @@ fn vectors() -> Vec<Vector> {
 fn render(vectors: &[Vector]) -> String {
     let mut out = String::new();
     out.push_str("{\n");
-    out.push_str("  \"schema\": \"pith-cdc.reference.v1\",\n");
+    out.push_str("  \"schema\": \"sillstone-cdc.reference.v1\",\n");
     out.push_str("  \"algorithm\": \"FastCDC (Xia et al., USENIX ATC 2016): Gear rolling fingerprint, zero-padded fp & mask == 0 judgment, normalized chunking\",\n");
     out.push_str("  \"vectors\": [\n");
     for (vi, v) in vectors.iter().enumerate() {
@@ -413,7 +413,7 @@ mod tests {
         let a = render(&vectors());
         let b = render(&vectors());
         assert_eq!(a, b);
-        assert!(a.starts_with("{\n  \"schema\": \"pith-cdc.reference.v1\""));
+        assert!(a.starts_with("{\n  \"schema\": \"sillstone-cdc.reference.v1\""));
         assert!(a.ends_with("}\n"));
     }
 

@@ -5,8 +5,8 @@
 //! untouched, so a refusal can never hand a half-built buffer to the caller.
 
 use sillstone_math::ffi::{
-    PITH_E_INVALID, PITH_E_REJECTED, PITH_OK, sillstone_math_complex_div, sillstone_math_corr,
-    sillstone_math_dct2_2d, sillstone_math_free, sillstone_math_ransac_line,
+    SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_OK, sillstone_math_complex_div,
+    sillstone_math_corr, sillstone_math_dct2_2d, sillstone_math_free, sillstone_math_ransac_line,
 };
 
 /// Output slots as the caller would pass them.
@@ -51,7 +51,7 @@ fn complex_div_by_zero_is_rejected_and_by_nonzero_succeeds() {
             &mut s.out_len,
         )
     };
-    assert_eq!(status, PITH_E_REJECTED);
+    assert_eq!(status, SILLSTONE_E_REJECTED);
     s.assert_untouched("complex_div by zero");
 
     // Only an all-zero denominator is refused: a purely imaginary one is fine.
@@ -65,7 +65,7 @@ fn complex_div_by_zero_is_rejected_and_by_nonzero_succeeds() {
             &mut s.out_len,
         )
     };
-    assert_eq!(status, PITH_OK);
+    assert_eq!(status, SILLSTONE_OK);
     assert_eq!(s.take(), vec![0.5, -2.5]);
 
     // A wrong pair count is an argument error, not a rejection.
@@ -74,7 +74,7 @@ fn complex_div_by_zero_is_rejected_and_by_nonzero_succeeds() {
     let status = unsafe {
         sillstone_math_complex_div(three.as_ptr(), three.len(), &mut s.out, &mut s.out_len)
     };
-    assert_eq!(status, PITH_E_INVALID);
+    assert_eq!(status, SILLSTONE_E_INVALID);
     s.assert_untouched("complex_div wrong length");
 }
 
@@ -86,7 +86,7 @@ fn dct2_2d_refuses_each_null_argument() {
 
     let status =
         unsafe { sillstone_math_dct2_2d(core::ptr::null(), 4, 2, 2, &mut out, &mut out_len) };
-    assert_eq!(status, PITH_E_INVALID, "null input");
+    assert_eq!(status, SILLSTONE_E_INVALID, "null input");
 
     let status = unsafe {
         sillstone_math_dct2_2d(
@@ -98,7 +98,7 @@ fn dct2_2d_refuses_each_null_argument() {
             &mut out_len,
         )
     };
-    assert_eq!(status, PITH_E_INVALID, "null out");
+    assert_eq!(status, SILLSTONE_E_INVALID, "null out");
 
     let status = unsafe {
         sillstone_math_dct2_2d(
@@ -110,7 +110,7 @@ fn dct2_2d_refuses_each_null_argument() {
             core::ptr::null_mut(),
         )
     };
-    assert_eq!(status, PITH_E_INVALID, "null out_len");
+    assert_eq!(status, SILLSTONE_E_INVALID, "null out_len");
 
     assert!(out.is_null());
     assert_eq!(out_len, 0);
@@ -134,7 +134,7 @@ fn corr_refuses_a_bad_split_between_the_two_operands() {
                 &mut s.out_len,
             )
         };
-        assert_eq!(status, PITH_E_INVALID, "{what}");
+        assert_eq!(status, SILLSTONE_E_INVALID, "{what}");
         s.assert_untouched(what);
     }
 
@@ -144,7 +144,7 @@ fn corr_refuses_a_bad_split_between_the_two_operands() {
     let status = unsafe {
         sillstone_math_corr(packed.as_ptr(), packed.len(), 3, &mut s.out, &mut s.out_len)
     };
-    assert_eq!(status, PITH_OK);
+    assert_eq!(status, SILLSTONE_OK);
     assert_eq!(s.take(), vec![4.0, 8.0, 12.0]);
 }
 
@@ -157,7 +157,7 @@ fn ransac_line_refuses_null_and_malformed_configuration() {
     let status = unsafe {
         sillstone_math_ransac_line(core::ptr::null(), 6, 0.5, 16, 1, &mut out, &mut out_len)
     };
-    assert_eq!(status, PITH_E_INVALID, "null input");
+    assert_eq!(status, SILLSTONE_E_INVALID, "null input");
 
     // Configuration errors: too few points, odd packing, zero iterations,
     // non-positive or NaN threshold.
@@ -182,7 +182,7 @@ fn ransac_line_refuses_null_and_malformed_configuration() {
                 &mut s.out_len,
             )
         };
-        assert_eq!(status, PITH_E_INVALID, "{what}");
+        assert_eq!(status, SILLSTONE_E_INVALID, "{what}");
         s.assert_untouched(what);
     }
 
@@ -201,7 +201,7 @@ fn ransac_line_refuses_null_and_malformed_configuration() {
             &mut s.out_len,
         )
     };
-    assert_eq!(status, PITH_E_REJECTED);
+    assert_eq!(status, SILLSTONE_E_REJECTED);
     s.assert_untouched("all-vertical points");
 
     // And the valid call right next to those refusals succeeds, with the
@@ -218,6 +218,6 @@ fn ransac_line_refuses_null_and_malformed_configuration() {
             &mut s.out_len,
         )
     };
-    assert_eq!(status, PITH_OK);
+    assert_eq!(status, SILLSTONE_OK);
     assert_eq!(s.take(), vec![1.0, 1.0, 3.0]);
 }

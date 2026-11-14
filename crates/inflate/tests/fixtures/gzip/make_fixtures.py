@@ -109,7 +109,7 @@ def main() -> int:
     )
     fixtures["fname.gz"] = gzip_member(b"FNAME payload", flg=FNAME, name=b"payload.txt")
     fixtures["fcomment.gz"] = gzip_member(
-        b"FCOMMENT payload", flg=FCOMMENT, comment=b"crafted for the pith-inflate corpus"
+        b"FCOMMENT payload", flg=FCOMMENT, comment=b"crafted for the sillstone-inflate corpus"
     )
     fixtures["fhcrc.gz"] = gzip_member(b"FHCRC payload", flg=FHCRC)
     fixtures["all-flags.gz"] = gzip_member(

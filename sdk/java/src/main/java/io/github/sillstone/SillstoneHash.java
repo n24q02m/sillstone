@@ -24,13 +24,26 @@ import java.util.Arrays;
  */
 public final class SillstoneHash {
     /** Status: success. */
-    public static final int PITH_OK = 0;
+    public static final int SILLSTONE_OK = 0;
     /** Status: a caller argument is invalid. */
-    public static final int PITH_E_INVALID = -1;
+    public static final int SILLSTONE_E_INVALID = -1;
     /** Status: the core decoder refused the input. */
-    public static final int PITH_E_REJECTED = -2;
+    public static final int SILLSTONE_E_REJECTED = -2;
 
-    /** Format wire codes: the {@code pith_digest::Format} declaration order. */
+    /** Pre-rename alias of {@link #SILLSTONE_OK}, kept for source compatibility.
+     *  @deprecated use {@link #SILLSTONE_OK}. */
+    @Deprecated
+    public static final int PITH_OK = SILLSTONE_OK;
+    /** Pre-rename alias of {@link #SILLSTONE_E_INVALID}, kept for source compatibility.
+     *  @deprecated use {@link #SILLSTONE_E_INVALID}. */
+    @Deprecated
+    public static final int PITH_E_INVALID = SILLSTONE_E_INVALID;
+    /** Pre-rename alias of {@link #SILLSTONE_E_REJECTED}, kept for source compatibility.
+     *  @deprecated use {@link #SILLSTONE_E_REJECTED}. */
+    @Deprecated
+    public static final int PITH_E_REJECTED = SILLSTONE_E_REJECTED;
+
+    /** Format wire codes: the {@code sillstone_digest::Format} declaration order. */
     public static final int FORMAT_PNG = 0;
     /** See {@link #FORMAT_PNG}. */
     public static final int FORMAT_JPEG = 1;

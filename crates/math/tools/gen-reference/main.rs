@@ -533,7 +533,7 @@ fn push_f64s(out: &mut String, vs: &[f64], indent: &str) {
 fn render(vs: &[Vector]) -> String {
     let mut out = String::new();
     out.push_str("{\n");
-    out.push_str("  \"suite\": \"pith-math\",\n");
+    out.push_str("  \"suite\": \"sillstone-math\",\n");
     out.push_str(
         "  \"note\": \"every f64 is its raw IEEE-754 bit pattern as 16-digit \
 lowercase hex; exact vectors must match bit-for-bit, twiddle-factor vectors \

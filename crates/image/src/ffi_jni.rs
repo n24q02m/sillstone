@@ -1,9 +1,9 @@
-//! The JNI surface of `sillstone-image`: the `Java_hash_sillstone_image_PithImage_*`
+//! The JNI surface of `sillstone-image`: the `Java_io_github_sillstone_SillstoneImage_*`
 //! exports the Java SDK (`sdk/java`) binds its `native` methods through.
 //!
 //! The C ABI of [`crate::ffi`] is untouched: JNI requires exports named
 //! `Java_<package>_<Class>_<method>`, so the Java-facing shims live here
-//! and forward every call to the existing `pith_*` C export — same
+//! and forward every call to the existing `sillstone_*` C export — same
 //! status codes, same refusals, no second implementation of the
 //! pipeline. The module is compiled out of the unit-test build
 //! (`#[cfg(not(test))]` at the registration site in `lib.rs`); the
@@ -15,11 +15,11 @@
 //! * the export takes the JNI environment first and the receiving
 //!   class second (the methods are static), then the Java arguments;
 //! * the status code crosses back through a trailing one-element
-//!   `int[]` — the same `PITH_OK` / `PITH_E_INVALID` values the C ABI
+//!   `int[]` — the same `SILLSTONE_OK` / `SILLSTONE_E_INVALID` values the C ABI
 //!   returns;
 //! * the hash crosses back bit-cast to `jlong` (0 unless the status is
-//!   `PITH_OK`);
-//! * a null `data` array maps to `PITH_E_INVALID` exactly as the C ABI
+//!   `SILLSTONE_OK`);
+//! * a null `data` array maps to `SILLSTONE_E_INVALID` exactly as the C ABI
 //!   maps a null pointer; a null environment or status array
 //!   short-circuits to a zero return without touching memory (both are
 //!   unreachable through the Java wrapper, which always passes live
@@ -38,7 +38,7 @@
 
 use core::ffi::c_void;
 
-use crate::ffi::{PITH_E_INVALID, PITH_OK, sillstone_image_phash};
+use crate::ffi::{SILLSTONE_E_INVALID, SILLSTONE_OK, sillstone_image_phash};
 
 /// A JNI environment handle — C-mode `JNIEnv*`, a pointer to the
 /// function table.
@@ -115,15 +115,15 @@ unsafe fn table<'a>(env: *mut JNIEnv) -> &'a JniTable {
 ///
 /// `env` must be a live JNI environment and `array` a live `byte[]`
 /// reference for the duration of the call; a null array is
-/// [`PITH_E_INVALID`], mirroring the C ABI's null-pointer rule.
+/// [`SILLSTONE_E_INVALID`], mirroring the C ABI's null-pointer rule.
 unsafe fn java_bytes(env: *mut JNIEnv, array: JArray) -> Result<Vec<u8>, i32> {
     if array.is_null() {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let functions = unsafe { table(env) };
     let len = unsafe { (functions.get_array_length)(env, array) };
     if len < 0 {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let mut bytes = vec![0u8; len as usize];
     unsafe { (functions.get_byte_array_region)(env, array, 0, len, bytes.as_mut_ptr().cast()) };
@@ -147,8 +147,8 @@ unsafe fn set_status(env: *mut JNIEnv, status: JIntArray, value: jint) {
 /// `data` is the flat, row-major, channel-interleaved dump of a
 /// `width`×`height` image; `layout` is one of the Java `LAYOUT_*`
 /// codes — the same wire codes as the C ABI. The hash crosses back
-/// bit-cast to `jlong`, and the status (`PITH_OK`, or
-/// `PITH_E_INVALID` for a null array, an unknown layout code or a
+/// bit-cast to `jlong`, and the status (`SILLSTONE_OK`, or
+/// `SILLSTONE_E_INVALID` for a null array, an unknown layout code or a
 /// geometry mismatch) through `status[0]`.
 ///
 /// # Safety
@@ -160,7 +160,7 @@ unsafe fn set_status(env: *mut JNIEnv, status: JIntArray, value: jint) {
 // signature over the private table type would trip
 // `private_interfaces`.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_image_PithImage_phashNative(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneImage_phashNative(
     env: *mut JNIEnv,
     _class: JClass,
     data: JArray,
@@ -191,5 +191,37 @@ unsafe extern "system" fn Java_hash_sillstone_image_PithImage_phashNative(
         )
     };
     unsafe { set_status(env, status, code) };
-    if code == PITH_OK { hash as jlong } else { 0 }
+    if code == SILLSTONE_OK {
+        hash as jlong
+    } else {
+        0
+    }
+}
+
+// Deprecated pre-rename JNI exports: the symbols Java classes compiled against the
+// suite's old class names resolve. Each one forwards to its canonical
+// `io.github.sillstone` export unchanged.
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneImage_phashNative`]: the export for the
+/// pre-rename `hash.sillstone.image.PithImage` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneImage_phashNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneImage_phashNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_image_PithImage_phashNative(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    width: jint,
+    height: jint,
+    layout: jint,
+    status: JIntArray,
+) -> jlong {
+    unsafe {
+        Java_io_github_sillstone_SillstoneImage_phashNative(
+            env, class, data, width, height, layout, status,
+        )
+    }
 }

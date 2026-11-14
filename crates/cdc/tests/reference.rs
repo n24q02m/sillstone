@@ -351,7 +351,7 @@ fn reference_document_shape_is_frozen() {
     let document = parse_document(REFERENCE_JSON);
     assert_eq!(
         document.get("schema").as_str(),
-        "pith-cdc.reference.v1",
+        "sillstone-cdc.reference.v1",
         "reference.json: schema marker changed"
     );
     assert!(

@@ -1,6 +1,6 @@
 //! JPEG decoding for baseline (SOF0/SOF1) and progressive (SOF2) profiles.
 //!
-//! Part of the `pith` zero-dependency hashing suite: this crate depends
+//! Part of the `sillstone` zero-dependency hashing suite: this crate depends
 //! only on `sillstone-digest`, `sillstone-math` and `sillstone-image`, so the
 //! whole suite resolves without a single registry package.
 //!
@@ -43,18 +43,18 @@ extern crate alloc;
 mod baseline;
 mod bits;
 mod color;
+pub mod encode;
 mod huffman;
 mod idct;
 mod parser;
 mod progressive;
 mod upsample;
-pub mod encode;
 
 pub mod ffi;
 pub mod reference;
 
-pub use encode::{encode_gray, encode_rgb};
 use alloc::vec::Vec;
+pub use encode::{encode_gray, encode_rgb};
 
 use sillstone_digest::{Error, Result};
 use sillstone_image::raster::{Gray, Image, Rgb};

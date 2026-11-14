@@ -2,7 +2,7 @@
 //! (ctypes), Node (koffi) and Go (cgo) SDKs bind through.
 //!
 //! The suite's FFI convention, defined by the pilot cdylibs and
-//! mirrored by every `pith-*` cdylib:
+//! mirrored by every `sillstone-*` cdylib:
 //!
 //! * flat `#[unsafe(no_mangle)] pub unsafe extern "C"` functions — raw
 //!   pointers plus lengths, no structs across the boundary;
@@ -23,8 +23,8 @@
 //!   channel-interleaved, exactly the buffer the committed
 //!   `reference.json` `digests` section pins (and the `.raw`
 //!   companions hold). `layout` selects the output encoding via the
-//!   `sillstone-image` layout codes ([`PITH_LAYOUT_GRAY8`] = 0,
-//!   [`PITH_LAYOUT_RGB8`] = 2, [`PITH_LAYOUT_RGBA8`] = 4); a grayscale
+//!   `sillstone-image` layout codes ([`SILLSTONE_LAYOUT_GRAY8`] = 0,
+//!   [`SILLSTONE_LAYOUT_RGB8`] = 2, [`SILLSTONE_LAYOUT_RGBA8`] = 4); a grayscale
 //!   image widens by channel replication, an RGB image to RGBA by
 //!   opaque alpha, and RGB→gray is refused rather than invented.
 //! * [`sillstone_jpeg_channels`] — the frame's native channel count (1 or
@@ -37,9 +37,9 @@
 //!   bit patterns as **little-endian u64** (one 8-byte lane per
 //!   value); lengths are explicit and enforced.
 //!
-//! Status codes follow the suite convention: [`PITH_OK`],
-//! [`PITH_E_INVALID`] (caller bug: null pointer, unknown layout,
-//! wrong buffer length), [`PITH_E_REJECTED`] (the decoder refused the
+//! Status codes follow the suite convention: [`SILLSTONE_OK`],
+//! [`SILLSTONE_E_INVALID`] (caller bug: null pointer, unknown layout,
+//! wrong buffer length), [`SILLSTONE_E_REJECTED`] (the decoder refused the
 //! input or the conversion is not offered).
 
 #![allow(unsafe_code)]
@@ -51,20 +51,20 @@ use sillstone_digest::fnv1a64;
 use sillstone_math::idct2_2d;
 
 /// Status: success.
-pub const PITH_OK: i32 = 0;
+pub const SILLSTONE_OK: i32 = 0;
 /// Status: a caller argument is invalid — null pointer, unknown
 /// layout, or a buffer whose length does not match the operation.
-pub const PITH_E_INVALID: i32 = -1;
+pub const SILLSTONE_E_INVALID: i32 = -1;
 /// Status: the core decoder refused the input (malformed JPEG), or
 /// the requested conversion is not offered (RGB→gray).
-pub const PITH_E_REJECTED: i32 = -2;
+pub const SILLSTONE_E_REJECTED: i32 = -2;
 
 /// Layout code: 8-bit grayscale (the `sillstone-image` code).
-pub const PITH_LAYOUT_GRAY8: u32 = 0;
+pub const SILLSTONE_LAYOUT_GRAY8: u32 = 0;
 /// Layout code: 8-bit RGB, channel-interleaved (the `sillstone-image` code).
-pub const PITH_LAYOUT_RGB8: u32 = 2;
+pub const SILLSTONE_LAYOUT_RGB8: u32 = 2;
 /// Layout code: 8-bit RGBA, channel-interleaved (the `sillstone-image` code).
-pub const PITH_LAYOUT_RGBA8: u32 = 4;
+pub const SILLSTONE_LAYOUT_RGBA8: u32 = 4;
 
 /// One `f64` lane in the kernel wire format, in bytes.
 const LANE: usize = 8;
@@ -98,10 +98,10 @@ unsafe fn write_lanes(buf: *mut u8, values: &[f64]) {
 }
 
 /// Length-checked lane read for the shell bodies: maps a wrong buffer
-/// length to [`PITH_E_INVALID`].
+/// length to [`SILLSTONE_E_INVALID`].
 fn lanes_in(buf: *const u8, len: usize, want: usize) -> Result<Vec<f64>, i32> {
     if buf.is_null() || len != want * LANE {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     Ok(unsafe { read_lanes(buf, want) })
 }
@@ -113,7 +113,7 @@ fn lanes_in(buf: *const u8, len: usize, want: usize) -> Result<Vec<f64>, i32> {
 /// `out` must be valid for `out_len` bytes when non-null.
 unsafe fn lanes_out(out: *mut u8, out_len: usize, want: usize, values: &[f64]) -> Result<(), i32> {
     if out.is_null() || out_len != want * LANE {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     unsafe { write_lanes(out, values) };
     Ok(())
@@ -126,33 +126,33 @@ unsafe fn lanes_out(out: *mut u8, out_len: usize, want: usize, values: &[f64]) -
 /// [`sillstone_jpeg_channels`]-style callers.
 fn digest_for(bytes: &[u8], layout: u32) -> Result<(u64, u32), i32> {
     match layout {
-        PITH_LAYOUT_GRAY8 | PITH_LAYOUT_RGB8 | PITH_LAYOUT_RGBA8 => {}
-        _ => return Err(PITH_E_INVALID),
+        SILLSTONE_LAYOUT_GRAY8 | SILLSTONE_LAYOUT_RGB8 | SILLSTONE_LAYOUT_RGBA8 => {}
+        _ => return Err(SILLSTONE_E_INVALID),
     }
-    let jpeg = decode(bytes).map_err(|_| PITH_E_REJECTED)?;
+    let jpeg = decode(bytes).map_err(|_| SILLSTONE_E_REJECTED)?;
     let native_channels: u32 = match &jpeg {
         Jpeg::Gray(_) => 1,
         Jpeg::Rgb(_) => 3,
     };
     let bytes: alloc::vec::Vec<u8> = match (&jpeg, layout) {
-        (Jpeg::Gray(img), PITH_LAYOUT_GRAY8) => img.as_slice().to_vec(),
-        (Jpeg::Rgb(img), PITH_LAYOUT_RGB8) => img.as_slice().to_vec(),
-        (Jpeg::Gray(img), PITH_LAYOUT_RGB8) => {
+        (Jpeg::Gray(img), SILLSTONE_LAYOUT_GRAY8) => img.as_slice().to_vec(),
+        (Jpeg::Rgb(img), SILLSTONE_LAYOUT_RGB8) => img.as_slice().to_vec(),
+        (Jpeg::Gray(img), SILLSTONE_LAYOUT_RGB8) => {
             img.as_slice().iter().flat_map(|&g| [g, g, g]).collect()
         }
-        (Jpeg::Gray(img), PITH_LAYOUT_RGBA8) => img
+        (Jpeg::Gray(img), SILLSTONE_LAYOUT_RGBA8) => img
             .as_slice()
             .iter()
             .flat_map(|&g| [g, g, g, u8::MAX])
             .collect(),
-        (Jpeg::Rgb(img), PITH_LAYOUT_RGBA8) => img
+        (Jpeg::Rgb(img), SILLSTONE_LAYOUT_RGBA8) => img
             .as_slice()
             .chunks_exact(3)
             .flat_map(|c| [c[0], c[1], c[2], u8::MAX])
             .collect(),
         // RGB→gray would invent a luma weighting the suite never
         // pinned; refuse instead of guessing.
-        (Jpeg::Rgb(_), PITH_LAYOUT_GRAY8) => return Err(PITH_E_REJECTED),
+        (Jpeg::Rgb(_), SILLSTONE_LAYOUT_GRAY8) => return Err(SILLSTONE_E_REJECTED),
         _ => unreachable!("layout membership checked above"),
     };
     Ok((fnv1a64(&bytes), native_channels))
@@ -175,22 +175,22 @@ pub unsafe extern "C" fn sillstone_jpeg_decode(
     digest: *mut u64,
 ) -> i32 {
     if data.is_null() && len != 0 {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     if digest.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     if data.is_null() {
         // Null-ified zero-length bindings (Node's `Buffer.alloc(0)`) or
         // an explicit empty hand-off: the empty stream is a refusal,
         // never a slice.
-        return PITH_E_REJECTED;
+        return SILLSTONE_E_REJECTED;
     }
     let bytes = unsafe { core::slice::from_raw_parts(data, len) };
     match digest_for(bytes, layout) {
         Ok((value, _)) => {
             unsafe { *digest = value };
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(status) => status,
     }
@@ -198,8 +198,8 @@ pub unsafe extern "C" fn sillstone_jpeg_decode(
 
 /// Writes the frame's native channel count (1 or 3) through `out`
 /// without converting anything: the digest-exact layout for a fixture
-/// is [`PITH_LAYOUT_GRAY8`] when this reports 1 and
-/// [`PITH_LAYOUT_RGB8`] when it reports 3.
+/// is [`SILLSTONE_LAYOUT_GRAY8`] when this reports 1 and
+/// [`SILLSTONE_LAYOUT_RGB8`] when it reports 3.
 ///
 /// # Safety
 ///
@@ -208,14 +208,14 @@ pub unsafe extern "C" fn sillstone_jpeg_decode(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sillstone_jpeg_channels(data: *const u8, len: usize, out: *mut u32) -> i32 {
     if data.is_null() && len != 0 {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     if out.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     if data.is_null() {
         // Same refusal rule as `sillstone_jpeg_decode`.
-        return PITH_E_REJECTED;
+        return SILLSTONE_E_REJECTED;
     }
     let bytes = unsafe { core::slice::from_raw_parts(data, len) };
     match decode(bytes) {
@@ -226,9 +226,9 @@ pub unsafe extern "C" fn sillstone_jpeg_channels(data: *const u8, len: usize, ou
                     Jpeg::Rgb(_) => 3,
                 };
             }
-            PITH_OK
+            SILLSTONE_OK
         }
-        Err(_) => PITH_E_REJECTED,
+        Err(_) => SILLSTONE_E_REJECTED,
     }
 }
 
@@ -260,7 +260,7 @@ pub unsafe extern "C" fn sillstone_jpeg_dequant_zigzag(
         natural[ZIGZAG[k] as usize] = val;
     }
     match unsafe { lanes_out(output, output_len, BLOCK, &natural) } {
-        Ok(()) => PITH_OK,
+        Ok(()) => SILLSTONE_OK,
         Err(status) => status,
     }
 }
@@ -293,7 +293,7 @@ pub unsafe extern "C" fn sillstone_jpeg_dequant(
         .map(|(&c, &q)| c * q)
         .collect();
     match unsafe { lanes_out(output, output_len, BLOCK, &products) } {
-        Ok(()) => PITH_OK,
+        Ok(()) => SILLSTONE_OK,
         Err(status) => status,
     }
 }
@@ -327,7 +327,7 @@ pub unsafe extern "C" fn sillstone_jpeg_idct_islow(
     dequant_idct_into(&coefs, &qt, &mut plane, 8, 0, 0);
     let samples: Vec<f64> = plane.iter().map(|&s| f64::from(s)).collect();
     match unsafe { lanes_out(output, output_len, BLOCK, &samples) } {
-        Ok(()) => PITH_OK,
+        Ok(()) => SILLSTONE_OK,
         Err(status) => status,
     }
 }
@@ -356,18 +356,40 @@ pub unsafe extern "C" fn sillstone_jpeg_idct_oracle(
     };
     idct2_2d(&mut block, 8, 8);
     match unsafe { lanes_out(output, output_len, BLOCK, &block) } {
-        Ok(()) => PITH_OK,
+        Ok(()) => SILLSTONE_OK,
         Err(status) => status,
     }
 }
 
+// Deprecated pre-rename aliases: the `PITH_*` names the suite shipped before
+// it became `sillstone`. Each one is the same value as its `SILLSTONE_*` twin.
+
+/// Deprecated alias of [`SILLSTONE_OK`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_OK`")]
+pub const PITH_OK: i32 = SILLSTONE_OK;
+/// Deprecated alias of [`SILLSTONE_E_INVALID`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_INVALID`")]
+pub const PITH_E_INVALID: i32 = SILLSTONE_E_INVALID;
+/// Deprecated alias of [`SILLSTONE_E_REJECTED`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_REJECTED`")]
+pub const PITH_E_REJECTED: i32 = SILLSTONE_E_REJECTED;
+/// Deprecated alias of [`SILLSTONE_LAYOUT_GRAY8`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_LAYOUT_GRAY8`")]
+pub const PITH_LAYOUT_GRAY8: u32 = SILLSTONE_LAYOUT_GRAY8;
+/// Deprecated alias of [`SILLSTONE_LAYOUT_RGB8`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_LAYOUT_RGB8`")]
+pub const PITH_LAYOUT_RGB8: u32 = SILLSTONE_LAYOUT_RGB8;
+/// Deprecated alias of [`SILLSTONE_LAYOUT_RGBA8`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_LAYOUT_RGBA8`")]
+pub const PITH_LAYOUT_RGBA8: u32 = SILLSTONE_LAYOUT_RGBA8;
+
 #[cfg(test)]
 mod tests {
     use super::{
-        BLOCK, PITH_E_INVALID, PITH_E_REJECTED, PITH_LAYOUT_GRAY8, PITH_LAYOUT_RGB8,
-        PITH_LAYOUT_RGBA8, PITH_OK, digest_for, lanes_in, lanes_out, sillstone_jpeg_channels,
-        sillstone_jpeg_decode, sillstone_jpeg_dequant, sillstone_jpeg_dequant_zigzag, sillstone_jpeg_idct_islow,
-        sillstone_jpeg_idct_oracle,
+        BLOCK, SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_LAYOUT_GRAY8,
+        SILLSTONE_LAYOUT_RGB8, SILLSTONE_LAYOUT_RGBA8, SILLSTONE_OK, digest_for, lanes_in,
+        lanes_out, sillstone_jpeg_channels, sillstone_jpeg_decode, sillstone_jpeg_dequant,
+        sillstone_jpeg_dequant_zigzag, sillstone_jpeg_idct_islow, sillstone_jpeg_idct_oracle,
     };
     use crate::reference;
 
@@ -405,9 +427,9 @@ mod tests {
                 .file;
             let bytes = fixture(file);
             let layout = if name.contains("gray") {
-                PITH_LAYOUT_GRAY8
+                SILLSTONE_LAYOUT_GRAY8
             } else {
-                PITH_LAYOUT_RGB8
+                SILLSTONE_LAYOUT_RGB8
             };
             let (digest, _) = digest_for(&bytes, layout).expect("decode");
             assert_eq!(digest, want, "{name}");
@@ -416,15 +438,20 @@ mod tests {
 
     /// The raw FFI entry point: OK + digest on a fixture, refusals on
     /// garbage, empty input, unknown layout and the refused RGB→gray
-    /// conversion; null pointers are [`PITH_E_INVALID`].
+    /// conversion; null pointers are [`SILLSTONE_E_INVALID`].
     #[test]
     fn ffi_decode_statuses() {
         let bytes = fixture("base_gray.jpg");
         let mut digest: u64 = 0;
         let status = unsafe {
-            sillstone_jpeg_decode(bytes.as_ptr(), bytes.len(), PITH_LAYOUT_GRAY8, &mut digest)
+            sillstone_jpeg_decode(
+                bytes.as_ptr(),
+                bytes.len(),
+                SILLSTONE_LAYOUT_GRAY8,
+                &mut digest,
+            )
         };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         let want = reference::digest_values()
             .into_iter()
             .find(|(n, _)| *n == "base_gray")
@@ -438,7 +465,7 @@ mod tests {
 
         let mut channels: u32 = 0;
         let status = unsafe { sillstone_jpeg_channels(bytes.as_ptr(), bytes.len(), &mut channels) };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(channels, 1);
 
         let garbage = b"not a jpeg at all";
@@ -446,37 +473,45 @@ mod tests {
             sillstone_jpeg_decode(
                 garbage.as_ptr(),
                 garbage.len(),
-                PITH_LAYOUT_GRAY8,
+                SILLSTONE_LAYOUT_GRAY8,
                 &mut digest,
             )
         };
-        assert_eq!(status, PITH_E_REJECTED);
+        assert_eq!(status, SILLSTONE_E_REJECTED);
 
         let empty = [];
-        let status = unsafe { sillstone_jpeg_decode(empty.as_ptr(), 0, PITH_LAYOUT_GRAY8, &mut digest) };
-        assert_eq!(status, PITH_E_REJECTED);
+        let status = unsafe {
+            sillstone_jpeg_decode(empty.as_ptr(), 0, SILLSTONE_LAYOUT_GRAY8, &mut digest)
+        };
+        assert_eq!(status, SILLSTONE_E_REJECTED);
 
         let status = unsafe { sillstone_jpeg_decode(bytes.as_ptr(), bytes.len(), 9, &mut digest) };
-        assert_eq!(status, PITH_E_INVALID);
+        assert_eq!(status, SILLSTONE_E_INVALID);
 
         let color = fixture("base_444.jpg");
         let status = unsafe {
-            sillstone_jpeg_decode(color.as_ptr(), color.len(), PITH_LAYOUT_GRAY8, &mut digest)
+            sillstone_jpeg_decode(
+                color.as_ptr(),
+                color.len(),
+                SILLSTONE_LAYOUT_GRAY8,
+                &mut digest,
+            )
         };
-        assert_eq!(status, PITH_E_REJECTED);
+        assert_eq!(status, SILLSTONE_E_REJECTED);
 
-        let status =
-            unsafe { sillstone_jpeg_decode(core::ptr::null(), 0, PITH_LAYOUT_GRAY8, &mut digest) };
-        assert_eq!(status, PITH_E_REJECTED);
+        let status = unsafe {
+            sillstone_jpeg_decode(core::ptr::null(), 0, SILLSTONE_LAYOUT_GRAY8, &mut digest)
+        };
+        assert_eq!(status, SILLSTONE_E_REJECTED);
         let status = unsafe {
             sillstone_jpeg_decode(
                 bytes.as_ptr(),
                 bytes.len(),
-                PITH_LAYOUT_GRAY8,
+                SILLSTONE_LAYOUT_GRAY8,
                 core::ptr::null_mut(),
             )
         };
-        assert_eq!(status, PITH_E_INVALID);
+        assert_eq!(status, SILLSTONE_E_INVALID);
     }
 
     /// Layout conversions: gray widens by replication (digests move),
@@ -488,17 +523,32 @@ mod tests {
         let mut widened: u64 = 0;
         unsafe {
             assert_eq!(
-                sillstone_jpeg_decode(gray.as_ptr(), gray.len(), PITH_LAYOUT_GRAY8, &mut native),
-                PITH_OK
+                sillstone_jpeg_decode(
+                    gray.as_ptr(),
+                    gray.len(),
+                    SILLSTONE_LAYOUT_GRAY8,
+                    &mut native
+                ),
+                SILLSTONE_OK
             );
             assert_eq!(
-                sillstone_jpeg_decode(gray.as_ptr(), gray.len(), PITH_LAYOUT_RGB8, &mut widened),
-                PITH_OK
+                sillstone_jpeg_decode(
+                    gray.as_ptr(),
+                    gray.len(),
+                    SILLSTONE_LAYOUT_RGB8,
+                    &mut widened
+                ),
+                SILLSTONE_OK
             );
             assert_ne!(native, widened);
             assert_eq!(
-                sillstone_jpeg_decode(gray.as_ptr(), gray.len(), PITH_LAYOUT_RGBA8, &mut widened),
-                PITH_OK
+                sillstone_jpeg_decode(
+                    gray.as_ptr(),
+                    gray.len(),
+                    SILLSTONE_LAYOUT_RGBA8,
+                    &mut widened
+                ),
+                SILLSTONE_OK
             );
         }
 
@@ -506,8 +556,13 @@ mod tests {
         let mut rgba: u64 = 0;
         unsafe {
             assert_eq!(
-                sillstone_jpeg_decode(color.as_ptr(), color.len(), PITH_LAYOUT_RGBA8, &mut rgba),
-                PITH_OK
+                sillstone_jpeg_decode(
+                    color.as_ptr(),
+                    color.len(),
+                    SILLSTONE_LAYOUT_RGBA8,
+                    &mut rgba
+                ),
+                SILLSTONE_OK
             );
         }
         assert_ne!(rgba, 0);
@@ -515,7 +570,7 @@ mod tests {
 
     /// The four kernel entry points reproduce the recorded outputs
     /// (bit-exact on the integer pipeline, in-tolerance on the
-    /// oracle); wrong lengths and nulls are [`PITH_E_INVALID`].
+    /// oracle); wrong lengths and nulls are [`SILLSTONE_E_INVALID`].
     #[test]
     fn ffi_kernels_reproduce_the_recorded_vectors() {
         for vector in reference::vectors() {
@@ -550,7 +605,7 @@ mod tests {
                     other => panic!("unmapped vector {other}"),
                 }
             };
-            assert_eq!(status, PITH_OK, "{}", vector.name);
+            assert_eq!(status, SILLSTONE_OK, "{}", vector.name);
             let got = unlanes(&output);
             if vector.exact {
                 assert_eq!(got, vector.output, "{}", vector.name);
@@ -581,7 +636,7 @@ mod tests {
                 ok_out.len(),
             )
         };
-        assert_eq!(status, PITH_E_INVALID);
+        assert_eq!(status, SILLSTONE_E_INVALID);
         let status = unsafe {
             sillstone_jpeg_dequant_zigzag(
                 ok_in.as_ptr(),
@@ -590,7 +645,7 @@ mod tests {
                 ok_out.len() - 8,
             )
         };
-        assert_eq!(status, PITH_E_INVALID);
+        assert_eq!(status, SILLSTONE_E_INVALID);
         let status = unsafe {
             sillstone_jpeg_dequant_zigzag(
                 core::ptr::null(),
@@ -599,7 +654,7 @@ mod tests {
                 ok_out.len(),
             )
         };
-        assert_eq!(status, PITH_E_INVALID);
+        assert_eq!(status, SILLSTONE_E_INVALID);
         let status = unsafe {
             sillstone_jpeg_dequant(
                 ok_in.as_ptr(),
@@ -608,12 +663,12 @@ mod tests {
                 ok_out.len(),
             )
         };
-        assert_eq!(status, PITH_E_INVALID);
+        assert_eq!(status, SILLSTONE_E_INVALID);
         let two = vec![0u8; 128 * 8];
         let status = unsafe {
             sillstone_jpeg_idct_islow(two.as_ptr(), two.len(), ok_out.as_mut_ptr(), ok_out.len())
         };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         let status = unsafe {
             sillstone_jpeg_idct_oracle(
                 ok_in.as_ptr(),
@@ -622,7 +677,7 @@ mod tests {
                 ok_out.len(),
             )
         };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
     }
 
     /// The lane helpers enforce exact lengths and round-trip bits.
@@ -630,7 +685,7 @@ mod tests {
     fn lane_helpers_roundtrip() {
         assert_eq!(
             lanes_in(core::ptr::null(), 0, BLOCK).unwrap_err(),
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         let values = vec![-0.5f64, 1.5, f64::MAX, -1.0e-300];
         let bytes = lanes(&values);
@@ -640,8 +695,24 @@ mod tests {
         unsafe {
             assert_eq!(
                 lanes_out(out.as_mut_ptr(), out.len() - 1, values.len(), &values).unwrap_err(),
-                PITH_E_INVALID
+                SILLSTONE_E_INVALID
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod deprecated_alias_tests {
+    #![allow(deprecated)]
+    use super::*;
+
+    #[test]
+    fn pith_aliases_equal_their_sillstone_twins() {
+        assert_eq!(PITH_OK, SILLSTONE_OK);
+        assert_eq!(PITH_E_INVALID, SILLSTONE_E_INVALID);
+        assert_eq!(PITH_E_REJECTED, SILLSTONE_E_REJECTED);
+        assert_eq!(PITH_LAYOUT_GRAY8, SILLSTONE_LAYOUT_GRAY8);
+        assert_eq!(PITH_LAYOUT_RGB8, SILLSTONE_LAYOUT_RGB8);
+        assert_eq!(PITH_LAYOUT_RGBA8, SILLSTONE_LAYOUT_RGBA8);
     }
 }

@@ -39,9 +39,17 @@ const HASH_NAMES: [&str; 5] = ["phash", "ahash", "dhash", "whash", "colorhash"];
 fn phash_refuses_null_data_and_null_out() {
     let data = [0u8; 4];
     let mut slot = SLOT;
-    let status =
-        unsafe { sillstone_image_phash(core::ptr::null(), 4, 2, 2, PITH_LAYOUT_GRAY8, &mut slot) };
-    assert_eq!(status, PITH_E_INVALID, "null data");
+    let status = unsafe {
+        sillstone_image_phash(
+            core::ptr::null(),
+            4,
+            2,
+            2,
+            SILLSTONE_LAYOUT_GRAY8,
+            &mut slot,
+        )
+    };
+    assert_eq!(status, SILLSTONE_E_INVALID, "null data");
     assert_eq!(slot, SLOT, "slot written on refusal");
 
     let status = unsafe {
@@ -50,17 +58,20 @@ fn phash_refuses_null_data_and_null_out() {
             data.len(),
             2,
             2,
-            PITH_LAYOUT_GRAY8,
+            SILLSTONE_LAYOUT_GRAY8,
             core::ptr::null_mut(),
         )
     };
-    assert_eq!(status, PITH_E_INVALID, "null out");
+    assert_eq!(status, SILLSTONE_E_INVALID, "null out");
 }
 
 #[test]
 fn sixteen_bit_hashes_refuse_a_dump_that_does_not_match_the_geometry() {
     // (layout, bytes per pixel, name)
-    for (layout, bytes_per_pixel) in [(PITH_LAYOUT_GRAY16, 2usize), (PITH_LAYOUT_RGB16, 6)] {
+    for (layout, bytes_per_pixel) in [
+        (SILLSTONE_LAYOUT_GRAY16, 2usize),
+        (SILLSTONE_LAYOUT_RGB16, 6),
+    ] {
         for (kind, name) in HASH_NAMES.iter().enumerate() {
             // 2x2: needs 4 * bytes_per_pixel bytes; one byte short and one
             // byte long are both refused, an exact dump is accepted.
@@ -70,7 +81,7 @@ fn sixteen_bit_hashes_refuse_a_dump_that_does_not_match_the_geometry() {
                 let mut slot = SLOT;
                 let status = run_hash(kind, &dump, 2, 2, layout, &mut slot);
                 assert_eq!(
-                    status, PITH_E_INVALID,
+                    status, SILLSTONE_E_INVALID,
                     "{name} layout {layout} len {bad_len}"
                 );
                 assert_eq!(slot, SLOT, "{name} wrote the slot on a length mismatch");
@@ -80,7 +91,10 @@ fn sixteen_bit_hashes_refuse_a_dump_that_does_not_match_the_geometry() {
             // before any allocation, with an empty dump.
             let mut slot = SLOT;
             let status = run_hash(kind, &[], u32::MAX, u32::MAX, layout, &mut slot);
-            assert_eq!(status, PITH_E_INVALID, "{name} layout {layout} overflow");
+            assert_eq!(
+                status, SILLSTONE_E_INVALID,
+                "{name} layout {layout} overflow"
+            );
             assert_eq!(slot, SLOT, "{name} wrote the slot on overflowing geometry");
         }
     }
@@ -92,12 +106,15 @@ fn sixteen_bit_hashes_refuse_a_dump_that_does_not_match_the_geometry() {
 /// aHash and dHash (both strict comparisons) are 0 by definition.
 #[test]
 fn sixteen_bit_hashes_accept_an_exact_dump() {
-    for (layout, bytes_per_pixel) in [(PITH_LAYOUT_GRAY16, 2usize), (PITH_LAYOUT_RGB16, 6)] {
+    for (layout, bytes_per_pixel) in [
+        (SILLSTONE_LAYOUT_GRAY16, 2usize),
+        (SILLSTONE_LAYOUT_RGB16, 6),
+    ] {
         let dump = vec![0x80u8; 16 * 16 * bytes_per_pixel];
         for (kind, name) in HASH_NAMES.iter().enumerate() {
             let mut slot = SLOT;
             let status = run_hash(kind, &dump, 16, 16, layout, &mut slot);
-            assert_eq!(status, PITH_OK, "{name} layout {layout}");
+            assert_eq!(status, SILLSTONE_OK, "{name} layout {layout}");
             if kind == 1 || kind == 2 {
                 assert_eq!(slot, 0, "{name} of a constant image");
             }
@@ -108,9 +125,9 @@ fn sixteen_bit_hashes_accept_an_exact_dump() {
 #[test]
 fn resize_rejects_a_zero_input_dimension() {
     for (layout, c) in [
-        (PITH_LAYOUT_GRAY8, 1usize),
-        (PITH_LAYOUT_RGB8, 3),
-        (PITH_LAYOUT_RGBA8, 4),
+        (SILLSTONE_LAYOUT_GRAY8, 1usize),
+        (SILLSTONE_LAYOUT_RGB8, 3),
+        (SILLSTONE_LAYOUT_RGBA8, 4),
     ] {
         // 0x5 input: the declared geometry is empty, so a zero-length dump
         // matches it, and the image constructor is what refuses the zero side.
@@ -130,7 +147,7 @@ fn resize_rejects_a_zero_input_dimension() {
                 out.len(),
             )
         };
-        assert_eq!(status, PITH_E_REJECTED, "layout {layout} zero width");
+        assert_eq!(status, SILLSTONE_E_REJECTED, "layout {layout} zero width");
         assert!(
             out.iter().all(|&b| b == FILL),
             "layout {layout} output written"
@@ -150,7 +167,7 @@ fn resize_rejects_a_zero_input_dimension() {
                 out.len(),
             )
         };
-        assert_eq!(status, PITH_E_REJECTED, "layout {layout} zero height");
+        assert_eq!(status, SILLSTONE_E_REJECTED, "layout {layout} zero height");
         assert!(
             out.iter().all(|&b| b == FILL),
             "layout {layout} output written"
@@ -161,9 +178,9 @@ fn resize_rejects_a_zero_input_dimension() {
 #[test]
 fn resize_rejects_a_zero_output_dimension() {
     for (layout, c) in [
-        (PITH_LAYOUT_GRAY8, 1usize),
-        (PITH_LAYOUT_RGB8, 3),
-        (PITH_LAYOUT_RGBA8, 4),
+        (SILLSTONE_LAYOUT_GRAY8, 1usize),
+        (SILLSTONE_LAYOUT_RGB8, 3),
+        (SILLSTONE_LAYOUT_RGBA8, 4),
     ] {
         let src = vec![9u8; 2 * 2 * c];
         let mut out = vec![FILL; 16];
@@ -184,7 +201,10 @@ fn resize_rejects_a_zero_output_dimension() {
                     0,
                 )
             };
-            assert_eq!(status, PITH_E_REJECTED, "layout {layout} out {ow}x{oh}");
+            assert_eq!(
+                status, SILLSTONE_E_REJECTED,
+                "layout {layout} out {ow}x{oh}"
+            );
             assert!(
                 out.iter().all(|&b| b == FILL),
                 "layout {layout} output written"
@@ -208,7 +228,7 @@ fn resize_rejects_a_zero_output_dimension() {
                 one.len(),
             )
         };
-        assert_eq!(status, PITH_OK, "layout {layout} control");
+        assert_eq!(status, SILLSTONE_OK, "layout {layout} control");
         assert_eq!(one, vec![9u8; c], "layout {layout} control pixel");
     }
 }
@@ -219,13 +239,13 @@ fn rotate_size_rejects_a_bounding_box_wider_than_u32() {
     let (mut w, mut h) = (7u32, 9u32);
     let status =
         unsafe { sillstone_image_rotate_size(u32::MAX, u32::MAX, 45.0, 1, &mut w, &mut h) };
-    assert_eq!(status, PITH_E_REJECTED);
+    assert_eq!(status, SILLSTONE_E_REJECTED);
     assert_eq!((w, h), (7, 9), "dimensions written on refusal");
 
     // Control: a 90 degree turn of the same extreme width only swaps sides and
     // fits, so the refusal above is the size, not the extreme input.
     let status = unsafe { sillstone_image_rotate_size(u32::MAX, 1, 90.0, 1, &mut w, &mut h) };
-    assert_eq!(status, PITH_OK);
+    assert_eq!(status, SILLSTONE_OK);
     assert_eq!((w, h), (1, u32::MAX));
 }
 
@@ -234,9 +254,9 @@ type Conversion<'a> = (&'a str, &'a [u8], u32, u32, Vec<u8>);
 
 #[test]
 fn color_convert_refuses_an_output_buffer_one_byte_short() {
-    const RGBA: u32 = PITH_LAYOUT_RGBA8;
-    const RGB: u32 = PITH_LAYOUT_RGB8;
-    const GRAY: u32 = PITH_LAYOUT_GRAY8;
+    const RGBA: u32 = SILLSTONE_LAYOUT_RGBA8;
+    const RGB: u32 = SILLSTONE_LAYOUT_RGB8;
+    const GRAY: u32 = SILLSTONE_LAYOUT_GRAY8;
     // Two pixels. Luma of (10,20,30) by Pillow's integer form
     // (19595*r + 38470*g + 7471*b + 0x8000) >> 16 is 1222248 >> 16 = 18, and a
     // grey pixel (100,100,100) maps to 100.
@@ -282,7 +302,7 @@ fn color_convert_refuses_an_output_buffer_one_byte_short() {
                 expected.len() - 1,
             )
         };
-        assert_eq!(status, PITH_E_INVALID, "{name}");
+        assert_eq!(status, SILLSTONE_E_INVALID, "{name}");
         assert!(out.iter().all(|&b| b == FILL), "{name} wrote on refusal");
 
         let status = unsafe {
@@ -297,7 +317,7 @@ fn color_convert_refuses_an_output_buffer_one_byte_short() {
                 expected.len(),
             )
         };
-        assert_eq!(status, PITH_OK, "{name} control");
+        assert_eq!(status, SILLSTONE_OK, "{name} control");
         assert_eq!(
             &out[..expected.len()],
             &expected[..],
@@ -317,12 +337,12 @@ fn bmp_encode_rgba_refuses_a_dump_of_the_wrong_length() {
             3,
             1,
             1,
-            PITH_LAYOUT_RGBA8,
+            SILLSTONE_LAYOUT_RGBA8,
             &mut out_ptr,
             &mut out_len,
         )
     };
-    assert_eq!(status, PITH_E_REJECTED);
+    assert_eq!(status, SILLSTONE_E_REJECTED);
     assert!(out_ptr.is_null(), "pointer written on refusal");
     assert_eq!(out_len, 77, "length written on refusal");
 
@@ -334,12 +354,12 @@ fn bmp_encode_rgba_refuses_a_dump_of_the_wrong_length() {
             4,
             1,
             1,
-            PITH_LAYOUT_RGBA8,
+            SILLSTONE_LAYOUT_RGBA8,
             &mut out_ptr,
             &mut out_len,
         )
     };
-    assert_eq!(status, PITH_OK);
+    assert_eq!(status, SILLSTONE_OK);
     assert_eq!(out_len, 14 + 108 + 4);
     let file = unsafe { core::slice::from_raw_parts(out_ptr, out_len) };
     assert_eq!(&file[..2], b"BM");

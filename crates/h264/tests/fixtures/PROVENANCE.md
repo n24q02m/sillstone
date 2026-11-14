@@ -1,4 +1,4 @@
-# Fixture provenance — `pith-h264` conformance vectors
+# Fixture provenance — `sillstone-h264` conformance vectors
 
 All fixtures in this directory were generated **locally and offline** on
 2026-10-03 with ffmpeg 9.0.1 (`-full_build-www.gyan.dev`, libx264 inside)

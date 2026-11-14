@@ -164,10 +164,10 @@ fn reference_json() -> String {
     let mut out = String::with_capacity(16 * 1024);
     out.push_str("{\n");
     out.push_str("  \"schema\": 1,\n");
-    out.push_str("  \"crate\": \"pith-zip\",\n");
+    out.push_str("  \"crate\": \"sillstone-zip\",\n");
     out.push_str(
         "  \"description\": \"hex-exact ZIP archive reference vectors: every \
-tests/fixtures/*.zip archive parsed by pith-zip, each member checked against \
+tests/fixtures/*.zip archive parsed by sillstone-zip, each member checked against \
 its corpus entry and pinned by CRC-32 and SHA-256 content digests\",\n",
     );
     out.push_str("  \"vectors\": [\n");

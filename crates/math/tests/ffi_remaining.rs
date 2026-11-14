@@ -8,9 +8,9 @@
 use core::f64::consts::{PI, SQRT_2};
 
 use sillstone_math::ffi::{
-    PITH_E_INVALID, PITH_E_REJECTED, PITH_OK, sillstone_math_complex_log, sillstone_math_dct2_2d,
-    sillstone_math_dct3_2d, sillstone_math_dst1, sillstone_math_dst2, sillstone_math_dst3,
-    sillstone_math_fft_n, sillstone_math_free, sillstone_math_ifft_n,
+    SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_OK, sillstone_math_complex_log,
+    sillstone_math_dct2_2d, sillstone_math_dct3_2d, sillstone_math_dst1, sillstone_math_dst2,
+    sillstone_math_dst3, sillstone_math_fft_n, sillstone_math_free, sillstone_math_ifft_n,
     sillstone_math_simpson_samples, sillstone_math_trapezoid_samples,
 };
 
@@ -36,7 +36,7 @@ fn signal(n: usize) -> Vec<f64> {
 fn run_dst(f: DstFn, x: &[f64]) -> Vec<f64> {
     let mut out = vec![f64::NAN; x.len()];
     let status = unsafe { f(x.as_ptr(), x.len(), out.as_mut_ptr()) };
-    assert_eq!(status, PITH_OK);
+    assert_eq!(status, SILLSTONE_OK);
     out
 }
 
@@ -113,9 +113,12 @@ fn dst_refuses_null_and_empty() {
         sillstone_math_dst3,
     ] {
         unsafe {
-            assert_eq!(f(core::ptr::null(), 3, out.as_mut_ptr()), PITH_E_INVALID);
-            assert_eq!(f(x.as_ptr(), 3, core::ptr::null_mut()), PITH_E_INVALID);
-            assert_eq!(f(x.as_ptr(), 0, out.as_mut_ptr()), PITH_E_INVALID);
+            assert_eq!(
+                f(core::ptr::null(), 3, out.as_mut_ptr()),
+                SILLSTONE_E_INVALID
+            );
+            assert_eq!(f(x.as_ptr(), 3, core::ptr::null_mut()), SILLSTONE_E_INVALID);
+            assert_eq!(f(x.as_ptr(), 0, out.as_mut_ptr()), SILLSTONE_E_INVALID);
         }
     }
 }
@@ -134,17 +137,17 @@ fn trapezoid_integrates_a_line_exactly() {
     let dx = 2.0 / 8.0;
     let y: Vec<f64> = (0..9).map(|i| 3.0 * (i as f64 * dx) + 1.0).collect();
     let (status, got) = run_rule(sillstone_math_trapezoid_samples, &y, dx);
-    assert_eq!(status, PITH_OK);
+    assert_eq!(status, SILLSTONE_OK);
     assert!(close(got, 8.0, 1e-12), "got {got}");
 
     // Two samples are one trapezoid; one sample has no width.
     assert_eq!(
         run_rule(sillstone_math_trapezoid_samples, &[2.0, 4.0], 0.5),
-        (PITH_OK, 1.5)
+        (SILLSTONE_OK, 1.5)
     );
     assert_eq!(
         run_rule(sillstone_math_trapezoid_samples, &[9.0], 0.5),
-        (PITH_OK, 0.0)
+        (SILLSTONE_OK, 0.0)
     );
 }
 
@@ -155,15 +158,15 @@ fn trapezoid_refuses_null_and_empty() {
     unsafe {
         assert_eq!(
             sillstone_math_trapezoid_samples(core::ptr::null(), 2, 1.0, &mut out),
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             sillstone_math_trapezoid_samples(y.as_ptr(), 2, 1.0, core::ptr::null_mut()),
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             sillstone_math_trapezoid_samples(y.as_ptr(), 0, 1.0, &mut out),
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
     }
 }
@@ -179,12 +182,12 @@ fn simpson_integrates_a_cubic_exactly() {
         })
         .collect();
     let (status, got) = run_rule(sillstone_math_simpson_samples, &y, dx);
-    assert_eq!(status, PITH_OK);
+    assert_eq!(status, SILLSTONE_OK);
     assert!(got.abs() < 1e-12, "got {got}");
 
     // x^2 on [0, 1] with 3 samples: 1/3.
     let (status, got) = run_rule(sillstone_math_simpson_samples, &[0.0, 0.25, 1.0], 0.5);
-    assert_eq!(status, PITH_OK);
+    assert_eq!(status, SILLSTONE_OK);
     assert!(close(got, 1.0 / 3.0, 1e-12), "got {got}");
 }
 
@@ -193,22 +196,22 @@ fn simpson_needs_an_even_interval_count() {
     // 4 samples = 3 intervals, and fewer than 3 samples, are both refused.
     assert_eq!(
         run_rule(sillstone_math_simpson_samples, &[1.0; 4], 1.0).0,
-        PITH_E_INVALID
+        SILLSTONE_E_INVALID
     );
     assert_eq!(
         run_rule(sillstone_math_simpson_samples, &[1.0; 2], 1.0).0,
-        PITH_E_INVALID
+        SILLSTONE_E_INVALID
     );
     let y = [1.0; 3];
     let mut out = 0.0;
     unsafe {
         assert_eq!(
             sillstone_math_simpson_samples(core::ptr::null(), 3, 1.0, &mut out),
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             sillstone_math_simpson_samples(y.as_ptr(), 3, 1.0, core::ptr::null_mut()),
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
     }
 }
@@ -221,7 +224,7 @@ fn alloc_call(
     let mut out: *mut f64 = core::ptr::null_mut();
     let mut out_len: usize = 0;
     let status = op(input.as_ptr(), input.len(), &mut out, &mut out_len);
-    if status != PITH_OK {
+    if status != SILLSTONE_OK {
         return (status, Vec::new());
     }
     let count = out_len / core::mem::size_of::<f64>();
@@ -240,27 +243,27 @@ fn complex_log_is_the_principal_branch() {
     };
 
     let (status, got) = run([1.0, 1.0]);
-    assert_eq!(status, PITH_OK);
+    assert_eq!(status, SILLSTONE_OK);
     assert_all_close(&got, &[0.5 * 2.0f64.ln(), PI / 4.0], 1e-14, "ln(1+i)");
 
     // A negative real sits on the cut: arg = +pi.
     let (status, got) = run([-1.0, 0.0]);
-    assert_eq!(status, PITH_OK);
+    assert_eq!(status, SILLSTONE_OK);
     assert_all_close(&got, &[0.0, PI], 1e-14, "ln(-1)");
 
     let (status, got) = run([0.0, -2.0]);
-    assert_eq!(status, PITH_OK);
+    assert_eq!(status, SILLSTONE_OK);
     assert_all_close(&got, &[2.0f64.ln(), -PI / 2.0], 1e-14, "ln(-2i)");
 
     // z = 0 is outside the domain; a wrong-sized input is malformed.
-    assert_eq!(run([0.0, 0.0]).0, PITH_E_REJECTED);
+    assert_eq!(run([0.0, 0.0]).0, SILLSTONE_E_REJECTED);
     assert_eq!(
         alloc_call(
             |i, n, o, l| unsafe { sillstone_math_complex_log(i, n, o, l) },
             &[1.0]
         )
         .0,
-        PITH_E_INVALID
+        SILLSTONE_E_INVALID
     );
     assert_eq!(
         alloc_call(
@@ -268,7 +271,7 @@ fn complex_log_is_the_principal_branch() {
             &[1.0; 4]
         )
         .0,
-        PITH_E_INVALID
+        SILLSTONE_E_INVALID
     );
 }
 
@@ -297,14 +300,14 @@ fn fft_n_and_ifft_n_cover_non_power_of_two_lengths() {
             |i, l, o, ol| unsafe { sillstone_math_fft_n(i, l, o, ol) },
             &flat,
         );
-        assert_eq!(status, PITH_OK, "fft_n n={n}");
+        assert_eq!(status, SILLSTONE_OK, "fft_n n={n}");
         assert_all_close(&spectrum, &naive_dft(&flat, -1.0), 1e-10, "fft_n vs DFT");
 
         let (status, back) = alloc_call(
             |i, l, o, ol| unsafe { sillstone_math_ifft_n(i, l, o, ol) },
             &spectrum,
         );
-        assert_eq!(status, PITH_OK, "ifft_n n={n}");
+        assert_eq!(status, SILLSTONE_OK, "ifft_n n={n}");
         assert_all_close(&back, &flat, 1e-10, "ifft_n(fft_n(x))");
 
         // ifft_n alone is the conjugate-sign DFT scaled by 1/n.
@@ -313,7 +316,7 @@ fn fft_n_and_ifft_n_cover_non_power_of_two_lengths() {
             |i, l, o, ol| unsafe { sillstone_math_ifft_n(i, l, o, ol) },
             &flat,
         );
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_all_close(&got, &want, 1e-10, "ifft_n vs DFT");
     }
 }
@@ -334,10 +337,10 @@ fn fft_n_and_ifft_n_refuse_malformed_input() {
         )
         .0
     };
-    assert_eq!(fft(&[]), PITH_E_INVALID);
-    assert_eq!(fft(&[1.0, 2.0, 3.0]), PITH_E_INVALID);
-    assert_eq!(ifft(&[]), PITH_E_INVALID);
-    assert_eq!(ifft(&[1.0, 2.0, 3.0]), PITH_E_INVALID);
+    assert_eq!(fft(&[]), SILLSTONE_E_INVALID);
+    assert_eq!(fft(&[1.0, 2.0, 3.0]), SILLSTONE_E_INVALID);
+    assert_eq!(ifft(&[]), SILLSTONE_E_INVALID);
+    assert_eq!(ifft(&[1.0, 2.0, 3.0]), SILLSTONE_E_INVALID);
 
     let x = [1.0, 0.0];
     let mut out: *mut f64 = core::ptr::null_mut();
@@ -345,15 +348,15 @@ fn fft_n_and_ifft_n_refuse_malformed_input() {
     unsafe {
         assert_eq!(
             sillstone_math_ifft_n(core::ptr::null(), 2, &mut out, &mut out_len),
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             sillstone_math_ifft_n(x.as_ptr(), 2, core::ptr::null_mut(), &mut out_len),
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             sillstone_math_ifft_n(x.as_ptr(), 2, &mut out, core::ptr::null_mut()),
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
     }
 }
@@ -366,12 +369,12 @@ fn dct3_2d_inverts_dct2_2d_on_rectangles() {
             |i, n, o, l| unsafe { sillstone_math_dct2_2d(i, n, w, h, o, l) },
             &data,
         );
-        assert_eq!(status, PITH_OK, "dct2_2d {w}x{h}");
+        assert_eq!(status, SILLSTONE_OK, "dct2_2d {w}x{h}");
         let (status, back) = alloc_call(
             |i, n, o, l| unsafe { sillstone_math_dct3_2d(i, n, w, h, o, l) },
             &coeffs,
         );
-        assert_eq!(status, PITH_OK, "dct3_2d {w}x{h}");
+        assert_eq!(status, SILLSTONE_OK, "dct3_2d {w}x{h}");
         assert_all_close(&back, &data, 1e-12, "dct3_2d(dct2_2d(x))");
     }
 }
@@ -386,26 +389,26 @@ fn dct3_2d_refuses_bad_geometry_and_null() {
         )
         .0
     };
-    assert_eq!(call(12, 0, 12), PITH_E_INVALID);
-    assert_eq!(call(12, 12, 0), PITH_E_INVALID);
-    assert_eq!(call(12, 5, 2), PITH_E_INVALID);
-    assert_eq!(call(11, 4, 3), PITH_E_INVALID);
-    assert_eq!(call(12, usize::MAX, 2), PITH_E_INVALID);
+    assert_eq!(call(12, 0, 12), SILLSTONE_E_INVALID);
+    assert_eq!(call(12, 12, 0), SILLSTONE_E_INVALID);
+    assert_eq!(call(12, 5, 2), SILLSTONE_E_INVALID);
+    assert_eq!(call(11, 4, 3), SILLSTONE_E_INVALID);
+    assert_eq!(call(12, usize::MAX, 2), SILLSTONE_E_INVALID);
 
     let mut out: *mut f64 = core::ptr::null_mut();
     let mut out_len = 0usize;
     unsafe {
         assert_eq!(
             sillstone_math_dct3_2d(core::ptr::null(), 12, 4, 3, &mut out, &mut out_len),
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             sillstone_math_dct3_2d(data.as_ptr(), 12, 4, 3, core::ptr::null_mut(), &mut out_len),
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             sillstone_math_dct3_2d(data.as_ptr(), 12, 4, 3, &mut out, core::ptr::null_mut()),
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
     }
 }

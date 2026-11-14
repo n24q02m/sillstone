@@ -1,6 +1,6 @@
 {
-  "schema": "pith-mp3/reference-vectors-v1",
-  "note": "Decoded-PCM vectors per conformance fixture. pcm_sha256 is SHA-256 (pith-digest) over the interleaved i32 samples in little-endian byte order; pcm_head_hex carries the first 64 of those bytes.",
+  "schema": "sillstone-mp3/reference-vectors-v1",
+  "note": "Decoded-PCM vectors per conformance fixture. pcm_sha256 is SHA-256 (sillstone-digest) over the interleaved i32 samples in little-endian byte order; pcm_head_hex carries the first 64 of those bytes.",
   "vectors": [
       {
         "fixture": "l1_stereo.mp1",

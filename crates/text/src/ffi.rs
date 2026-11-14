@@ -2,7 +2,7 @@
 //! (ctypes), Node (koffi) and Go (cgo) SDKs bind through.
 //!
 //! The suite's FFI convention, defined by this module and mirrored by
-//! every `pith-*` cdylib:
+//! every `sillstone-*` cdylib:
 //!
 //! * one flat set of `#[unsafe(no_mangle)] pub unsafe extern "C"`
 //!   functions — raw pointers plus lengths, no structs across the
@@ -33,7 +33,7 @@
 //! `signature_fnv1a64` / `signature_sha256` folds of `reference.json`
 //! are the standard folds over the 1024-byte little-endian tail. The
 //! input is UTF-8: `len` is a **byte** length, and bytes that are not
-//! valid UTF-8 are rejected ([`PITH_E_REJECTED`]), never lossily
+//! valid UTF-8 are rejected ([`SILLSTONE_E_REJECTED`]), never lossily
 //! coerced. The empty input is valid and pins the sentinel stream
 //! (zero counts, 128 `u64::MAX` words) — it is *not* a refusal.
 //!
@@ -46,7 +46,7 @@
 //! is the legal empty slice — the sentinel operand
 //! (`reference.json`'s `empty-signature` arm passes `Vec::new()`,
 //! *not* `signature("")`, whose all-`u64::MAX` words would score
-//! ≈ 0) — while a null pointer with `len > 0` is [`PITH_E_INVALID`].
+//! ≈ 0) — while a null pointer with `len > 0` is [`SILLSTONE_E_INVALID`].
 
 #![allow(unsafe_code)]
 
@@ -57,13 +57,13 @@ use crate::jaccard_estimate;
 use crate::reference::canonical_stream;
 
 /// Status: success.
-pub const PITH_OK: i32 = 0;
+pub const SILLSTONE_OK: i32 = 0;
 /// Status: a caller argument is invalid — a null pointer (or a null
 /// buffer carrying a nonzero length where a slice is read).
-pub const PITH_E_INVALID: i32 = -1;
+pub const SILLSTONE_E_INVALID: i32 = -1;
 /// Status: the core pipeline refused the input (the bytes are not
 /// valid UTF-8).
-pub const PITH_E_REJECTED: i32 = -2;
+pub const SILLSTONE_E_REJECTED: i32 = -2;
 
 /// Computes the full text fingerprint of a UTF-8 string into the
 /// canonical byte stream the `reference.json` vectors are defined
@@ -74,7 +74,7 @@ pub const PITH_E_REJECTED: i32 = -2;
 /// character count); `len == 0` — with or without a null `data` — is
 /// the valid empty input. On success the function allocates a buffer,
 /// writes its address through `out`, its length through `out_len`,
-/// and returns [`PITH_OK`]; the caller owns the buffer and must
+/// and returns [`SILLSTONE_OK`]; the caller owns the buffer and must
 /// release it with [`sillstone_text_free`], passing back the same pointer
 /// *and* length. The buffer layout is documented in the [module
 /// docs](self): big-endian counts header, canonical UTF-8 bytes,
@@ -93,7 +93,7 @@ pub unsafe extern "C" fn sillstone_text_fingerprint(
     out_len: *mut usize,
 ) -> i32 {
     if out.is_null() || out_len.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let bytes: &[u8] = if len == 0 {
         // The empty input is legal (the canon-empty / sentinel case);
@@ -101,7 +101,7 @@ pub unsafe extern "C" fn sillstone_text_fingerprint(
         &[]
     } else {
         if data.is_null() {
-            return PITH_E_INVALID;
+            return SILLSTONE_E_INVALID;
         }
         unsafe { core::slice::from_raw_parts(data, len) }
     };
@@ -115,7 +115,7 @@ pub unsafe extern "C" fn sillstone_text_fingerprint(
                 *out = ptr.cast::<u8>();
                 *out_len = len;
             }
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(status) => status,
     }
@@ -131,7 +131,7 @@ pub unsafe extern "C" fn sillstone_text_fingerprint(
 /// 128-word signatures; the empty slice (`len == 0`, null allowed)
 /// is the sentinel operand of `reference.json`'s `empty-signature`
 /// vectors. On success the estimate is written through `out_bits` as
-/// its `f64` bit pattern and [`PITH_OK`] is returned.
+/// its `f64` bit pattern and [`SILLSTONE_OK`] is returned.
 ///
 /// # Safety
 ///
@@ -149,7 +149,7 @@ pub unsafe extern "C" fn sillstone_text_jaccard(
     out_bits: *mut u64,
 ) -> i32 {
     if out_bits.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let a = match unsafe { read_words(a, a_words) } {
         Ok(words) => words,
@@ -160,7 +160,7 @@ pub unsafe extern "C" fn sillstone_text_jaccard(
         Err(status) => return status,
     };
     unsafe { *out_bits = jaccard_bits(&a, &b) };
-    PITH_OK
+    SILLSTONE_OK
 }
 
 /// Releases a buffer handed out by [`sillstone_text_fingerprint`].
@@ -183,9 +183,9 @@ pub unsafe extern "C" fn sillstone_text_free(ptr: *mut u8, len: usize) {
 
 /// The safe core of [`sillstone_text_fingerprint`]: validate UTF-8, then
 /// serialize the canonical stream. Non-UTF-8 bytes map to
-/// [`PITH_E_REJECTED`].
+/// [`SILLSTONE_E_REJECTED`].
 fn fingerprint_stream(bytes: &[u8]) -> Result<Vec<u8>, i32> {
-    let text = core::str::from_utf8(bytes).map_err(|_| PITH_E_REJECTED)?;
+    let text = core::str::from_utf8(bytes).map_err(|_| SILLSTONE_E_REJECTED)?;
     Ok(canonical_stream(text))
 }
 
@@ -199,7 +199,7 @@ fn jaccard_bits(a: &[u64], b: &[u64]) -> u64 {
 /// [`core::ptr::read_unaligned`] per element — the SDK-side blob is a
 /// byte buffer, alignment is not guaranteed. A null pointer with a
 /// zero length is the legal empty slice; a null pointer with a
-/// nonzero length is [`PITH_E_INVALID`].
+/// nonzero length is [`SILLSTONE_E_INVALID`].
 ///
 /// # Safety
 ///
@@ -210,7 +210,7 @@ unsafe fn read_words(ptr: *const u64, words: usize) -> Result<Vec<u64>, i32> {
         if words == 0 {
             return Ok(Vec::new());
         }
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let mut out = Vec::new();
     for i in 0..words {
@@ -232,10 +232,10 @@ pub unsafe extern "C" fn sillstone_text_tlsh(
     out: *mut u8,
 ) -> i32 {
     if out.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     if len > 0 && data.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let slice = if len == 0 {
         &[]
@@ -250,33 +250,33 @@ pub unsafe extern "C" fn sillstone_text_tlsh(
             unsafe {
                 core::ptr::copy_nonoverlapping(bytes.as_ptr(), out, 72);
             }
-            PITH_OK
+            SILLSTONE_OK
         }
-        Err(_) => PITH_E_REJECTED,
+        Err(_) => SILLSTONE_E_REJECTED,
     }
 }
 
 /// Distance between two 72-byte TLSH digests already bounded to 72 bytes each.
 fn tlsh_distance_72(slice_a: &[u8], slice_b: &[u8], out: *mut u32) -> i32 {
     let Ok(str_a) = core::str::from_utf8(slice_a) else {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     };
     let Ok(str_b) = core::str::from_utf8(slice_b) else {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     };
 
     let Ok(t_a) = crate::tlsh::Tlsh::parse(str_a) else {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     };
     let Ok(t_b) = crate::tlsh::Tlsh::parse(str_b) else {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     };
 
     let dist = t_a.distance(&t_b);
     unsafe {
         *out = dist;
     }
-    PITH_OK
+    SILLSTONE_OK
 }
 
 /// Computes the distance score between two 72-byte TLSH hashes.
@@ -284,7 +284,7 @@ fn tlsh_distance_72(slice_a: &[u8], slice_b: &[u8], out: *mut u32) -> i32 {
 /// Deprecated: this function takes no lengths, so it cannot tell a short buffer from a
 /// 72-byte one and always reads 72 bytes from each pointer. Use
 /// [`sillstone_text_tlsh_distance_checked`], which validates the lengths and refuses
-/// anything other than 72 bytes with [`PITH_E_INVALID`]. This function stays exported
+/// anything other than 72 bytes with [`SILLSTONE_E_INVALID`]. This function stays exported
 /// with an unchanged signature for existing callers.
 ///
 /// # Safety
@@ -297,7 +297,7 @@ pub unsafe extern "C" fn sillstone_text_tlsh_distance(
     out: *mut u32,
 ) -> i32 {
     if hash_a.is_null() || hash_b.is_null() || out.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let slice_a = unsafe { core::slice::from_raw_parts(hash_a, 72) };
     let slice_b = unsafe { core::slice::from_raw_parts(hash_b, 72) };
@@ -306,7 +306,7 @@ pub unsafe extern "C" fn sillstone_text_tlsh_distance(
 
 /// Computes the distance score between two TLSH digests, checking their lengths.
 ///
-/// Returns [`PITH_E_INVALID`] when a pointer is null, when either length is not exactly
+/// Returns [`SILLSTONE_E_INVALID`] when a pointer is null, when either length is not exactly
 /// 72, or when a digest is not a well-formed TLSH string; `out` is left untouched in
 /// every error case. No byte beyond `len_a` / `len_b` is read.
 ///
@@ -323,20 +323,33 @@ pub unsafe extern "C" fn sillstone_text_tlsh_distance_checked(
     out: *mut u32,
 ) -> i32 {
     if hash_a.is_null() || hash_b.is_null() || out.is_null() || len_a != 72 || len_b != 72 {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let slice_a = unsafe { core::slice::from_raw_parts(hash_a, 72) };
     let slice_b = unsafe { core::slice::from_raw_parts(hash_b, 72) };
     tlsh_distance_72(slice_a, slice_b, out)
 }
 
+// Deprecated pre-rename aliases: the `PITH_*` names the suite shipped before
+// it became `sillstone`. Each one is the same value as its `SILLSTONE_*` twin.
+
+/// Deprecated alias of [`SILLSTONE_OK`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_OK`")]
+pub const PITH_OK: i32 = SILLSTONE_OK;
+/// Deprecated alias of [`SILLSTONE_E_INVALID`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_INVALID`")]
+pub const PITH_E_INVALID: i32 = SILLSTONE_E_INVALID;
+/// Deprecated alias of [`SILLSTONE_E_REJECTED`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_REJECTED`")]
+pub const PITH_E_REJECTED: i32 = SILLSTONE_E_REJECTED;
+
 #[cfg(test)]
 mod tests {
     use alloc::vec::Vec;
 
     use super::{
-        PITH_E_INVALID, PITH_E_REJECTED, PITH_OK, fingerprint_stream, jaccard_bits,
-        sillstone_text_fingerprint, sillstone_text_free, sillstone_text_jaccard, read_words,
+        SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_OK, fingerprint_stream, jaccard_bits,
+        read_words, sillstone_text_fingerprint, sillstone_text_free, sillstone_text_jaccard,
     };
 
     /// The canonical stream through the public module path, from raw
@@ -371,9 +384,10 @@ mod tests {
 
         let mut out: *mut u8 = core::ptr::null_mut();
         let mut out_len: usize = 0;
-        let status =
-            unsafe { sillstone_text_fingerprint(input.as_ptr(), input.len(), &mut out, &mut out_len) };
-        assert_eq!(status, PITH_OK);
+        let status = unsafe {
+            sillstone_text_fingerprint(input.as_ptr(), input.len(), &mut out, &mut out_len)
+        };
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(out_len, expected.len());
         let handed_back = unsafe { core::slice::from_raw_parts(out, out_len) };
         assert_eq!(handed_back, expected.as_slice());
@@ -393,9 +407,10 @@ mod tests {
         let empty: Vec<u8> = Vec::new();
         let mut out: *mut u8 = core::ptr::null_mut();
         let mut out_len: usize = 0;
-        let status =
-            unsafe { sillstone_text_fingerprint(empty.as_ptr(), empty.len(), &mut out, &mut out_len) };
-        assert_eq!(status, PITH_OK);
+        let status = unsafe {
+            sillstone_text_fingerprint(empty.as_ptr(), empty.len(), &mut out, &mut out_len)
+        };
+        assert_eq!(status, SILLSTONE_OK);
         let handed_back = unsafe { core::slice::from_raw_parts(out, out_len) };
         assert_eq!(handed_back, expected.as_slice());
         assert_eq!(handed_back[8], b'\n');
@@ -404,13 +419,14 @@ mod tests {
 
         // A null pointer with len == 0 is the same legal empty input
         // (how the Go binding passes zero-length operands).
-        let status = unsafe { sillstone_text_fingerprint(core::ptr::null(), 0, &mut out, &mut out_len) };
-        assert_eq!(status, PITH_OK);
+        let status =
+            unsafe { sillstone_text_fingerprint(core::ptr::null(), 0, &mut out, &mut out_len) };
+        assert_eq!(status, SILLSTONE_OK);
         unsafe { sillstone_text_free(out, out_len) };
     }
 
     /// Null out-parameters and a null buffer with a nonzero length are
-    /// [`PITH_E_INVALID`]; non-UTF-8 bytes are [`PITH_E_REJECTED`]; a
+    /// [`SILLSTONE_E_INVALID`]; non-UTF-8 bytes are [`SILLSTONE_E_REJECTED`]; a
     /// null buffer is a legal free.
     #[test]
     fn ffi_fingerprint_refusals() {
@@ -426,23 +442,23 @@ mod tests {
                 &mut out_len,
             )
         };
-        assert_eq!(null_out, PITH_E_INVALID);
+        assert_eq!(null_out, SILLSTONE_E_INVALID);
 
         let null_out_len = unsafe {
             sillstone_text_fingerprint(input.as_ptr(), input.len(), &mut out, core::ptr::null_mut())
         };
-        assert_eq!(null_out_len, PITH_E_INVALID);
+        assert_eq!(null_out_len, SILLSTONE_E_INVALID);
 
         let null_data = unsafe {
             sillstone_text_fingerprint(core::ptr::null(), input.len(), &mut out, &mut out_len)
         };
-        assert_eq!(null_data, PITH_E_INVALID);
+        assert_eq!(null_data, SILLSTONE_E_INVALID);
 
         let bad_utf8: &[u8] = &[b'o', b'n', b'e', 0xFF];
         let status = unsafe {
             sillstone_text_fingerprint(bad_utf8.as_ptr(), bad_utf8.len(), &mut out, &mut out_len)
         };
-        assert_eq!(status, PITH_E_REJECTED);
+        assert_eq!(status, SILLSTONE_E_REJECTED);
 
         unsafe { sillstone_text_free(core::ptr::null_mut(), 0) };
     }
@@ -451,7 +467,7 @@ mod tests {
     /// status instead of panicking.
     #[test]
     fn safe_core_rejects_non_utf8() {
-        assert_eq!(fingerprint_stream(&[0xFF]), Err(PITH_E_REJECTED));
+        assert_eq!(fingerprint_stream(&[0xFF]), Err(SILLSTONE_E_REJECTED));
         assert_eq!(fingerprint_stream(b"ok"), Ok(canonical_stream_core(b"ok")));
     }
 
@@ -476,7 +492,7 @@ mod tests {
                 &mut bits,
             )
         };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(bits, 0x3fef_8000_0000_0000);
 
         // jaccard-unrelated: doc_a vs doc_b == 0.
@@ -489,7 +505,7 @@ mod tests {
                 &mut bits,
             )
         };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(bits, 0x0000_0000_0000_0000);
 
         // jaccard-identical: prose vs prose == 1.0.
@@ -502,7 +518,7 @@ mod tests {
                 &mut bits,
             )
         };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(bits, 0x3ff0_0000_0000_0000);
 
         // jaccard-against-empty: doc_a vs the EMPTY slice (null, 0
@@ -510,18 +526,19 @@ mod tests {
         let status = unsafe {
             sillstone_text_jaccard(doc_a.as_ptr(), doc_a.len(), core::ptr::null(), 0, &mut bits)
         };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(bits, 0x3ff0_0000_0000_0000);
 
         // empty vs empty is the degenerate 1.0.
-        let status =
-            unsafe { sillstone_text_jaccard(core::ptr::null(), 0, core::ptr::null(), 0, &mut bits) };
-        assert_eq!(status, PITH_OK);
+        let status = unsafe {
+            sillstone_text_jaccard(core::ptr::null(), 0, core::ptr::null(), 0, &mut bits)
+        };
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(bits, 0x3ff0_0000_0000_0000);
     }
 
     /// A null word pointer with a nonzero length and a null
-    /// out-parameter are [`PITH_E_INVALID`].
+    /// out-parameter are [`SILLSTONE_E_INVALID`].
     #[test]
     fn ffi_jaccard_refusals() {
         let words = [1u64, 2, 3];
@@ -536,17 +553,17 @@ mod tests {
                 core::ptr::null_mut(),
             )
         };
-        assert_eq!(null_bits, PITH_E_INVALID);
+        assert_eq!(null_bits, SILLSTONE_E_INVALID);
 
         let null_a = unsafe {
             sillstone_text_jaccard(core::ptr::null(), 1, words.as_ptr(), words.len(), &mut bits)
         };
-        assert_eq!(null_a, PITH_E_INVALID);
+        assert_eq!(null_a, SILLSTONE_E_INVALID);
 
         let null_b = unsafe {
             sillstone_text_jaccard(words.as_ptr(), words.len(), core::ptr::null(), 2, &mut bits)
         };
-        assert_eq!(null_b, PITH_E_INVALID);
+        assert_eq!(null_b, SILLSTONE_E_INVALID);
     }
 
     /// [`read_words`] and [`jaccard_bits`] mirror the FFI contract in
@@ -557,7 +574,7 @@ mod tests {
         assert_eq!(unsafe { read_words(core::ptr::null(), 0) }, Ok(Vec::new()));
         assert_eq!(
             unsafe { read_words(core::ptr::null(), 1) },
-            Err(PITH_E_INVALID)
+            Err(SILLSTONE_E_INVALID)
         );
         let words = [7u64, 9];
         assert_eq!(
@@ -568,5 +585,18 @@ mod tests {
         // Equal words → 1.0; differing words at the common prefix → 0.0.
         assert_eq!(jaccard_bits(&[1], &[1]), 1.0f64.to_bits());
         assert_eq!(jaccard_bits(&[1], &[2]), 0.0f64.to_bits());
+    }
+}
+
+#[cfg(test)]
+mod deprecated_alias_tests {
+    #![allow(deprecated)]
+    use super::*;
+
+    #[test]
+    fn pith_aliases_equal_their_sillstone_twins() {
+        assert_eq!(PITH_OK, SILLSTONE_OK);
+        assert_eq!(PITH_E_INVALID, SILLSTONE_E_INVALID);
+        assert_eq!(PITH_E_REJECTED, SILLSTONE_E_REJECTED);
     }
 }

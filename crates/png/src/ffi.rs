@@ -2,7 +2,7 @@
 //! (ctypes), Node (koffi) and Go (cgo) SDKs bind through.
 //!
 //! The suite's FFI convention, defined by this module and mirrored by
-//! every `pith-*` cdylib:
+//! every `sillstone-*` cdylib:
 //!
 //! * one flat set of `#[unsafe(no_mangle)] pub unsafe extern "C"`
 //!   functions — raw pointers plus lengths, no structs across the
@@ -26,19 +26,19 @@ use crate::reference::canonical_bytes;
 use crate::{Limits, decode};
 
 /// Status: success.
-pub const PITH_OK: i32 = 0;
+pub const SILLSTONE_OK: i32 = 0;
 /// Status: a caller argument is invalid — a null pointer.
-pub const PITH_E_INVALID: i32 = -1;
+pub const SILLSTONE_E_INVALID: i32 = -1;
 /// Status: the core decoder refused the input (malformed PNG: bad
 /// signature, CRC, chunk order, filter, or truncated stream).
-pub const PITH_E_REJECTED: i32 = -2;
+pub const SILLSTONE_E_REJECTED: i32 = -2;
 
 /// Decodes a PNG stream into the canonical byte stream the
 /// `reference.json` vectors are defined over.
 ///
 /// `data` points at `len` bytes of the complete PNG file. On success
 /// the function allocates a buffer, writes its address through `out`,
-/// its length through `out_len`, and returns [`PITH_OK`]; the caller
+/// its length through `out_len`, and returns [`SILLSTONE_OK`]; the caller
 /// owns the buffer and must release it with [`sillstone_png_free`], passing
 /// back the same pointer *and* length. The buffer layout is the
 /// canonical decode-output serialization of [`crate::reference`]:
@@ -58,7 +58,7 @@ pub unsafe extern "C" fn sillstone_png_decode_canonical(
     out_len: *mut usize,
 ) -> i32 {
     if data.is_null() || out.is_null() || out_len.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let bytes = unsafe { core::slice::from_raw_parts(data, len) };
     match decode_and_serialize(bytes) {
@@ -71,7 +71,7 @@ pub unsafe extern "C" fn sillstone_png_decode_canonical(
                 *out = ptr.cast::<u8>();
                 *out_len = len;
             }
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(status) => status,
     }
@@ -95,8 +95,21 @@ pub unsafe extern "C" fn sillstone_png_free(ptr: *mut u8, len: usize) {
 }
 
 /// The safe core of [`sillstone_png_decode_canonical`]: decode, then
-/// serialize canonically. Decoding failures map to [`PITH_E_REJECTED`].
+/// serialize canonically. Decoding failures map to [`SILLSTONE_E_REJECTED`].
 fn decode_and_serialize(bytes: &[u8]) -> Result<alloc::vec::Vec<u8>, i32> {
-    let png = decode(bytes, &Limits::default()).map_err(|_| PITH_E_REJECTED)?;
+    let png = decode(bytes, &Limits::default()).map_err(|_| SILLSTONE_E_REJECTED)?;
     Ok(canonical_bytes(&png))
 }
+
+// Deprecated pre-rename aliases: the `PITH_*` names the suite shipped before
+// it became `sillstone`. Each one is the same value as its `SILLSTONE_*` twin.
+
+/// Deprecated alias of [`SILLSTONE_OK`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_OK`")]
+pub const PITH_OK: i32 = SILLSTONE_OK;
+/// Deprecated alias of [`SILLSTONE_E_INVALID`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_INVALID`")]
+pub const PITH_E_INVALID: i32 = SILLSTONE_E_INVALID;
+/// Deprecated alias of [`SILLSTONE_E_REJECTED`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_REJECTED`")]
+pub const PITH_E_REJECTED: i32 = SILLSTONE_E_REJECTED;

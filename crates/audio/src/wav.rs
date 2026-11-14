@@ -1,8 +1,8 @@
 //! RIFF/WAVE decoding for 8/16/24/32-bit PCM and 32/64-bit IEEE float
 //! samples.
 //!
-//! Part of the `pith` zero-dependency hashing suite: every crate depends
-//! only on other `pith-*` crates plus `std`, so the whole suite resolves
+//! Part of the `sillstone` zero-dependency hashing suite: every crate depends
+//! only on other `sillstone-*` crates plus `std`, so the whole suite resolves
 //! without a single registry package. This module is the former
 //! standalone `modhash-wav` crate, merged into `sillstone-audio` as the `wav`
 //! module during the suite split.
