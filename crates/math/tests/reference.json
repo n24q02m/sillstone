@@ -1,5 +1,5 @@
 {
-  "suite": "pith-math",
+  "suite": "sillstone-math",
   "note": "every f64 is its raw IEEE-754 bit pattern as 16-digit lowercase hex; exact vectors must match bit-for-bit, twiddle-factor vectors within max(tol_abs, tol_rel * |expected|)",
   "vectors": {
     "bluestein.n17": {

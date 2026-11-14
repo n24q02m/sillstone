@@ -61,10 +61,10 @@ fn decode(data: &[u8], cap: usize) -> (i32, Vec<u8>, usize) {
 fn base64_rfc_4648_vectors_pass_through_the_c_abi_both_ways() {
     for (plain, encoded) in RFC_4648_S10 {
         let (status, out, out_len) = encode(plain, 32);
-        assert_eq!(status, ffi::PITH_OK, "encode {plain:?}");
+        assert_eq!(status, ffi::SILLSTONE_OK, "encode {plain:?}");
         assert_eq!(&out[..out_len], encoded, "encode {plain:?}");
         let (status, out, out_len) = decode(encoded, 32);
-        assert_eq!(status, ffi::PITH_OK, "decode {encoded:?}");
+        assert_eq!(status, ffi::SILLSTONE_OK, "decode {encoded:?}");
         assert_eq!(&out[..out_len], plain, "decode {encoded:?}");
     }
 }
@@ -83,17 +83,17 @@ fn base64_encode_refuses_null_arguments_and_leaves_the_slots_alone() {
                 8,
                 null_mut()
             ),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
         // A null out buffer.
         assert_eq!(
             ffi::sillstone_digest_base64_encode(b"foo".as_ptr(), 3, null_mut(), 8, &mut out_len),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
         // A null data pointer that claims a length.
         assert_eq!(
             ffi::sillstone_digest_base64_encode(null(), 3, out.as_mut_ptr(), 8, &mut out_len),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
     }
     assert_eq!(out, [SENTINEL; 8], "out buffer untouched");
@@ -102,12 +102,12 @@ fn base64_encode_refuses_null_arguments_and_leaves_the_slots_alone() {
     // Control: the same call with every pointer valid succeeds, and a
     // null data pointer with length zero is the empty input.
     let (status, bytes, written) = encode(b"foo", 8);
-    assert_eq!(status, ffi::PITH_OK);
+    assert_eq!(status, ffi::SILLSTONE_OK);
     assert_eq!(&bytes[..written], b"Zm9v");
     let status = unsafe {
         ffi::sillstone_digest_base64_encode(null(), 0, out.as_mut_ptr(), 8, &mut out_len)
     };
-    assert_eq!(status, ffi::PITH_OK);
+    assert_eq!(status, ffi::SILLSTONE_OK);
     assert_eq!(out_len, 0, "empty input encodes to zero bytes");
     assert_eq!(out, [SENTINEL; 8], "empty input writes nothing");
 }
@@ -125,15 +125,15 @@ fn base64_decode_refuses_null_arguments_and_leaves_the_slots_alone() {
                 8,
                 null_mut()
             ),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
         assert_eq!(
             ffi::sillstone_digest_base64_decode(b"Zm9v".as_ptr(), 4, null_mut(), 8, &mut out_len),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
         assert_eq!(
             ffi::sillstone_digest_base64_decode(null(), 4, out.as_mut_ptr(), 8, &mut out_len),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
     }
     assert_eq!(out, [SENTINEL; 8], "out buffer untouched");
@@ -142,12 +142,12 @@ fn base64_decode_refuses_null_arguments_and_leaves_the_slots_alone() {
     // Control: valid pointers decode; a null data pointer with length
     // zero is the empty input.
     let (status, bytes, written) = decode(b"Zm9v", 8);
-    assert_eq!(status, ffi::PITH_OK);
+    assert_eq!(status, ffi::SILLSTONE_OK);
     assert_eq!(&bytes[..written], b"foo");
     let status = unsafe {
         ffi::sillstone_digest_base64_decode(null(), 0, out.as_mut_ptr(), 8, &mut out_len)
     };
-    assert_eq!(status, ffi::PITH_OK);
+    assert_eq!(status, ffi::SILLSTONE_OK);
     assert_eq!(out_len, 0, "empty input decodes to zero bytes");
     assert_eq!(out, [SENTINEL; 8], "empty input writes nothing");
 }
@@ -156,22 +156,22 @@ fn base64_decode_refuses_null_arguments_and_leaves_the_slots_alone() {
 fn base64_encode_refuses_a_capacity_one_byte_short() {
     // "foobar" needs 8 bytes of output.
     let (status, out, out_len) = encode(b"foobar", 7);
-    assert_eq!(status, ffi::PITH_E_REJECTED);
+    assert_eq!(status, ffi::SILLSTONE_E_REJECTED);
     assert_eq!(out, vec![SENTINEL; 32], "nothing written on a short buffer");
     assert_eq!(out_len, LEN_SENTINEL, "out_len untouched");
 
     // "f" needs 4 (padding included), not 2.
     let (status, out, out_len) = encode(b"f", 3);
-    assert_eq!(status, ffi::PITH_E_REJECTED);
+    assert_eq!(status, ffi::SILLSTONE_E_REJECTED);
     assert_eq!(out, vec![SENTINEL; 32]);
     assert_eq!(out_len, LEN_SENTINEL);
 
     // Controls: exactly the needed capacity succeeds.
     let (status, out, out_len) = encode(b"foobar", 8);
-    assert_eq!(status, ffi::PITH_OK);
+    assert_eq!(status, ffi::SILLSTONE_OK);
     assert_eq!(&out[..out_len], b"Zm9vYmFy");
     let (status, out, out_len) = encode(b"f", 4);
-    assert_eq!(status, ffi::PITH_OK);
+    assert_eq!(status, ffi::SILLSTONE_OK);
     assert_eq!(&out[..out_len], b"Zg==");
 }
 
@@ -179,23 +179,23 @@ fn base64_encode_refuses_a_capacity_one_byte_short() {
 fn base64_decode_refuses_a_capacity_one_byte_short() {
     // Eight characters decode to at most six bytes.
     let (status, out, out_len) = decode(b"Zm9vYmFy", 5);
-    assert_eq!(status, ffi::PITH_E_REJECTED);
+    assert_eq!(status, ffi::SILLSTONE_E_REJECTED);
     assert_eq!(out, vec![SENTINEL; 32], "nothing written on a short buffer");
     assert_eq!(out_len, LEN_SENTINEL, "out_len untouched");
 
     // The worst case is sized by the input length, padding included:
     // "Zg==" decodes to one byte but is refused below three.
     let (status, out, out_len) = decode(b"Zg==", 2);
-    assert_eq!(status, ffi::PITH_E_REJECTED);
+    assert_eq!(status, ffi::SILLSTONE_E_REJECTED);
     assert_eq!(out, vec![SENTINEL; 32]);
     assert_eq!(out_len, LEN_SENTINEL);
 
     // Controls: exactly the worst-case capacity succeeds.
     let (status, out, out_len) = decode(b"Zm9vYmFy", 6);
-    assert_eq!(status, ffi::PITH_OK);
+    assert_eq!(status, ffi::SILLSTONE_OK);
     assert_eq!(&out[..out_len], b"foobar");
     let (status, out, out_len) = decode(b"Zg==", 3);
-    assert_eq!(status, ffi::PITH_OK);
+    assert_eq!(status, ffi::SILLSTONE_OK);
     assert_eq!(&out[..out_len], b"f");
 }
 
@@ -203,13 +203,13 @@ fn base64_decode_refuses_a_capacity_one_byte_short() {
 fn base64_decode_refuses_a_length_that_is_not_a_multiple_of_four() {
     for bad in [&b"Z"[..], b"Zg", b"Zm9", b"Zm9vY", b"Zm9vYmF"] {
         let (status, out, out_len) = decode(bad, 32);
-        assert_eq!(status, ffi::PITH_E_REJECTED, "{bad:?}");
+        assert_eq!(status, ffi::SILLSTONE_E_REJECTED, "{bad:?}");
         assert_eq!(out, vec![SENTINEL; 32], "{bad:?} writes nothing");
         assert_eq!(out_len, LEN_SENTINEL, "{bad:?}");
     }
     // Control: the same prefixes completed to a full group decode.
     let (status, out, out_len) = decode(b"Zg==", 32);
-    assert_eq!(status, ffi::PITH_OK);
+    assert_eq!(status, ffi::SILLSTONE_OK);
     assert_eq!(&out[..out_len], b"f");
 }
 
@@ -232,13 +232,13 @@ fn base64_decode_refuses_non_canonical_text() {
     ];
     for (bad, label) in cases {
         let (status, _out, out_len) = decode(bad, 32);
-        assert_eq!(status, ffi::PITH_E_REJECTED, "{label}");
+        assert_eq!(status, ffi::SILLSTONE_E_REJECTED, "{label}");
         assert_eq!(out_len, LEN_SENTINEL, "{label}: out_len untouched");
     }
     // Control: the closest canonical neighbours of those inputs decode.
     for good in [&b"Zm9vYmFy"[..], b"Zg==", b"Zm8="] {
         let (status, _out, _out_len) = decode(good, 32);
-        assert_eq!(status, ffi::PITH_OK, "{good:?}");
+        assert_eq!(status, ffi::SILLSTONE_OK, "{good:?}");
     }
 }
 
@@ -248,20 +248,20 @@ fn prng_fills_accept_a_null_out_slot_only_for_a_zero_count() {
         // A null slot with a zero count is a legal no-op.
         assert_eq!(
             ffi::sillstone_digest_splitmix64_fill(1, null_mut(), 0),
-            ffi::PITH_OK
+            ffi::SILLSTONE_OK
         );
         assert_eq!(
             ffi::sillstone_digest_xoshiro256_fill(1, null_mut(), 0),
-            ffi::PITH_OK
+            ffi::SILLSTONE_OK
         );
         // A null slot that claims a count is refused.
         assert_eq!(
             ffi::sillstone_digest_splitmix64_fill(1, null_mut(), 1),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
         assert_eq!(
             ffi::sillstone_digest_xoshiro256_fill(1, null_mut(), 1),
-            ffi::PITH_E_INVALID
+            ffi::SILLSTONE_E_INVALID
         );
     }
 }

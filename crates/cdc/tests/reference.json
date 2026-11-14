@@ -1,5 +1,5 @@
 {
-  "schema": "pith-cdc.reference.v1",
+  "schema": "sillstone-cdc.reference.v1",
   "algorithm": "FastCDC (Xia et al., USENIX ATC 2016): Gear rolling fingerprint, zero-padded fp & mask == 0 judgment, normalized chunking",
   "vectors": [
     {

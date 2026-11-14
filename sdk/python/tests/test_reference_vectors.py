@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright (c) 2026 pith-hash / sillstone Contributors
+# Copyright (c) 2026 sillstone Contributors
 """Hex-exact conformance: the committed reference vectors through Python.
 
 Every one of the 45 vectors in the repository-root reference.json is replayed

@@ -1,9 +1,9 @@
 {
-  "suite": "pith",
-  "crate": "pith-hash",
+  "suite": "sillstone",
+  "crate": "sillstone-curator",
   "format_version": 1,
   "generator": "cargo run --bin gen-reference -- gen",
-  "description": "Hex-exact cross-modal reference vectors for the pith-hash curator: detect verdicts per container magic, tier-2 signature folds (image pHash, audio landmark folds, MinHash folds, FastCDC chunk folds, video frame-chain folds), describe tier-1 digests with facts, and match outcomes (integer hamming/votes, IEEE-754-bit Jaccard and score pins, exact refusal messages) over the committed fixture corpus plus deterministic inline recipes. Hash pins carry only fixtures with real low-frequency energy; flat fills are excluded (subnormal-floor DCT AC flips bits across platforms).",
+  "description": "Hex-exact cross-modal reference vectors for the sillstone-curator: detect verdicts per container magic, tier-2 signature folds (image pHash, audio landmark folds, MinHash folds, FastCDC chunk folds, video frame-chain folds), describe tier-1 digests with facts, and match outcomes (integer hamming/votes, IEEE-754-bit Jaccard and score pins, exact refusal messages) over the committed fixture corpus plus deterministic inline recipes. Hash pins carry only fixtures with real low-frequency energy; flat fills are excluded (subnormal-floor DCT AC flips bits across platforms).",
   "vectors": [
     {
       "name": "detect-png",

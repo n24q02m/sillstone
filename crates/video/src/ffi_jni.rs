@@ -2,9 +2,13 @@
 //! (`sdk/java`) bind through after `System.load`ing this cdylib.
 //!
 //! The names follow the JVM's resolve convention for
-//! `package hash.pith` + `class PithVideo`: `Java_hash_pith_PithVideo_<method>`.
+//! `package io.github.sillstone` + `class SillstoneVideo`: `Java_io_github_sillstone_SillstoneVideo_<method>`.
 //! The existing C ABI in [`crate::ffi`] is untouched — this module only
 //! adds `Java_*` symbols and routes through the same safe cores.
+//!
+//! Each export also has a deprecated twin under the pre-rename name
+//! `Java_hash_pith_PithVideo_<method>` so a JVM still loading the old class
+//! keeps resolving; the twin throws the old exception class (below).
 //!
 //! # The JNIEnv function table
 //!
@@ -22,7 +26,8 @@
 //! # Error convention
 //!
 //! Refusals never unwind into the JVM: the export throws
-//! `hash.pith.PithFfiException(status, message)` (status codes as in
+//! `io.github.sillstone.SillstoneFfiException(status, message)` (the deprecated
+//! twins throw `hash.pith.PithFfiException` instead; status codes as in
 //! [`crate::ffi`]: `-1` invalid argument, `-2` core refusal) and
 //! returns a Java `null`; if the exception class cannot be resolved,
 //! a plain `java.lang.RuntimeException` is thrown via `ThrowNew`.
@@ -42,9 +47,16 @@
 
 use alloc::ffi::CString;
 use alloc::vec::Vec;
-use core::ffi::{c_char, c_void};
+use core::ffi::{CStr, c_char, c_void};
 
-use crate::ffi::{PITH_E_INVALID, fingerprint_and_serialize};
+use crate::ffi::{SILLSTONE_E_INVALID, fingerprint_and_serialize};
+
+/// The exception class the canonical exports throw on refusal.
+const SILLSTONE_FFI_EXCEPTION: &CStr = c"io/github/sillstone/SillstoneFfiException";
+
+/// The exception class the deprecated pre-rename exports throw, so old
+/// `catch` blocks still match.
+const LEGACY_FFI_EXCEPTION: &CStr = c"hash/pith/PithFfiException";
 
 /// An opaque JVM object handle (`jobject` and friends in `jni.h`).
 #[repr(C)]
@@ -132,7 +144,7 @@ pub type JNIEnv = *const JnInterface;
 
 /// JNI binding of
 /// [`sillstone_video_fingerprint`](crate::ffi::sillstone_video_fingerprint) for
-/// `PithVideo.fingerprint(byte[])`: decodes the whole ISO-BMFF input
+/// `SillstoneVideo.fingerprint(byte[])`: decodes the whole ISO-BMFF input
 /// and hands back the canonical stream (`byte[]`) the `reference.json`
 /// vectors are defined over. A null input array or a null `env` is a
 /// thrown `-1`; every decode refusal is a thrown `-2`.
@@ -142,21 +154,55 @@ pub type JNIEnv = *const JnInterface;
 /// `env` must be the `JNIEnv*` the JVM passed in (or null, which is
 /// reported as `-1`); `input` must be a `jbyteArray` handle (or null).
 #[cfg_attr(not(test), unsafe(no_mangle))]
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneVideo_fingerprint(
+    env: *mut JNIEnv,
+    _class: JClass,
+    input: JbyteArray,
+) -> JbyteArray {
+    unsafe { fingerprint(env, SILLSTONE_FFI_EXCEPTION, input) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneVideo_fingerprint`]: the export for the pre-rename
+/// `hash.pith.PithVideo` class. Refusals throw [`LEGACY_FFI_EXCEPTION`] so
+/// callers that catch the old exception type keep working.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneVideo_fingerprint`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneVideo_fingerprint`")]
+#[cfg_attr(not(test), unsafe(no_mangle))]
 pub unsafe extern "system" fn Java_hash_pith_PithVideo_fingerprint(
     env: *mut JNIEnv,
     _class: JClass,
     input: JbyteArray,
 ) -> JbyteArray {
+    unsafe { fingerprint(env, LEGACY_FFI_EXCEPTION, input) }
+}
+
+/// The body of [`Java_io_github_sillstone_SillstoneVideo_fingerprint`], throwing `exception` on refusal.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneVideo_fingerprint`].
+unsafe fn fingerprint(env: *mut JNIEnv, exception: &CStr, input: JbyteArray) -> JbyteArray {
     match unsafe { read_byte_array(env, input) } {
         Some(bytes) => unsafe {
             byte_array(
                 env,
+                exception,
                 "sillstone_video_fingerprint",
                 fingerprint_and_serialize(&bytes),
             )
         },
         None => {
-            unsafe { throw_status(env, "sillstone_video_fingerprint", PITH_E_INVALID) };
+            unsafe {
+                throw_status(
+                    env,
+                    exception,
+                    "sillstone_video_fingerprint",
+                    SILLSTONE_E_INVALID,
+                )
+            };
             core::ptr::null_mut()
         }
     }
@@ -193,11 +239,16 @@ unsafe fn read_byte_array(env: *mut JNIEnv, array: JbyteArray) -> Option<Vec<u8>
 /// # Safety
 ///
 /// `env` must be a valid JVM environment or null.
-unsafe fn byte_array(env: *mut JNIEnv, op: &str, result: Result<Vec<u8>, i32>) -> JbyteArray {
+unsafe fn byte_array(
+    env: *mut JNIEnv,
+    exception: &CStr,
+    op: &str,
+    result: Result<Vec<u8>, i32>,
+) -> JbyteArray {
     let bytes = match result {
         Ok(bytes) => bytes,
         Err(status) => {
-            unsafe { throw_status(env, op, status) };
+            unsafe { throw_status(env, exception, op, status) };
             return core::ptr::null_mut();
         }
     };
@@ -224,15 +275,15 @@ unsafe fn byte_array(env: *mut JNIEnv, op: &str, result: Result<Vec<u8>, i32>) -
     array
 }
 
-/// Throws `hash.pith.PithFfiException(status, "<op> failed with
-/// status <status>")`; every resolution failure on the way falls back
+/// Throws `exception(status, "<op> failed with status <status>")` (the class
+/// [`SILLSTONE_FFI_EXCEPTION`] or [`LEGACY_FFI_EXCEPTION`]); every resolution failure on the way falls back
 /// to `ThrowNew(java.lang.RuntimeException)`. A null `env` has no JVM
 /// to throw into and returns quietly (the Java caller sees `null`).
 ///
 /// # Safety
 ///
 /// `env` must be a valid JVM environment or null.
-unsafe fn throw_status(env: *mut JNIEnv, op: &str, status: i32) {
+unsafe fn throw_status(env: *mut JNIEnv, exception: &CStr, op: &str, status: i32) {
     if env.is_null() {
         return;
     }
@@ -240,9 +291,7 @@ unsafe fn throw_status(env: *mut JNIEnv, op: &str, status: i32) {
     let Ok(text) = CString::new(alloc::format!("{op} failed with status {status}")) else {
         return;
     };
-    let class = unsafe {
-        (table.find_class.expect("FindClass slot"))(env, c"hash/pith/PithFfiException".as_ptr())
-    };
+    let class = unsafe { (table.find_class.expect("FindClass slot"))(env, exception.as_ptr()) };
     if class.is_null() {
         unsafe { throw_runtime(env, table, &text) };
         return;
@@ -325,6 +374,8 @@ mod tests {
         throw_new_calls: Cell<u32>,
         /// Array handles are `(index + 1)` cast to a pointer.
         arrays: std::cell::RefCell<Vec<Vec<u8>>>,
+        /// Every class name `FindClass` was asked for, in call order.
+        classes: std::cell::RefCell<Vec<String>>,
     }
 
     fn reset() {
@@ -339,6 +390,7 @@ mod tests {
             j.threw.set(false);
             j.throw_new_calls.set(0);
             j.arrays.borrow_mut().clear();
+            j.classes.borrow_mut().clear();
         });
     }
 
@@ -353,8 +405,12 @@ mod tests {
         JVM.with(|j| j.arrays.borrow()[(handle as usize) - 1].clone())
     }
 
-    unsafe extern "system" fn fake_find_class(_env: *mut JNIEnv, _name: *const c_char) -> JClass {
+    unsafe extern "system" fn fake_find_class(_env: *mut JNIEnv, name: *const c_char) -> JClass {
+        let name = unsafe { core::ffi::CStr::from_ptr(name) }
+            .to_string_lossy()
+            .into_owned();
         JVM.with(|j| {
+            j.classes.borrow_mut().push(name);
             let call = j.find_class_calls.get();
             j.find_class_calls.set(call + 1);
             if call == 0 && j.fail_first_find_class.get() {
@@ -543,8 +599,13 @@ mod tests {
         let env = fake_env();
         let input = fixture("a_64x48.mp4");
         let handle = push_array(&input);
-        let out =
-            unsafe { Java_hash_pith_PithVideo_fingerprint(env.0, core::ptr::null_mut(), handle) };
+        let out = unsafe {
+            Java_io_github_sillstone_SillstoneVideo_fingerprint(
+                env.0,
+                core::ptr::null_mut(),
+                handle,
+            )
+        };
         assert!(!out.is_null());
         assert_eq!(array_bytes(out), fingerprint_and_serialize(&input).unwrap());
         let jvm = JVM.with(|j| {
@@ -563,7 +624,11 @@ mod tests {
         let env = fake_env();
         let input = fixture("a_64x48.mp4");
         let out = unsafe {
-            Java_hash_pith_PithVideo_fingerprint(env.0, core::ptr::null_mut(), push_array(&input))
+            Java_io_github_sillstone_SillstoneVideo_fingerprint(
+                env.0,
+                core::ptr::null_mut(),
+                push_array(&input),
+            )
         };
         let raw = array_bytes(out);
         // width=64, height=48, sampled_frames=8, big-endian.
@@ -577,7 +642,7 @@ mod tests {
         reset();
         let env = fake_env();
         let out = unsafe {
-            Java_hash_pith_PithVideo_fingerprint(
+            Java_io_github_sillstone_SillstoneVideo_fingerprint(
                 env.0,
                 core::ptr::null_mut(),
                 push_array(b"definitely not an mp4"),
@@ -595,7 +660,11 @@ mod tests {
         reset();
         let env = fake_env();
         let out = unsafe {
-            Java_hash_pith_PithVideo_fingerprint(env.0, core::ptr::null_mut(), push_array(&[]))
+            Java_io_github_sillstone_SillstoneVideo_fingerprint(
+                env.0,
+                core::ptr::null_mut(),
+                push_array(&[]),
+            )
         };
         assert!(out.is_null());
         assert_eq!(JVM.with(|j| j.pending_status.get()), -2);
@@ -606,7 +675,7 @@ mod tests {
         reset();
         let env = fake_env();
         let out = unsafe {
-            Java_hash_pith_PithVideo_fingerprint(
+            Java_io_github_sillstone_SillstoneVideo_fingerprint(
                 env.0,
                 core::ptr::null_mut(),
                 core::ptr::null_mut(),
@@ -619,7 +688,14 @@ mod tests {
     #[test]
     fn byte_array_with_null_env_and_ok_result_returns_null() {
         reset();
-        let out = unsafe { byte_array(core::ptr::null_mut(), "op", Ok(alloc::vec![1u8, 2, 3])) };
+        let out = unsafe {
+            byte_array(
+                core::ptr::null_mut(),
+                SILLSTONE_FFI_EXCEPTION,
+                "op",
+                Ok(alloc::vec![1u8, 2, 3]),
+            )
+        };
         assert!(out.is_null());
         assert!(JVM.with(|j| !j.threw.get()));
     }
@@ -628,7 +704,7 @@ mod tests {
     fn null_env_is_null_without_panicking() {
         reset();
         let out = unsafe {
-            Java_hash_pith_PithVideo_fingerprint(
+            Java_io_github_sillstone_SillstoneVideo_fingerprint(
                 core::ptr::null_mut(),
                 core::ptr::null_mut(),
                 core::ptr::null_mut(),
@@ -644,7 +720,7 @@ mod tests {
         JVM.with(|j| j.fail_first_find_class.set(true));
         let env = fake_env();
         let out = unsafe {
-            Java_hash_pith_PithVideo_fingerprint(
+            Java_io_github_sillstone_SillstoneVideo_fingerprint(
                 env.0,
                 core::ptr::null_mut(),
                 push_array(b"garbage"),
@@ -667,7 +743,7 @@ mod tests {
         JVM.with(|j| j.fail_method_id.set(true));
         let env = fake_env();
         let out = unsafe {
-            Java_hash_pith_PithVideo_fingerprint(
+            Java_io_github_sillstone_SillstoneVideo_fingerprint(
                 env.0,
                 core::ptr::null_mut(),
                 push_array(b"garbage"),
@@ -683,7 +759,7 @@ mod tests {
         JVM.with(|j| j.fail_string.set(true));
         let env = fake_env();
         let out = unsafe {
-            Java_hash_pith_PithVideo_fingerprint(
+            Java_io_github_sillstone_SillstoneVideo_fingerprint(
                 env.0,
                 core::ptr::null_mut(),
                 push_array(b"garbage"),
@@ -699,7 +775,7 @@ mod tests {
         JVM.with(|j| j.fail_new_object.set(true));
         let env = fake_env();
         let out = unsafe {
-            Java_hash_pith_PithVideo_fingerprint(
+            Java_io_github_sillstone_SillstoneVideo_fingerprint(
                 env.0,
                 core::ptr::null_mut(),
                 push_array(b"garbage"),
@@ -716,7 +792,11 @@ mod tests {
         let env = fake_env();
         let input = fixture("a_64x48.mp4");
         let out = unsafe {
-            Java_hash_pith_PithVideo_fingerprint(env.0, core::ptr::null_mut(), push_array(&input))
+            Java_io_github_sillstone_SillstoneVideo_fingerprint(
+                env.0,
+                core::ptr::null_mut(),
+                push_array(&input),
+            )
         };
         assert!(out.is_null());
         let jvm = JVM.with(|j| {
@@ -727,5 +807,46 @@ mod tests {
             )
         });
         assert_eq!(jvm, (0, false, 0));
+    }
+
+    /// The class name the first `FindClass` of the last throw asked for.
+    fn thrown_class() -> String {
+        JVM.with(|j| j.classes.borrow().first().cloned().unwrap_or_default())
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn legacy_export_matches_the_canonical_one() {
+        reset();
+        let env = fake_env();
+        let input = fixture("a_64x48.mp4");
+        let out = unsafe {
+            Java_hash_pith_PithVideo_fingerprint(env.0, core::ptr::null_mut(), push_array(&input))
+        };
+        assert!(!out.is_null());
+        assert_eq!(array_bytes(out), fingerprint_and_serialize(&input).unwrap());
+        assert_eq!(
+            JVM.with(|j| (j.pending_status.get(), j.threw.get())),
+            (0, false)
+        );
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn canonical_export_throws_the_sillstone_exception_and_alias_the_legacy_one() {
+        let null = core::ptr::null_mut();
+        reset();
+        let env = fake_env();
+        unsafe { Java_io_github_sillstone_SillstoneVideo_fingerprint(env.0, null, null) };
+        assert_eq!(thrown_class(), "io/github/sillstone/SillstoneFfiException");
+
+        reset();
+        let out = unsafe { Java_hash_pith_PithVideo_fingerprint(env.0, null, null) };
+        assert!(out.is_null());
+        assert_eq!(thrown_class(), "hash/pith/PithFfiException");
+        assert_eq!(
+            JVM.with(|j| (j.pending_status.get(), j.threw.get())),
+            (-1, true)
+        );
     }
 }

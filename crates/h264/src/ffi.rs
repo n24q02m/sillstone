@@ -2,7 +2,7 @@
 //! (ctypes), Node (koffi) and Go (cgo) SDKs bind through.
 //!
 //! The suite's FFI convention, defined by this module and mirrored by
-//! every `pith-*` cdylib:
+//! every `sillstone-*` cdylib:
 //!
 //! * one flat set of `#[unsafe(no_mangle)] pub unsafe extern "C"`
 //!   functions — raw pointers plus lengths, no structs across the
@@ -35,19 +35,19 @@
 use crate::reference::canonical_bytes;
 
 /// Status: success.
-pub const PITH_OK: i32 = 0;
+pub const SILLSTONE_OK: i32 = 0;
 /// Status: a caller argument is invalid — a null pointer.
-pub const PITH_E_INVALID: i32 = -1;
+pub const SILLSTONE_E_INVALID: i32 = -1;
 /// Status: the core decoder refused the input (malformed Annex-B
 /// stream: bad magic, unsupported profile or feature, truncated NAL).
-pub const PITH_E_REJECTED: i32 = -2;
+pub const SILLSTONE_E_REJECTED: i32 = -2;
 
 /// Decodes an Annex-B H.264 byte stream into the canonical byte stream
 /// the `reference.json` vectors are defined over.
 ///
 /// `data` points at `len` bytes of the complete stream. On success the
 /// function allocates a buffer, writes its address through `out`, its
-/// length through `out_len`, and returns [`PITH_OK`]; the caller owns
+/// length through `out_len`, and returns [`SILLSTONE_OK`]; the caller owns
 /// the buffer and must release it with [`sillstone_h264_free`], passing
 /// back the same pointer *and* length. The buffer layout is the
 /// canonical decode-output serialization of [`crate::reference`]:
@@ -69,7 +69,7 @@ pub unsafe extern "C" fn sillstone_h264_decode_planes(
     out_len: *mut usize,
 ) -> i32 {
     if data.is_null() || out.is_null() || out_len.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let bytes = unsafe { core::slice::from_raw_parts(data, len) };
     match decode_and_serialize(bytes) {
@@ -82,7 +82,7 @@ pub unsafe extern "C" fn sillstone_h264_decode_planes(
                 *out = ptr.cast::<u8>();
                 *out_len = len;
             }
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(status) => status,
     }
@@ -106,16 +106,29 @@ pub unsafe extern "C" fn sillstone_h264_free(ptr: *mut u8, len: usize) {
 }
 
 /// The safe core of [`sillstone_h264_decode_planes`]: decode, then
-/// serialize canonically. Decoding failures map to [`PITH_E_REJECTED`].
+/// serialize canonically. Decoding failures map to [`SILLSTONE_E_REJECTED`].
 fn decode_and_serialize(bytes: &[u8]) -> Result<alloc::vec::Vec<u8>, i32> {
-    canonical_bytes(bytes).map_err(|_| PITH_E_REJECTED)
+    canonical_bytes(bytes).map_err(|_| SILLSTONE_E_REJECTED)
 }
+
+// Deprecated pre-rename aliases: the `PITH_*` names the suite shipped before
+// it became `sillstone`. Each one is the same value as its `SILLSTONE_*` twin.
+
+/// Deprecated alias of [`SILLSTONE_OK`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_OK`")]
+pub const PITH_OK: i32 = SILLSTONE_OK;
+/// Deprecated alias of [`SILLSTONE_E_INVALID`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_INVALID`")]
+pub const PITH_E_INVALID: i32 = SILLSTONE_E_INVALID;
+/// Deprecated alias of [`SILLSTONE_E_REJECTED`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_REJECTED`")]
+pub const PITH_E_REJECTED: i32 = SILLSTONE_E_REJECTED;
 
 #[cfg(test)]
 mod tests {
     use super::{
-        PITH_E_INVALID, PITH_E_REJECTED, PITH_OK, decode_and_serialize, sillstone_h264_decode_planes,
-        sillstone_h264_free,
+        SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_OK, decode_and_serialize,
+        sillstone_h264_decode_planes, sillstone_h264_free,
     };
 
     /// A committed conformance fixture, decoded end-to-end through the
@@ -132,7 +145,7 @@ mod tests {
         let status = unsafe {
             sillstone_h264_decode_planes(stream.as_ptr(), stream.len(), &mut out, &mut out_len)
         };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(out_len, expected.len());
         let handed_back = unsafe { core::slice::from_raw_parts(out, out_len) };
         assert_eq!(handed_back, expected.as_slice());
@@ -142,15 +155,15 @@ mod tests {
         unsafe { sillstone_h264_free(out, out_len) };
     }
 
-    /// Null pointers are [`PITH_E_INVALID`]; garbage input is
-    /// [`PITH_E_REJECTED`]; a null buffer is a legal free.
+    /// Null pointers are [`SILLSTONE_E_INVALID`]; garbage input is
+    /// [`SILLSTONE_E_REJECTED`]; a null buffer is a legal free.
     #[test]
     fn ffi_refusals() {
         let mut out: *mut u8 = core::ptr::null_mut();
         let mut out_len: usize = 0;
         let null_data =
             unsafe { sillstone_h264_decode_planes(core::ptr::null(), 0, &mut out, &mut out_len) };
-        assert_eq!(null_data, PITH_E_INVALID);
+        assert_eq!(null_data, SILLSTONE_E_INVALID);
 
         let stream = [0u8; 16];
         let null_out = unsafe {
@@ -161,7 +174,7 @@ mod tests {
                 &mut out_len,
             )
         };
-        assert_eq!(null_out, PITH_E_INVALID);
+        assert_eq!(null_out, SILLSTONE_E_INVALID);
 
         let null_out_len = unsafe {
             sillstone_h264_decode_planes(
@@ -171,18 +184,18 @@ mod tests {
                 core::ptr::null_mut(),
             )
         };
-        assert_eq!(null_out_len, PITH_E_INVALID);
+        assert_eq!(null_out_len, SILLSTONE_E_INVALID);
 
         let garbage = unsafe {
             sillstone_h264_decode_planes(stream.as_ptr(), stream.len(), &mut out, &mut out_len)
         };
-        assert_eq!(garbage, PITH_E_REJECTED);
+        assert_eq!(garbage, SILLSTONE_E_REJECTED);
 
         unsafe { sillstone_h264_free(core::ptr::null_mut(), 0) };
     }
 
     /// The three recorded error inputs — every `decode()` failure kind
-    /// the cross-SDK contract pins — come back as [`PITH_E_REJECTED`].
+    /// the cross-SDK contract pins — come back as [`SILLSTONE_E_REJECTED`].
     #[test]
     fn ffi_rejects_the_recorded_error_inputs() {
         let inputs: [&[u8]; 3] = [
@@ -191,13 +204,13 @@ mod tests {
             &[0x00, 0x00, 0x01, 0x67],                   // truncated-sps-nal: Truncated
         ];
         for input in inputs {
-            assert_eq!(decode_and_serialize(input), Err(PITH_E_REJECTED));
+            assert_eq!(decode_and_serialize(input), Err(SILLSTONE_E_REJECTED));
             let mut out: *mut u8 = core::ptr::null_mut();
             let mut out_len: usize = 0;
             let status = unsafe {
                 sillstone_h264_decode_planes(input.as_ptr(), input.len(), &mut out, &mut out_len)
             };
-            assert_eq!(status, PITH_E_REJECTED);
+            assert_eq!(status, SILLSTONE_E_REJECTED);
         }
     }
 
@@ -206,7 +219,20 @@ mod tests {
     fn safe_core_rejects_garbage() {
         assert_eq!(
             decode_and_serialize(&[0x00, 0x00, 0x00, 0x01, 0x67, 0xff, 0xff]),
-            Err(PITH_E_REJECTED)
+            Err(SILLSTONE_E_REJECTED)
         );
+    }
+}
+
+#[cfg(test)]
+mod deprecated_alias_tests {
+    #![allow(deprecated)]
+    use super::*;
+
+    #[test]
+    fn pith_aliases_equal_their_sillstone_twins() {
+        assert_eq!(PITH_OK, SILLSTONE_OK);
+        assert_eq!(PITH_E_INVALID, SILLSTONE_E_INVALID);
+        assert_eq!(PITH_E_REJECTED, SILLSTONE_E_REJECTED);
     }
 }

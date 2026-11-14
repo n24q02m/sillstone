@@ -2,7 +2,7 @@
 //! (ctypes), Node (koffi) and Go (cgo) SDKs bind through.
 //!
 //! The suite's FFI convention, defined by this module and mirrored by
-//! every `pith-*` cdylib:
+//! every `sillstone-*` cdylib:
 //!
 //! * one flat set of `#[unsafe(no_mangle)] pub unsafe extern "C"`
 //!   functions — raw pointers plus lengths, no structs across the
@@ -34,25 +34,25 @@ use crate::{Document, Error};
 use sillstone_digest::Error as KErr;
 
 /// Status: success.
-pub const PITH_OK: i32 = 0;
+pub const SILLSTONE_OK: i32 = 0;
 /// Status: a caller argument is invalid — a null pointer.
-pub const PITH_E_INVALID: i32 = -1;
+pub const SILLSTONE_E_INVALID: i32 = -1;
 /// Status: the core refused the input (malformed PDF: truncated
 /// header, unreadable xref with no scannable fallback, parse error).
-pub const PITH_E_REJECTED: i32 = -2;
+pub const SILLSTONE_E_REJECTED: i32 = -2;
 /// Status: the core refuses to guess — an encrypted document, or any
 /// [`KErr::Unsupported`] anywhere in the error chain (an unimplemented
 /// stream filter, a CID font without `/ToUnicode`). Distinguishing
 /// "malformed" from "deliberately not implemented" is why this is not
-/// the uniform [`PITH_E_REJECTED`].
-pub const PITH_E_UNSUPPORTED: i32 = -3;
+/// the uniform [`SILLSTONE_E_REJECTED`].
+pub const SILLSTONE_E_UNSUPPORTED: i32 = -3;
 
 /// Extracts all text from a PDF into the canonical byte stream the
 /// `reference.json` vectors are defined over.
 ///
 /// `data` points at `len` bytes of the complete PDF file. On success
 /// the function allocates a buffer, writes its address through `out`,
-/// its length through `out_len`, and returns [`PITH_OK`]; the caller
+/// its length through `out_len`, and returns [`SILLSTONE_OK`]; the caller
 /// owns the buffer and must release it with [`sillstone_pdf_free`], passing
 /// back the same pointer *and* length. The buffer layout is the
 /// canonical extraction serialization: `pages` (`u32` big-endian),
@@ -73,7 +73,7 @@ pub unsafe extern "C" fn sillstone_pdf_extract_canonical(
     out_len: *mut usize,
 ) -> i32 {
     if data.is_null() || out.is_null() || out_len.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let bytes = unsafe { core::slice::from_raw_parts(data, len) };
     match extract_and_serialize(bytes) {
@@ -86,7 +86,7 @@ pub unsafe extern "C" fn sillstone_pdf_extract_canonical(
                 *out = ptr.cast::<u8>();
                 *out_len = len;
             }
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(status) => status,
     }
@@ -121,19 +121,19 @@ fn is_unsupported(err: &Error) -> bool {
 }
 
 /// Maps a core [`Error`] onto an FFI status: an unsupported-feature
-/// refusal is [`PITH_E_UNSUPPORTED`], every other failure is
-/// [`PITH_E_REJECTED`].
+/// refusal is [`SILLSTONE_E_UNSUPPORTED`], every other failure is
+/// [`SILLSTONE_E_REJECTED`].
 fn status_of(err: &Error) -> i32 {
     if is_unsupported(err) {
-        PITH_E_UNSUPPORTED
+        SILLSTONE_E_UNSUPPORTED
     } else {
-        PITH_E_REJECTED
+        SILLSTONE_E_REJECTED
     }
 }
 
 /// The safe core of [`sillstone_pdf_extract_canonical`]: open the document,
 /// extract every page, then serialize canonically. Refusals map to
-/// [`PITH_E_REJECTED`] or [`PITH_E_UNSUPPORTED`].
+/// [`SILLSTONE_E_REJECTED`] or [`SILLSTONE_E_UNSUPPORTED`].
 fn extract_and_serialize(bytes: &[u8]) -> Result<alloc::vec::Vec<u8>, i32> {
     let doc = Document::open(bytes).map_err(|e| status_of(&e))?;
     let pages = u32::try_from(doc.pages()).unwrap_or(u32::MAX);
@@ -147,11 +147,27 @@ fn extract_and_serialize(bytes: &[u8]) -> Result<alloc::vec::Vec<u8>, i32> {
     Ok(stream)
 }
 
+// Deprecated pre-rename aliases: the `PITH_*` names the suite shipped before
+// it became `sillstone`. Each one is the same value as its `SILLSTONE_*` twin.
+
+/// Deprecated alias of [`SILLSTONE_OK`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_OK`")]
+pub const PITH_OK: i32 = SILLSTONE_OK;
+/// Deprecated alias of [`SILLSTONE_E_INVALID`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_INVALID`")]
+pub const PITH_E_INVALID: i32 = SILLSTONE_E_INVALID;
+/// Deprecated alias of [`SILLSTONE_E_REJECTED`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_REJECTED`")]
+pub const PITH_E_REJECTED: i32 = SILLSTONE_E_REJECTED;
+/// Deprecated alias of [`SILLSTONE_E_UNSUPPORTED`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_UNSUPPORTED`")]
+pub const PITH_E_UNSUPPORTED: i32 = SILLSTONE_E_UNSUPPORTED;
+
 #[cfg(test)]
 mod tests {
     use super::{
-        PITH_E_INVALID, PITH_E_REJECTED, PITH_E_UNSUPPORTED, PITH_OK, extract_and_serialize,
-        sillstone_pdf_extract_canonical, sillstone_pdf_free,
+        SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_E_UNSUPPORTED, SILLSTONE_OK,
+        extract_and_serialize, sillstone_pdf_extract_canonical, sillstone_pdf_free,
     };
     use std::path::PathBuf;
 
@@ -174,9 +190,10 @@ mod tests {
 
         let mut out: *mut u8 = core::ptr::null_mut();
         let mut out_len: usize = 0;
-        let status =
-            unsafe { sillstone_pdf_extract_canonical(pdf.as_ptr(), pdf.len(), &mut out, &mut out_len) };
-        assert_eq!(status, PITH_OK);
+        let status = unsafe {
+            sillstone_pdf_extract_canonical(pdf.as_ptr(), pdf.len(), &mut out, &mut out_len)
+        };
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(out_len, expected.len());
         let handed_back = unsafe { core::slice::from_raw_parts(out, out_len) };
         assert_eq!(handed_back, expected.as_slice());
@@ -196,32 +213,34 @@ mod tests {
     }
 
     /// An encrypted document refuses extraction with
-    /// [`PITH_E_UNSUPPORTED`]: a real format feature this suite will
+    /// [`SILLSTONE_E_UNSUPPORTED`]: a real format feature this suite will
     /// not guess at, not a malformed file.
     #[test]
     fn ffi_encrypted_document_maps_to_unsupported() {
         let pdf = fixture("encrypted.pdf");
         assert_eq!(
             extract_and_serialize(&pdf),
-            Err(PITH_E_UNSUPPORTED),
+            Err(SILLSTONE_E_UNSUPPORTED),
             "the /Encrypt refusal must walk the page/object chain to Unsupported"
         );
         let mut out: *mut u8 = core::ptr::null_mut();
         let mut out_len: usize = 0;
-        let status =
-            unsafe { sillstone_pdf_extract_canonical(pdf.as_ptr(), pdf.len(), &mut out, &mut out_len) };
-        assert_eq!(status, PITH_E_UNSUPPORTED);
+        let status = unsafe {
+            sillstone_pdf_extract_canonical(pdf.as_ptr(), pdf.len(), &mut out, &mut out_len)
+        };
+        assert_eq!(status, SILLSTONE_E_UNSUPPORTED);
     }
 
-    /// Null pointers are [`PITH_E_INVALID`]; garbage input is
-    /// [`PITH_E_REJECTED`]; a null buffer is a legal free.
+    /// Null pointers are [`SILLSTONE_E_INVALID`]; garbage input is
+    /// [`SILLSTONE_E_REJECTED`]; a null buffer is a legal free.
     #[test]
     fn ffi_refusals() {
         let mut out: *mut u8 = core::ptr::null_mut();
         let mut out_len: usize = 0;
-        let null_data =
-            unsafe { sillstone_pdf_extract_canonical(core::ptr::null(), 0, &mut out, &mut out_len) };
-        assert_eq!(null_data, PITH_E_INVALID);
+        let null_data = unsafe {
+            sillstone_pdf_extract_canonical(core::ptr::null(), 0, &mut out, &mut out_len)
+        };
+        assert_eq!(null_data, SILLSTONE_E_INVALID);
 
         let garbage = [0u8; 16];
         let null_out = unsafe {
@@ -232,7 +251,7 @@ mod tests {
                 &mut out_len,
             )
         };
-        assert_eq!(null_out, PITH_E_INVALID);
+        assert_eq!(null_out, SILLSTONE_E_INVALID);
         let null_out_len = unsafe {
             sillstone_pdf_extract_canonical(
                 garbage.as_ptr(),
@@ -241,12 +260,12 @@ mod tests {
                 core::ptr::null_mut(),
             )
         };
-        assert_eq!(null_out_len, PITH_E_INVALID);
+        assert_eq!(null_out_len, SILLSTONE_E_INVALID);
 
         let rejected = unsafe {
             sillstone_pdf_extract_canonical(garbage.as_ptr(), garbage.len(), &mut out, &mut out_len)
         };
-        assert_eq!(rejected, PITH_E_REJECTED);
+        assert_eq!(rejected, SILLSTONE_E_REJECTED);
 
         unsafe { sillstone_pdf_free(core::ptr::null_mut(), 0) };
     }
@@ -263,5 +282,19 @@ mod tests {
             sillstone_digest::sha256(&canonical).expect("sha256").to_string(),
             "5a8db37861d2ffa061f87ad2ec1b4c55181e695473ec20dbd228bad355b40e7e"
         );
+    }
+}
+
+#[cfg(test)]
+mod deprecated_alias_tests {
+    #![allow(deprecated)]
+    use super::*;
+
+    #[test]
+    fn pith_aliases_equal_their_sillstone_twins() {
+        assert_eq!(PITH_OK, SILLSTONE_OK);
+        assert_eq!(PITH_E_INVALID, SILLSTONE_E_INVALID);
+        assert_eq!(PITH_E_REJECTED, SILLSTONE_E_REJECTED);
+        assert_eq!(PITH_E_UNSUPPORTED, SILLSTONE_E_UNSUPPORTED);
     }
 }

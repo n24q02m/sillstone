@@ -8,10 +8,7 @@ use std::cell::{Cell, RefCell};
 use std::path::Path;
 
 use sillstone_curator::ffi_jni::{
-    JNIEnv, JValue, Java_hash_pith_PithHash_contentHash, Java_hash_pith_PithHash_describe,
-    Java_hash_pith_PithHash_detect, Java_hash_pith_PithHash_match,
-    Java_hash_pith_PithHash_signature,
-    Java_io_github_sillstone_Generated_sillstone_1curator_1content_1hash,
+    JNIEnv, JValue, Java_io_github_sillstone_Generated_sillstone_1curator_1content_1hash,
     Java_io_github_sillstone_Generated_sillstone_1curator_1describe,
     Java_io_github_sillstone_Generated_sillstone_1curator_1detect,
     Java_io_github_sillstone_Generated_sillstone_1curator_1free,
@@ -407,7 +404,9 @@ fn detect_happy_png_returns_the_wire_triple() {
     reset();
     let env = fake_env();
     let input = fixture("phash_rgb8_48x40.png");
-    let out = unsafe { Java_hash_pith_PithHash_detect(env.0, NULL_CLASS, push_array(&input)) };
+    let out = unsafe {
+        Java_io_github_sillstone_SillstoneHash_detect(env.0, NULL_CLASS, push_array(&input))
+    };
     assert!(!out.is_null());
     assert_eq!(int_array_values(out), vec![0, 0, 0]);
     let jvm = JVM.with(|j| {
@@ -424,8 +423,13 @@ fn detect_happy_png_returns_the_wire_triple() {
 fn detect_gif_is_binary_modality() {
     reset();
     let env = fake_env();
-    let out =
-        unsafe { Java_hash_pith_PithHash_detect(env.0, NULL_CLASS, push_array(b"GIF89a payload")) };
+    let out = unsafe {
+        Java_io_github_sillstone_SillstoneHash_detect(
+            env.0,
+            NULL_CLASS,
+            push_array(b"GIF89a payload"),
+        )
+    };
     assert_eq!(int_array_values(out), vec![9, 3, 0]);
 }
 
@@ -434,7 +438,11 @@ fn detect_zip_magic_is_binary_modality() {
     reset();
     let env = fake_env();
     let out = unsafe {
-        Java_hash_pith_PithHash_detect(env.0, NULL_CLASS, push_array(b"PK\x03\x04 archive"))
+        Java_io_github_sillstone_SillstoneHash_detect(
+            env.0,
+            NULL_CLASS,
+            push_array(b"PK\x03\x04 archive"),
+        )
     };
     assert_eq!(int_array_values(out), vec![3, 3, 0]);
 }
@@ -443,7 +451,9 @@ fn detect_zip_magic_is_binary_modality() {
 fn detect_null_input_array_throws_invalid() {
     reset();
     let env = fake_env();
-    let out = unsafe { Java_hash_pith_PithHash_detect(env.0, NULL_CLASS, core::ptr::null_mut()) };
+    let out = unsafe {
+        Java_io_github_sillstone_SillstoneHash_detect(env.0, NULL_CLASS, core::ptr::null_mut())
+    };
     assert!(out.is_null());
     assert_eq!(JVM.with(|j| j.pending_status.get()), -1);
     assert!(JVM.with(|j| j.threw.get()));
@@ -453,7 +463,11 @@ fn detect_null_input_array_throws_invalid() {
 fn detect_null_env_is_null_without_panicking() {
     reset();
     let out = unsafe {
-        Java_hash_pith_PithHash_detect(core::ptr::null_mut(), NULL_CLASS, core::ptr::null_mut())
+        Java_io_github_sillstone_SillstoneHash_detect(
+            core::ptr::null_mut(),
+            NULL_CLASS,
+            core::ptr::null_mut(),
+        )
     };
     assert!(out.is_null());
     assert!(!JVM.with(|j| j.threw.get()));
@@ -465,7 +479,9 @@ fn signature_happy_matches_the_safe_core() {
     let env = fake_env();
     let input = fixture("phash_rgb8_48x40.png");
     let expected = reference::signature_stream(&signature(&input).unwrap());
-    let out = unsafe { Java_hash_pith_PithHash_signature(env.0, NULL_CLASS, push_array(&input)) };
+    let out = unsafe {
+        Java_io_github_sillstone_SillstoneHash_signature(env.0, NULL_CLASS, push_array(&input))
+    };
     assert!(!out.is_null());
     assert_eq!(array_bytes(out), expected);
     let jvm = JVM.with(|j| {
@@ -484,7 +500,9 @@ fn describe_happy_matches_the_safe_core() {
     let env = fake_env();
     let input = fixture("phash_rgb8_48x40.png");
     let expected = reference::describe_stream(&describe(&input).unwrap());
-    let out = unsafe { Java_hash_pith_PithHash_describe(env.0, NULL_CLASS, push_array(&input)) };
+    let out = unsafe {
+        Java_io_github_sillstone_SillstoneHash_describe(env.0, NULL_CLASS, push_array(&input))
+    };
     assert!(!out.is_null());
     assert_eq!(array_bytes(out), expected);
 }
@@ -495,7 +513,8 @@ fn match_happy_identical_blobs_is_matched_image() {
     let env = fake_env();
     let input = fixture("phash_rgb8_48x40.png");
     let handle = push_array(&input);
-    let out = unsafe { Java_hash_pith_PithHash_match(env.0, NULL_CLASS, handle, handle) };
+    let out =
+        unsafe { Java_io_github_sillstone_SillstoneHash_match(env.0, NULL_CLASS, handle, handle) };
     assert!(!out.is_null());
     // tag 0 (image), slots[0] = hamming 0, matched 1.
     assert_eq!(long_array_values(out), vec![0, 0, 0, 0, 0, 1]);
@@ -509,7 +528,7 @@ fn match_cross_modality_throws_rejected() {
     let env = fake_env();
     let a = push_array(&fixture("phash_rgb8_48x40.png"));
     let b = push_array(&b"just some words".repeat(64));
-    let out = unsafe { Java_hash_pith_PithHash_match(env.0, NULL_CLASS, a, b) };
+    let out = unsafe { Java_io_github_sillstone_SillstoneHash_match(env.0, NULL_CLASS, a, b) };
     assert!(out.is_null());
     assert_eq!(
         JVM.with(|j| (j.pending_status.get(), j.threw.get())),
@@ -522,7 +541,7 @@ fn match_null_input_array_throws_invalid() {
     reset();
     let env = fake_env();
     let out = unsafe {
-        Java_hash_pith_PithHash_match(
+        Java_io_github_sillstone_SillstoneHash_match(
             env.0,
             NULL_CLASS,
             core::ptr::null_mut(),
@@ -539,7 +558,9 @@ fn content_hash_happy_is_32_digest_bytes() {
     let env = fake_env();
     let input = fixture("phash_rgb8_48x40.png");
     let expected = sillstone_curator::content_hash(&input).unwrap();
-    let out = unsafe { Java_hash_pith_PithHash_contentHash(env.0, NULL_CLASS, push_array(&input)) };
+    let out = unsafe {
+        Java_io_github_sillstone_SillstoneHash_contentHash(env.0, NULL_CLASS, push_array(&input))
+    };
     assert!(!out.is_null());
     assert_eq!(array_bytes(out), expected.as_bytes().to_vec());
     assert_eq!(array_bytes(out).len(), 32);
@@ -550,7 +571,7 @@ fn content_hash_garbage_throws_rejected() {
     reset();
     let env = fake_env();
     let out = unsafe {
-        Java_hash_pith_PithHash_contentHash(
+        Java_io_github_sillstone_SillstoneHash_contentHash(
             env.0,
             NULL_CLASS,
             push_array(b"\x89PNG\r\n\x1a\ngarbage"),
@@ -568,7 +589,7 @@ fn garbage_signature_throws_rejected() {
     reset();
     let env = fake_env();
     let out = unsafe {
-        Java_hash_pith_PithHash_signature(
+        Java_io_github_sillstone_SillstoneHash_signature(
             env.0,
             NULL_CLASS,
             push_array(b"\x89PNG\r\n\x1a\ngarbage"),
@@ -586,13 +607,13 @@ fn corrupt_png_refuses_everywhere() {
     let corrupt = b"\x89PNG\r\n\x1a\ngarbage";
     for run in [
         |env: *mut JNIEnv, input: JbyteArray| unsafe {
-            Java_hash_pith_PithHash_signature(env, NULL_CLASS, input)
+            Java_io_github_sillstone_SillstoneHash_signature(env, NULL_CLASS, input)
         },
         |env: *mut JNIEnv, input: JbyteArray| unsafe {
-            Java_hash_pith_PithHash_describe(env, NULL_CLASS, input)
+            Java_io_github_sillstone_SillstoneHash_describe(env, NULL_CLASS, input)
         },
         |env: *mut JNIEnv, input: JbyteArray| unsafe {
-            Java_hash_pith_PithHash_contentHash(env, NULL_CLASS, input)
+            Java_io_github_sillstone_SillstoneHash_contentHash(env, NULL_CLASS, input)
         },
     ] {
         reset();
@@ -610,8 +631,9 @@ fn corrupt_png_refuses_everywhere() {
 fn null_input_array_throws_invalid() {
     reset();
     let env = fake_env();
-    let out =
-        unsafe { Java_hash_pith_PithHash_signature(env.0, NULL_CLASS, core::ptr::null_mut()) };
+    let out = unsafe {
+        Java_io_github_sillstone_SillstoneHash_signature(env.0, NULL_CLASS, core::ptr::null_mut())
+    };
     assert!(out.is_null());
     assert_eq!(JVM.with(|j| j.pending_status.get()), -1);
     assert!(JVM.with(|j| j.threw.get()));
@@ -621,12 +643,16 @@ fn null_input_array_throws_invalid() {
 fn null_env_is_null_without_panicking() {
     reset();
     let out = unsafe {
-        Java_hash_pith_PithHash_signature(core::ptr::null_mut(), NULL_CLASS, core::ptr::null_mut())
+        Java_io_github_sillstone_SillstoneHash_signature(
+            core::ptr::null_mut(),
+            NULL_CLASS,
+            core::ptr::null_mut(),
+        )
     };
     assert!(out.is_null());
     assert!(!JVM.with(|j| j.threw.get()));
     let out = unsafe {
-        Java_hash_pith_PithHash_match(
+        Java_io_github_sillstone_SillstoneHash_match(
             core::ptr::null_mut(),
             NULL_CLASS,
             core::ptr::null_mut(),
@@ -642,7 +668,7 @@ fn failed_new_byte_array_returns_null_without_throwing() {
     JVM.with(|j| j.fail_new_byte_array.set(true));
     let env = fake_env();
     let out = unsafe {
-        Java_hash_pith_PithHash_signature(
+        Java_io_github_sillstone_SillstoneHash_signature(
             env.0,
             NULL_CLASS,
             push_array(&fixture("phash_rgb8_48x40.png")),
@@ -665,7 +691,7 @@ fn failed_new_int_array_returns_null_without_throwing() {
     JVM.with(|j| j.fail_new_int_array.set(true));
     let env = fake_env();
     let out = unsafe {
-        Java_hash_pith_PithHash_detect(
+        Java_io_github_sillstone_SillstoneHash_detect(
             env.0,
             NULL_CLASS,
             push_array(&fixture("phash_rgb8_48x40.png")),
@@ -688,7 +714,7 @@ fn unresolvable_exception_class_falls_back_to_throw_new() {
     JVM.with(|j| j.fail_first_find_class.set(true));
     let env = fake_env();
     let out = unsafe {
-        Java_hash_pith_PithHash_signature(
+        Java_io_github_sillstone_SillstoneHash_signature(
             env.0,
             NULL_CLASS,
             push_array(b"\x89PNG\r\n\x1a\ngarbage"),
@@ -711,7 +737,7 @@ fn unresolvable_ctor_falls_back_to_throw_new() {
     JVM.with(|j| j.fail_method_id.set(true));
     let env = fake_env();
     let out = unsafe {
-        Java_hash_pith_PithHash_signature(
+        Java_io_github_sillstone_SillstoneHash_signature(
             env.0,
             NULL_CLASS,
             push_array(b"\x89PNG\r\n\x1a\ngarbage"),
@@ -727,7 +753,7 @@ fn failed_message_string_falls_back_to_throw_new() {
     JVM.with(|j| j.fail_string.set(true));
     let env = fake_env();
     let out = unsafe {
-        Java_hash_pith_PithHash_signature(
+        Java_io_github_sillstone_SillstoneHash_signature(
             env.0,
             NULL_CLASS,
             push_array(b"\x89PNG\r\n\x1a\ngarbage"),
@@ -743,7 +769,7 @@ fn failed_exception_object_falls_back_to_throw_new() {
     JVM.with(|j| j.fail_new_object.set(true));
     let env = fake_env();
     let out = unsafe {
-        Java_hash_pith_PithHash_signature(
+        Java_io_github_sillstone_SillstoneHash_signature(
             env.0,
             NULL_CLASS,
             push_array(b"\x89PNG\r\n\x1a\ngarbage"),
@@ -753,10 +779,12 @@ fn failed_exception_object_falls_back_to_throw_new() {
     assert_eq!(JVM.with(|j| j.throw_new_calls.get()), 1);
 }
 
-/// The `SillstoneHash` and `Generated_sillstone_curator_*` exports are the names the published
-/// Java classes bind to; each one must forward to the `PithHash` implementation unchanged.
+/// The `Generated_sillstone_curator_*` exports (the names the published Java classes bind to)
+/// and the deprecated pre-rename `hash.pith.PithHash` exports must each forward to the
+/// canonical `SillstoneHash` implementation unchanged.
 #[test]
-fn renamed_exports_forward_to_the_pith_implementation() {
+#[allow(deprecated)]
+fn legacy_and_generated_exports_forward_to_the_sillstone_implementation() {
     type Bytes = unsafe extern "system" fn(
         *mut JNIEnv,
         sillstone_curator::ffi_jni::JClass,
@@ -779,33 +807,33 @@ fn renamed_exports_forward_to_the_pith_implementation() {
 
     let byte_exports: [(&str, Bytes, Bytes); 6] = [
         (
-            "SillstoneHash.signature",
-            Java_hash_pith_PithHash_signature,
+            "PithHash.signature",
             Java_io_github_sillstone_SillstoneHash_signature,
+            sillstone_curator::ffi_jni::Java_hash_pith_PithHash_signature,
         ),
         (
-            "SillstoneHash.describe",
-            Java_hash_pith_PithHash_describe,
+            "PithHash.describe",
             Java_io_github_sillstone_SillstoneHash_describe,
+            sillstone_curator::ffi_jni::Java_hash_pith_PithHash_describe,
         ),
         (
-            "SillstoneHash.contentHash",
-            Java_hash_pith_PithHash_contentHash,
+            "PithHash.contentHash",
             Java_io_github_sillstone_SillstoneHash_contentHash,
+            sillstone_curator::ffi_jni::Java_hash_pith_PithHash_contentHash,
         ),
         (
             "Generated.signature",
-            Java_hash_pith_PithHash_signature,
+            Java_io_github_sillstone_SillstoneHash_signature,
             Java_io_github_sillstone_Generated_sillstone_1curator_1signature,
         ),
         (
             "Generated.describe",
-            Java_hash_pith_PithHash_describe,
+            Java_io_github_sillstone_SillstoneHash_describe,
             Java_io_github_sillstone_Generated_sillstone_1curator_1describe,
         ),
         (
             "Generated.content_hash",
-            Java_hash_pith_PithHash_contentHash,
+            Java_io_github_sillstone_SillstoneHash_contentHash,
             Java_io_github_sillstone_Generated_sillstone_1curator_1content_1hash,
         ),
     ];
@@ -821,8 +849,8 @@ fn renamed_exports_forward_to_the_pith_implementation() {
 
     let int_exports: [(&str, Ints); 2] = [
         (
-            "SillstoneHash.detect",
-            Java_io_github_sillstone_SillstoneHash_detect,
+            "PithHash.detect",
+            sillstone_curator::ffi_jni::Java_hash_pith_PithHash_detect,
         ),
         (
             "Generated.detect",
@@ -833,7 +861,7 @@ fn renamed_exports_forward_to_the_pith_implementation() {
         reset();
         let env = fake_env();
         let want = int_array_values(unsafe {
-            Java_hash_pith_PithHash_detect(env.0, NULL_CLASS, push_array(&input))
+            Java_io_github_sillstone_SillstoneHash_detect(env.0, NULL_CLASS, push_array(&input))
         });
         let got = int_array_values(unsafe { renamed(env.0, NULL_CLASS, push_array(&input)) });
         assert_eq!(want.len(), 3, "{name}");
@@ -842,8 +870,8 @@ fn renamed_exports_forward_to_the_pith_implementation() {
 
     let long_exports: [(&str, Longs); 2] = [
         (
-            "SillstoneHash.match",
-            Java_io_github_sillstone_SillstoneHash_match,
+            "PithHash.match",
+            sillstone_curator::ffi_jni::Java_hash_pith_PithHash_match,
         ),
         (
             "Generated.match",
@@ -854,7 +882,12 @@ fn renamed_exports_forward_to_the_pith_implementation() {
         reset();
         let env = fake_env();
         let want = long_array_values(unsafe {
-            Java_hash_pith_PithHash_match(env.0, NULL_CLASS, push_array(&input), push_array(&other))
+            Java_io_github_sillstone_SillstoneHash_match(
+                env.0,
+                NULL_CLASS,
+                push_array(&input),
+                push_array(&other),
+            )
         });
         let got = long_array_values(unsafe {
             renamed(env.0, NULL_CLASS, push_array(&input), push_array(&other))
@@ -878,7 +911,9 @@ fn renamed_exports_forward_to_the_pith_implementation() {
 fn describe_null_input_array_throws_invalid() {
     reset();
     let env = fake_env();
-    let out = unsafe { Java_hash_pith_PithHash_describe(env.0, NULL_CLASS, core::ptr::null_mut()) };
+    let out = unsafe {
+        Java_io_github_sillstone_SillstoneHash_describe(env.0, NULL_CLASS, core::ptr::null_mut())
+    };
     assert!(out.is_null());
     assert_eq!(
         JVM.with(|j| (j.pending_status.get(), j.threw.get())),
@@ -892,7 +927,8 @@ fn failed_new_long_array_returns_null_without_throwing() {
     JVM.with(|j| j.fail_new_long_array.set(true));
     let env = fake_env();
     let handle = push_array(&fixture("phash_rgb8_48x40.png"));
-    let out = unsafe { Java_hash_pith_PithHash_match(env.0, NULL_CLASS, handle, handle) };
+    let out =
+        unsafe { Java_io_github_sillstone_SillstoneHash_match(env.0, NULL_CLASS, handle, handle) };
     assert!(out.is_null());
     let jvm = JVM.with(|j| {
         (

@@ -7,11 +7,12 @@
 //! binary as well as the library's own harness.
 
 use sillstone_h264::ffi::{
-    PITH_E_INVALID, PITH_E_REJECTED, PITH_OK, sillstone_h264_decode_planes, sillstone_h264_free,
+    SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_OK, sillstone_h264_decode_planes,
+    sillstone_h264_free,
 };
 
 /// Decodes `data` through the raw C ABI and returns (status, buffer,
-/// length). The buffer, when status is `PITH_OK`, must be released
+/// length). The buffer, when status is `SILLSTONE_OK`, must be released
 /// with `sillstone_h264_free` by the caller.
 fn raw_decode(data: &[u8]) -> (i32, *mut u8, usize) {
     let mut out: *mut u8 = core::ptr::null_mut();
@@ -37,7 +38,7 @@ fn ffi_decode_planes_reproduces_the_canonical_stream() {
     expected.extend_from_slice(&sillstone_h264::reference::planes(&frames));
 
     let (status, out, out_len) = raw_decode(&stream);
-    assert_eq!(status, PITH_OK);
+    assert_eq!(status, SILLSTONE_OK);
     // 1 frame of 16x16: 12-byte header + w*h luma + 2*(w/2)*(h/2) chroma.
     assert_eq!(out_len, 12 + 16 * 16 + 2 * 8 * 8);
     let canonical = unsafe { core::slice::from_raw_parts(out, out_len) };
@@ -48,14 +49,15 @@ fn ffi_decode_planes_reproduces_the_canonical_stream() {
     unsafe { sillstone_h264_free(out, out_len) };
 }
 
-/// Null pointers are `PITH_E_INVALID`; non-null garbage is the
-/// decoder's `PITH_E_REJECTED`; a null buffer is a legal free.
+/// Null pointers are `SILLSTONE_E_INVALID`; non-null garbage is the
+/// decoder's `SILLSTONE_E_REJECTED`; a null buffer is a legal free.
 #[test]
 fn ffi_refusals_never_panic() {
     let mut out: *mut u8 = core::ptr::null_mut();
     let mut out_len: usize = 0;
-    let status = unsafe { sillstone_h264_decode_planes(core::ptr::null(), 0, &mut out, &mut out_len) };
-    assert_eq!(status, PITH_E_INVALID);
+    let status =
+        unsafe { sillstone_h264_decode_planes(core::ptr::null(), 0, &mut out, &mut out_len) };
+    assert_eq!(status, SILLSTONE_E_INVALID);
 
     let garbage = [0u8; 16];
     let status = unsafe {
@@ -66,7 +68,7 @@ fn ffi_refusals_never_panic() {
             &mut out_len,
         )
     };
-    assert_eq!(status, PITH_E_INVALID);
+    assert_eq!(status, SILLSTONE_E_INVALID);
     let status = unsafe {
         sillstone_h264_decode_planes(
             garbage.as_ptr(),
@@ -75,10 +77,10 @@ fn ffi_refusals_never_panic() {
             core::ptr::null_mut(),
         )
     };
-    assert_eq!(status, PITH_E_INVALID);
+    assert_eq!(status, SILLSTONE_E_INVALID);
 
     let (status, out, out_len) = raw_decode(&garbage);
-    assert_eq!(status, PITH_E_REJECTED);
+    assert_eq!(status, SILLSTONE_E_REJECTED);
     assert!(out.is_null() && out_len == 0);
 
     unsafe { sillstone_h264_free(core::ptr::null_mut(), 0) };
@@ -86,7 +88,7 @@ fn ffi_refusals_never_panic() {
 
 /// The three error inputs `reference.json` records — every decode()
 /// failure kind the cross-SDK contract pins — come back as
-/// `PITH_E_REJECTED` through the C ABI.
+/// `SILLSTONE_E_REJECTED` through the C ABI.
 #[test]
 fn ffi_rejects_the_recorded_error_inputs() {
     let inputs: [&[u8]; 3] = [
@@ -96,7 +98,7 @@ fn ffi_rejects_the_recorded_error_inputs() {
     ];
     for input in inputs {
         let (status, out, out_len) = raw_decode(input);
-        assert_eq!(status, PITH_E_REJECTED);
+        assert_eq!(status, SILLSTONE_E_REJECTED);
         assert!(out.is_null() && out_len == 0);
     }
 }

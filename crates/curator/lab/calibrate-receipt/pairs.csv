@@ -1,4 +1,4 @@
-# pith calibrate receipt dataset (R5-N1), image lane, 48x40 BMP
+# sillstone calibrate receipt dataset (R5-N1), image lane, 48x40 BMP
 # recipe: fixture::patterned_pixels(seed, 48, 40), seeds b1..b4 = 0xA1..0xA4;
 #   v1 = perturb_pixels(base, seed ^ 0x100, 4, 998)
 #   v2 = perturb_pixels(base, seed ^ 0x200, 4, 999)

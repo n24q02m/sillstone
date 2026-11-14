@@ -216,14 +216,21 @@ fn ffi_surface() {
     let mut out: u64 = 0;
     let call = |f: unsafe extern "C" fn(*const u8, usize, u32, u32, u32, *mut u64) -> i32,
                 out: &mut u64| unsafe {
-        f(data.as_ptr(), data.len(), 16, 16, PITH_LAYOUT_GRAY8, out)
+        f(
+            data.as_ptr(),
+            data.len(),
+            16,
+            16,
+            SILLSTONE_LAYOUT_GRAY8,
+            out,
+        )
     };
 
-    assert_eq!(call(sillstone_image_ahash, &mut out), PITH_OK);
+    assert_eq!(call(sillstone_image_ahash, &mut out), SILLSTONE_OK);
     assert_eq!(out, 0);
-    assert_eq!(call(sillstone_image_dhash, &mut out), PITH_OK);
+    assert_eq!(call(sillstone_image_dhash, &mut out), SILLSTONE_OK);
     assert_eq!(out, 0);
-    assert_eq!(call(sillstone_image_phash, &mut out), PITH_OK);
+    assert_eq!(call(sillstone_image_phash, &mut out), SILLSTONE_OK);
 
     // Default level / binbits (0) and an explicit pair.
     assert_eq!(
@@ -233,12 +240,12 @@ fn ffi_surface() {
                 data.len(),
                 16,
                 16,
-                PITH_LAYOUT_GRAY8,
+                SILLSTONE_LAYOUT_GRAY8,
                 0,
                 &mut out,
             )
         },
-        PITH_OK
+        SILLSTONE_OK
     );
     assert_eq!(out, 0);
     assert_eq!(
@@ -248,12 +255,12 @@ fn ffi_surface() {
                 data.len(),
                 16,
                 16,
-                PITH_LAYOUT_GRAY8,
+                SILLSTONE_LAYOUT_GRAY8,
                 3,
                 &mut out,
             )
         },
-        PITH_OK
+        SILLSTONE_OK
     );
     assert_eq!(out, 0x0000_0070_0000_0000);
     assert_eq!(
@@ -263,26 +270,37 @@ fn ffi_surface() {
                 data.len(),
                 16,
                 16,
-                PITH_LAYOUT_GRAY8,
+                SILLSTONE_LAYOUT_GRAY8,
                 2,
                 &mut out,
             )
         },
-        PITH_E_REJECTED
+        SILLSTONE_E_REJECTED
     );
 
     // Error cases
     assert_eq!(
-        unsafe { sillstone_image_ahash(core::ptr::null(), 0, 16, 16, PITH_LAYOUT_GRAY8, &mut out) },
-        PITH_E_INVALID
+        unsafe {
+            sillstone_image_ahash(
+                core::ptr::null(),
+                0,
+                16,
+                16,
+                SILLSTONE_LAYOUT_GRAY8,
+                &mut out,
+            )
+        },
+        SILLSTONE_E_INVALID
     );
     assert_eq!(
         unsafe { sillstone_image_ahash(data.as_ptr(), data.len(), 16, 16, 999, &mut out) },
-        PITH_E_INVALID
+        SILLSTONE_E_INVALID
     );
     assert_eq!(
-        unsafe { sillstone_image_ahash(data.as_ptr(), 5, 16, 16, PITH_LAYOUT_GRAY8, &mut out) },
-        PITH_E_INVALID
+        unsafe {
+            sillstone_image_ahash(data.as_ptr(), 5, 16, 16, SILLSTONE_LAYOUT_GRAY8, &mut out)
+        },
+        SILLSTONE_E_INVALID
     );
 }
 

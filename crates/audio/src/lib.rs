@@ -1,8 +1,8 @@
 //! Audio fingerprint facade: spectral peaks and the peak-to-id
 //! reverse map.
 //!
-//! Part of the `pith` zero-dependency hashing suite: every crate depends
-//! only on other `pith-*` crates plus `std`, so the whole suite resolves
+//! Part of the `sillstone` zero-dependency hashing suite: every crate depends
+//! only on other `sillstone-*` crates plus `std`, so the whole suite resolves
 //! without a single registry package. The decoders this facade fronts are
 //! the crate-local `wav` module (RIFF/WAVE) and `sillstone-flac` (FLAC);
 //! the FFT is `sillstone-math`'s.
@@ -46,9 +46,9 @@ pub mod ffi;
 // publicly nameable in Rust.
 #[cfg(all(not(test), feature = "std"))]
 mod ffi_jni;
+pub mod fingerprint;
 pub mod reference;
 pub mod wav;
-pub mod fingerprint;
 pub use fingerprint::{fingerprint, resample_linear};
 
 pub use peaks::{

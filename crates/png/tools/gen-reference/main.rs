@@ -170,7 +170,7 @@ fn reference_json() -> String {
         .collect();
     measured.sort_unstable_by_key(|(name, _)| *name);
     let mut out = String::from(
-        "{\n  \"suite\": \"pith\",\n  \"crate\": \"pith-png\",\n  \"schema\": 1,\n  \"generator\": \"cargo run --bin gen-reference -- gen\",\n  \"vectors\": {\n",
+        "{\n  \"suite\": \"sillstone\",\n  \"crate\": \"sillstone-png\",\n  \"schema\": 1,\n  \"generator\": \"cargo run --bin gen-reference -- gen\",\n  \"vectors\": {\n",
     );
     for (i, (name, m)) in measured.iter().enumerate() {
         let _ = write!(
@@ -317,7 +317,7 @@ mod tests {
     /// A drifted copy is rejected with the regeneration hint.
     #[test]
     fn verify_mode_rejects_drift() {
-        let drifted = reference_json().replace("pith-png", "pith-XNG");
+        let drifted = reference_json().replace("sillstone-png", "sillstone-XNG");
         assert_ne!(drifted, reference_json());
         assert!(verify_str(&drifted).is_err());
     }

@@ -7,8 +7,9 @@
 //! merge keys on.
 
 use sillstone_inflate::ffi::{
-    PITH_E_INVALID, PITH_E_REJECTED, PITH_OK, sillstone_inflate_adler32, sillstone_inflate_free,
-    sillstone_inflate_inflate_auto, sillstone_inflate_inflate_raw, sillstone_inflate_inflate_zlib,
+    SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_OK, sillstone_inflate_adler32,
+    sillstone_inflate_free, sillstone_inflate_inflate_auto, sillstone_inflate_inflate_raw,
+    sillstone_inflate_inflate_zlib,
 };
 
 /// The `text` vector of `reference.json`, pinned literally: its
@@ -38,7 +39,7 @@ fn decode(
     let mut out: *mut u8 = core::ptr::null_mut();
     let mut out_len: usize = 0;
     let status = unsafe { op(input.as_ptr(), input.len(), &mut out, &mut out_len) };
-    if status != PITH_OK {
+    if status != SILLSTONE_OK {
         return Err(status);
     }
     let handed = unsafe { core::slice::from_raw_parts(out, out_len) };
@@ -77,7 +78,7 @@ fn exports_reproduce_the_pinned_vectors() {
         assert_eq!(out, plain, "{name}");
         let mut sum: u32 = 0;
         let status = unsafe { sillstone_inflate_adler32(out.as_ptr(), out.len(), &mut sum) };
-        assert_eq!(status, PITH_OK, "{name}");
+        assert_eq!(status, SILLSTONE_OK, "{name}");
         let expected = if plain.is_empty() { 1 } else { 0xf724_c355 };
         assert_eq!(sum, expected, "{name}");
     }
@@ -107,7 +108,7 @@ fn exports_refuse_without_crashing() {
                     &mut out_len,
                 )
             },
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             unsafe {
@@ -118,32 +119,34 @@ fn exports_refuse_without_crashing() {
                     core::ptr::null_mut(),
                 )
             },
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             unsafe { op(core::ptr::null(), 16, &mut out, &mut out_len) },
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             unsafe { op(core::ptr::null(), 0, &mut out, &mut out_len) },
-            PITH_E_REJECTED
+            SILLSTONE_E_REJECTED
         );
-        assert_eq!(decode(op, b"\x78\xda"), Err(PITH_E_REJECTED));
-        assert_eq!(decode(op, &garbage), Err(PITH_E_REJECTED));
+        assert_eq!(decode(op, b"\x78\xda"), Err(SILLSTONE_E_REJECTED));
+        assert_eq!(decode(op, &garbage), Err(SILLSTONE_E_REJECTED));
     }
 
     let mut sum: u32 = 0;
     assert_eq!(
-        unsafe { sillstone_inflate_adler32(garbage.as_ptr(), garbage.len(), core::ptr::null_mut()) },
-        PITH_E_INVALID
+        unsafe {
+            sillstone_inflate_adler32(garbage.as_ptr(), garbage.len(), core::ptr::null_mut())
+        },
+        SILLSTONE_E_INVALID
     );
     assert_eq!(
         unsafe { sillstone_inflate_adler32(core::ptr::null(), 4, &mut sum) },
-        PITH_E_INVALID
+        SILLSTONE_E_INVALID
     );
     assert_eq!(
         unsafe { sillstone_inflate_adler32(core::ptr::null(), 0, &mut sum) },
-        PITH_OK
+        SILLSTONE_OK
     );
     assert_eq!(sum, 1);
 

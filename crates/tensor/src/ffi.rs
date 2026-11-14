@@ -1,8 +1,8 @@
 //! C-ABI exports for high-performance Tensor operations.
 
-const PITH_OK: i32 = 0;
-const PITH_E_INVALID: i32 = -1;
-const PITH_E_REJECTED: i32 = -2;
+const SILLSTONE_OK: i32 = 0;
+const SILLSTONE_E_INVALID: i32 = -1;
+const SILLSTONE_E_REJECTED: i32 = -2;
 
 /// Performs 2D GEMM matrix multiplication for float64 arrays: C = A @ B.
 /// A is [m, k1], B is [k2, n].
@@ -22,24 +22,24 @@ pub unsafe extern "C" fn sillstone_tensor_matmul_f64(
     out: *mut f64,
 ) -> i32 {
     if a.is_null() || b.is_null() || out.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     if k1 != k2 {
-        return PITH_E_REJECTED;
+        return SILLSTONE_E_REJECTED;
     }
 
     let (Some(a_len), Some(b_len), Some(out_len)) =
         (m.checked_mul(k1), k2.checked_mul(n), m.checked_mul(n))
     else {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     };
     let a_slice = unsafe { core::slice::from_raw_parts(a, a_len) };
     let b_slice = unsafe { core::slice::from_raw_parts(b, b_len) };
     let out_slice = unsafe { core::slice::from_raw_parts_mut(out, out_len) };
 
     match crate::linalg::gemm_into(a_slice, m, k1, b_slice, n, out_slice) {
-        Ok(()) => PITH_OK,
-        Err(_) => PITH_E_REJECTED,
+        Ok(()) => SILLSTONE_OK,
+        Err(_) => SILLSTONE_E_REJECTED,
     }
 }
 
@@ -57,7 +57,7 @@ pub unsafe extern "C" fn sillstone_tensor_add_f64(
     out: *mut f64,
 ) -> i32 {
     if a.is_null() || b.is_null() || out.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let a_slice = unsafe { core::slice::from_raw_parts(a, len) };
     let b_slice = unsafe { core::slice::from_raw_parts(b, len) };
@@ -66,7 +66,7 @@ pub unsafe extern "C" fn sillstone_tensor_add_f64(
     for i in 0..len {
         out_slice[i] = a_slice[i] + b_slice[i];
     }
-    PITH_OK
+    SILLSTONE_OK
 }
 
 /// Performs fast sum reduction for float64 arrays.
@@ -78,7 +78,7 @@ pub unsafe extern "C" fn sillstone_tensor_add_f64(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sillstone_tensor_sum_f64(a: *const f64, len: usize, out: *mut f64) -> i32 {
     if a.is_null() || out.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let a_slice = unsafe { core::slice::from_raw_parts(a, len) };
     let mut sum = 0.0f64;
@@ -88,5 +88,5 @@ pub unsafe extern "C" fn sillstone_tensor_sum_f64(a: *const f64, len: usize, out
     unsafe {
         *out = sum;
     }
-    PITH_OK
+    SILLSTONE_OK
 }

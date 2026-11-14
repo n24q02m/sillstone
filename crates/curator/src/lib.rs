@@ -1,7 +1,7 @@
 //! The suite facade: canonical hash, tier 1, tier 2, match and describe.
 //!
 //! Part of the `sillstone-curator` zero-dependency hashing suite: the curator
-//! consumes only the suite's own `pith-*` crates.
+//! consumes only the suite's own `sillstone-*` crates.
 //!
 //! This crate is the top of the suite DAG. It does not
 //! implement hashing itself — it *wires* the modality crates behind one

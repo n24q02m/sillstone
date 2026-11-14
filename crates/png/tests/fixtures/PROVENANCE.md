@@ -1,4 +1,4 @@
-# Fixture provenance — pith-png
+# Fixture provenance — sillstone-png
 
 Every `.png` in this directory was generated offline by
 `gen_fixtures.py` (same directory, Python 3.13 stdlib only: `zlib` for

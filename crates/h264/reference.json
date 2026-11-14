@@ -1,6 +1,6 @@
 {
-  "suite": "pith",
-  "crate": "pith-h264",
+  "suite": "sillstone",
+  "crate": "sillstone-h264",
   "format_version": 1,
   "generator": "cargo run --bin gen-reference -- gen",
   "vectors": [

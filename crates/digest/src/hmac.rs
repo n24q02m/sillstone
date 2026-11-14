@@ -320,34 +320,38 @@ mod tests {
     #[test]
     fn key_block_boundaries() {
         assert_eq!(
-            hmac_sha256(&[0x5a_u8; 64], b"pith").unwrap().to_string(),
-            "ce01adb54159b9c7c722ea928b1dca33b866e4147e924a7e0da34d08bf04731e"
+            hmac_sha256(&[0x5a_u8; 64], b"sillstone")
+                .unwrap()
+                .to_string(),
+            "1104cebee3d3bf7aae8a0ce2995554c953168da809d2d1c1f3bff38d273c74ae"
         );
         assert_eq!(
-            hmac_sha256(&[0x5a_u8; 65], b"pith").unwrap().to_string(),
-            "d46d5cc612e1c3570701177e2850acb85add57dbede0dcfcbb472e0e83f5736d"
+            hmac_sha256(&[0x5a_u8; 65], b"sillstone")
+                .unwrap()
+                .to_string(),
+            "454cd8c876558a3c7fe4304cb82520fad5f93d6598f6229b99665670e9e88772"
         );
         assert_eq!(
-            hmac_sha512(&[0x5a_u8; 128], b"pith").to_string(),
+            hmac_sha512(&[0x5a_u8; 128], b"sillstone").to_string(),
             concat!(
-                "4bc48fec9e29b700f99a4909d60a02728d59b5f198f31ef0b6463c672504f1bd",
-                "55758af5b6523d62dd734996c0fa9fdd6d1dca163a5c066de9816f311892ecf1",
+                "f405681cef1ff1f214a55eb9f6289e9b5a5426e267f5c3ab628afd3b5aec6cb8",
+                "18950b66c2a1d550e7c94c8b5f437b17ddaa5881f56afbfdc61e2b3f5ca3bd6a",
             )
         );
         assert_eq!(
-            hmac_sha512(&[0x5a_u8; 129], b"pith").to_string(),
+            hmac_sha512(&[0x5a_u8; 129], b"sillstone").to_string(),
             concat!(
-                "fb7360804ba4788fdbef6656dabc7d8c96612ee8861fd6165d890cff3da864e8",
-                "45b31d639f9bde9e08dd7755d0b8834f1a8de372d18190146afc40f7d394222a",
+                "e77aebcf3242b504521faed417f0d8dded21ab42a9b35ec55622ca68884b9760",
+                "eadf1de47c1073b1027d7f853bb51b2df66f267d8a140eab8098e63ea864e501",
             )
         );
         assert_eq!(
-            hmac_sha1(&[0x5a_u8; 64], b"pith").unwrap().to_string(),
-            "14fd693305d0a13e6fa3940e8b6296323837fe4d"
+            hmac_sha1(&[0x5a_u8; 64], b"sillstone").unwrap().to_string(),
+            "072fd6cae8e1964bc10c5bb6d3c986207e7bb85d"
         );
         assert_eq!(
-            hmac_sha1(&[0x5a_u8; 65], b"pith").unwrap().to_string(),
-            "03ca862849e9348f89ef6fac14dd68f43c7ea391"
+            hmac_sha1(&[0x5a_u8; 65], b"sillstone").unwrap().to_string(),
+            "522369b91b027dbe3a5879370eedb7aa85f0a2d4"
         );
     }
 }

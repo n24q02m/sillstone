@@ -13,9 +13,10 @@
 #![allow(unsafe_code)]
 
 use sillstone_jpeg::ffi::{
-    PITH_E_INVALID, PITH_E_REJECTED, PITH_LAYOUT_GRAY8, PITH_LAYOUT_RGB8, PITH_LAYOUT_RGBA8,
-    PITH_OK, sillstone_jpeg_channels, sillstone_jpeg_decode, sillstone_jpeg_dequant, sillstone_jpeg_dequant_zigzag,
-    sillstone_jpeg_idct_islow, sillstone_jpeg_idct_oracle,
+    SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_LAYOUT_GRAY8, SILLSTONE_LAYOUT_RGB8,
+    SILLSTONE_LAYOUT_RGBA8, SILLSTONE_OK, sillstone_jpeg_channels, sillstone_jpeg_decode,
+    sillstone_jpeg_dequant, sillstone_jpeg_dequant_zigzag, sillstone_jpeg_idct_islow,
+    sillstone_jpeg_idct_oracle,
 };
 use sillstone_jpeg::reference;
 
@@ -50,23 +51,24 @@ fn every_committed_digest_is_reproduced_through_the_ffi() {
             .file;
         let bytes = fixture(file);
         let layout = if name.contains("gray") {
-            PITH_LAYOUT_GRAY8
+            SILLSTONE_LAYOUT_GRAY8
         } else {
-            PITH_LAYOUT_RGB8
+            SILLSTONE_LAYOUT_RGB8
         };
         let mut digest: u64 = 0;
-        let status = unsafe { sillstone_jpeg_decode(bytes.as_ptr(), bytes.len(), layout, &mut digest) };
-        assert_eq!(status, PITH_OK, "{name}");
+        let status =
+            unsafe { sillstone_jpeg_decode(bytes.as_ptr(), bytes.len(), layout, &mut digest) };
+        assert_eq!(status, SILLSTONE_OK, "{name}");
         assert_eq!(digest, want, "{name}");
 
         // The native channel count matches the layout the digest pins.
         let mut channels: u32 = 0;
         let status = unsafe { sillstone_jpeg_channels(bytes.as_ptr(), bytes.len(), &mut channels) };
-        assert_eq!(status, PITH_OK, "{name}");
+        assert_eq!(status, SILLSTONE_OK, "{name}");
         let native_layout = if channels == 1 {
-            PITH_LAYOUT_GRAY8
+            SILLSTONE_LAYOUT_GRAY8
         } else {
-            PITH_LAYOUT_RGB8
+            SILLSTONE_LAYOUT_RGB8
         };
         assert_eq!(native_layout, layout, "{name}");
     }
@@ -76,9 +78,15 @@ fn every_committed_digest_is_reproduced_through_the_ffi() {
 fn decode_statuses_and_pinned_literal() {
     let gray = fixture("base_gray.jpg");
     let mut digest: u64 = 0;
-    let status =
-        unsafe { sillstone_jpeg_decode(gray.as_ptr(), gray.len(), PITH_LAYOUT_GRAY8, &mut digest) };
-    assert_eq!(status, PITH_OK);
+    let status = unsafe {
+        sillstone_jpeg_decode(
+            gray.as_ptr(),
+            gray.len(),
+            SILLSTONE_LAYOUT_GRAY8,
+            &mut digest,
+        )
+    };
+    assert_eq!(status, SILLSTONE_OK);
     // Pinned drift guard: the literal the three SDK harnesses pin too
     // (reference.json digests["base_gray"]).
     assert_eq!(digest, 0xe0ce_77f0_0e2c_b066);
@@ -88,20 +96,25 @@ fn decode_statuses_and_pinned_literal() {
     // caller bugs.
     let color = fixture("base_444.jpg");
     let cases = [
-        (gray.as_ptr(), gray.len(), 9u32, PITH_E_INVALID),
+        (gray.as_ptr(), gray.len(), 9u32, SILLSTONE_E_INVALID),
         (
             b"not a jpeg".as_ptr(),
             10,
-            PITH_LAYOUT_GRAY8,
-            PITH_E_REJECTED,
+            SILLSTONE_LAYOUT_GRAY8,
+            SILLSTONE_E_REJECTED,
         ),
         (
             color.as_ptr(),
             color.len(),
-            PITH_LAYOUT_GRAY8,
-            PITH_E_REJECTED,
+            SILLSTONE_LAYOUT_GRAY8,
+            SILLSTONE_E_REJECTED,
         ),
-        (core::ptr::null(), 0, PITH_LAYOUT_GRAY8, PITH_E_REJECTED),
+        (
+            core::ptr::null(),
+            0,
+            SILLSTONE_LAYOUT_GRAY8,
+            SILLSTONE_E_REJECTED,
+        ),
     ];
     for (ptr, len, layout, want) in cases {
         let status = unsafe { sillstone_jpeg_decode(ptr, len, layout, &mut digest) };
@@ -111,21 +124,23 @@ fn decode_statuses_and_pinned_literal() {
         sillstone_jpeg_decode(
             gray.as_ptr(),
             gray.len(),
-            PITH_LAYOUT_GRAY8,
+            SILLSTONE_LAYOUT_GRAY8,
             core::ptr::null_mut(),
         )
     };
-    assert_eq!(status, PITH_E_INVALID);
+    assert_eq!(status, SILLSTONE_E_INVALID);
 
     let empty: [u8; 0] = [];
-    let status = unsafe { sillstone_jpeg_decode(empty.as_ptr(), 0, PITH_LAYOUT_GRAY8, &mut digest) };
-    assert_eq!(status, PITH_E_REJECTED);
+    let status =
+        unsafe { sillstone_jpeg_decode(empty.as_ptr(), 0, SILLSTONE_LAYOUT_GRAY8, &mut digest) };
+    assert_eq!(status, SILLSTONE_E_REJECTED);
 
     let mut channels: u32 = 0;
     let status = unsafe { sillstone_jpeg_channels(b"x".as_ptr(), 1, &mut channels) };
-    assert_eq!(status, PITH_E_REJECTED);
-    let status = unsafe { sillstone_jpeg_channels(gray.as_ptr(), gray.len(), core::ptr::null_mut()) };
-    assert_eq!(status, PITH_E_INVALID);
+    assert_eq!(status, SILLSTONE_E_REJECTED);
+    let status =
+        unsafe { sillstone_jpeg_channels(gray.as_ptr(), gray.len(), core::ptr::null_mut()) };
+    assert_eq!(status, SILLSTONE_E_INVALID);
 }
 
 #[test]
@@ -136,16 +151,21 @@ fn layout_conversions_widen_without_touching_natives() {
     let mut rgba: u64 = 0;
     unsafe {
         assert_eq!(
-            sillstone_jpeg_decode(gray.as_ptr(), gray.len(), PITH_LAYOUT_GRAY8, &mut native),
-            PITH_OK
+            sillstone_jpeg_decode(
+                gray.as_ptr(),
+                gray.len(),
+                SILLSTONE_LAYOUT_GRAY8,
+                &mut native
+            ),
+            SILLSTONE_OK
         );
         assert_eq!(
-            sillstone_jpeg_decode(gray.as_ptr(), gray.len(), PITH_LAYOUT_RGB8, &mut rgb),
-            PITH_OK
+            sillstone_jpeg_decode(gray.as_ptr(), gray.len(), SILLSTONE_LAYOUT_RGB8, &mut rgb),
+            SILLSTONE_OK
         );
         assert_eq!(
-            sillstone_jpeg_decode(gray.as_ptr(), gray.len(), PITH_LAYOUT_RGBA8, &mut rgba),
-            PITH_OK
+            sillstone_jpeg_decode(gray.as_ptr(), gray.len(), SILLSTONE_LAYOUT_RGBA8, &mut rgba),
+            SILLSTONE_OK
         );
     }
     assert_ne!(native, rgb);
@@ -156,8 +176,13 @@ fn layout_conversions_widen_without_touching_natives() {
     let mut rgba: u64 = 0;
     unsafe {
         assert_eq!(
-            sillstone_jpeg_decode(color.as_ptr(), color.len(), PITH_LAYOUT_RGBA8, &mut rgba),
-            PITH_OK
+            sillstone_jpeg_decode(
+                color.as_ptr(),
+                color.len(),
+                SILLSTONE_LAYOUT_RGBA8,
+                &mut rgba
+            ),
+            SILLSTONE_OK
         );
     }
     assert_ne!(rgba, 0);
@@ -197,7 +222,7 @@ fn every_kernel_vector_is_replayed_through_the_ffi() {
                 other => panic!("unmapped vector {other}"),
             }
         };
-        assert_eq!(status, PITH_OK, "{}", vector.name);
+        assert_eq!(status, SILLSTONE_OK, "{}", vector.name);
         let got = unlanes(&output);
         if vector.exact {
             assert_eq!(got, vector.output, "{}", vector.name);
@@ -220,24 +245,26 @@ fn kernel_refusals_cover_null_and_wrong_lengths() {
     let two = vec![0u8; 128 * 8];
     let mut out = vec![0u8; 64 * 8];
 
-    let status =
-        unsafe { sillstone_jpeg_dequant_zigzag(two.as_ptr(), two.len(), out.as_mut_ptr(), out.len()) };
-    assert_eq!(status, PITH_E_INVALID);
+    let status = unsafe {
+        sillstone_jpeg_dequant_zigzag(two.as_ptr(), two.len(), out.as_mut_ptr(), out.len())
+    };
+    assert_eq!(status, SILLSTONE_E_INVALID);
     let status = unsafe {
         sillstone_jpeg_dequant_zigzag(block.as_ptr(), block.len(), out.as_mut_ptr(), out.len() - 8)
     };
-    assert_eq!(status, PITH_E_INVALID);
+    assert_eq!(status, SILLSTONE_E_INVALID);
     let status = unsafe {
         sillstone_jpeg_dequant_zigzag(core::ptr::null(), block.len(), out.as_mut_ptr(), out.len())
     };
-    assert_eq!(status, PITH_E_INVALID);
+    assert_eq!(status, SILLSTONE_E_INVALID);
     let status =
         unsafe { sillstone_jpeg_dequant(block.as_ptr(), block.len(), out.as_mut_ptr(), out.len()) };
-    assert_eq!(status, PITH_E_INVALID);
+    assert_eq!(status, SILLSTONE_E_INVALID);
     let status =
         unsafe { sillstone_jpeg_idct_islow(two.as_ptr(), two.len(), out.as_mut_ptr(), out.len()) };
-    assert_eq!(status, PITH_OK);
-    let status =
-        unsafe { sillstone_jpeg_idct_oracle(block.as_ptr(), block.len(), out.as_mut_ptr(), out.len()) };
-    assert_eq!(status, PITH_OK);
+    assert_eq!(status, SILLSTONE_OK);
+    let status = unsafe {
+        sillstone_jpeg_idct_oracle(block.as_ptr(), block.len(), out.as_mut_ptr(), out.len())
+    };
+    assert_eq!(status, SILLSTONE_OK);
 }

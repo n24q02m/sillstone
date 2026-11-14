@@ -6,8 +6,8 @@
 //! null-pointer refusal.
 
 use sillstone_mp4::ffi::{
-    PITH_E_INVALID, PITH_E_REJECTED, PITH_ERR_TRUNCATED, PITH_OK, sillstone_mp4_demux,
-    sillstone_mp4_free,
+    SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_ERR_TRUNCATED, SILLSTONE_OK,
+    sillstone_mp4_demux, sillstone_mp4_free,
 };
 
 fn bx(four: &[u8; 4], payload: &[u8]) -> Vec<u8> {
@@ -223,7 +223,7 @@ fn record_walk_covers_visual_audio_and_other_entries() {
     let file = three_track_file();
     let mdat = (file.len() - PAYLOAD.len()) as u64;
     let (status, err, got) = walk(&file);
-    assert_eq!((status, err), (PITH_OK, PITH_OK));
+    assert_eq!((status, err), (SILLSTONE_OK, SILLSTONE_OK));
 
     let mut w = Wire(Vec::new());
     w.raw(b"M4A ").u32(2).raw(b"M4A ").raw(b"isom");
@@ -259,7 +259,7 @@ fn audio_entry_without_esds_serializes_an_empty_blob() {
     let mut file = ftyp();
     file.extend_from_slice(&bx(b"moov", &moov));
     let (status, err, got) = walk(&file);
-    assert_eq!((status, err), (PITH_OK, PITH_OK));
+    assert_eq!((status, err), (SILLSTONE_OK, SILLSTONE_OK));
     // The last 4 + 1 + 4 + 4 + 4 + 4 bytes are the entry: kind, coding,
     // channels, rate, then a zero-length esds blob.
     let tail = &got[got.len() - (1 + 4 + 4 + 4 + 4)..];
@@ -284,11 +284,11 @@ fn null_arguments_are_invalid_and_leave_the_outputs_alone() {
                 &mut out_len,
                 &mut err
             ),
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             sillstone_mp4_demux(ok, file.len(), &mut out, core::ptr::null_mut(), &mut err),
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             sillstone_mp4_demux(
@@ -298,11 +298,11 @@ fn null_arguments_are_invalid_and_leave_the_outputs_alone() {
                 &mut out_len,
                 core::ptr::null_mut()
             ),
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             sillstone_mp4_demux(core::ptr::null(), 0, &mut out, &mut out_len, &mut err),
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         // Freeing null is a documented no-op.
         sillstone_mp4_free(core::ptr::null_mut(), 0);
@@ -316,7 +316,7 @@ fn a_cut_file_is_rejected_with_a_kind_code_and_no_buffer() {
     let file = three_track_file();
     // Cut inside the last trak: the moov box claims more than is there.
     let (status, err, got) = walk(&file[..file.len() - PAYLOAD.len() - 30]);
-    assert_eq!(status, PITH_E_REJECTED);
-    assert_eq!(err, PITH_ERR_TRUNCATED);
+    assert_eq!(status, SILLSTONE_E_REJECTED);
+    assert_eq!(err, SILLSTONE_ERR_TRUNCATED);
     assert!(got.is_empty());
 }

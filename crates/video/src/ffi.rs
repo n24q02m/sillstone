@@ -2,7 +2,7 @@
 //! (ctypes), Node (koffi) and Go (cgo) SDKs bind through.
 //!
 //! The suite's FFI convention, defined by this module and mirrored by
-//! every `pith-*` cdylib:
+//! every `sillstone-*` cdylib:
 //!
 //! * one flat set of `#[unsafe(no_mangle)] pub unsafe extern "C"`
 //!   functions — raw pointers plus lengths, no structs across the
@@ -52,13 +52,13 @@ use crate::reference::canonical_bytes;
 use crate::{Limits, decode};
 
 /// Status: success.
-pub const PITH_OK: i32 = 0;
+pub const SILLSTONE_OK: i32 = 0;
 /// Status: a caller argument is invalid — a null pointer.
-pub const PITH_E_INVALID: i32 = -1;
+pub const SILLSTONE_E_INVALID: i32 = -1;
 /// Status: the core decoder refused the input (malformed container or
 /// H.264 stream, unsupported codec, fragmented MP4, or a default
 /// [`Limits`] bound exceeded).
-pub const PITH_E_REJECTED: i32 = -2;
+pub const SILLSTONE_E_REJECTED: i32 = -2;
 
 /// Fingerprints a whole ISO-BMFF file (mp4/mov, H.264 video track)
 /// into the canonical byte stream the `reference.json` vectors are
@@ -66,7 +66,7 @@ pub const PITH_E_REJECTED: i32 = -2;
 ///
 /// `data` points at `len` bytes of the complete file. On success the
 /// function allocates a buffer, writes its address through `out`, its
-/// length through `out_len`, and returns [`PITH_OK`]; the caller owns
+/// length through `out_len`, and returns [`SILLSTONE_OK`]; the caller owns
 /// the buffer and must release it with [`sillstone_video_free`], passing
 /// back the same pointer *and* length. The layout is documented in the
 /// module docs: big-endian header and frame hashes, little-endian
@@ -85,7 +85,7 @@ pub unsafe extern "C" fn sillstone_video_fingerprint(
     out_len: *mut usize,
 ) -> i32 {
     if data.is_null() || out.is_null() || out_len.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let bytes = unsafe { core::slice::from_raw_parts(data, len) };
     match fingerprint_and_serialize(bytes) {
@@ -98,7 +98,7 @@ pub unsafe extern "C" fn sillstone_video_fingerprint(
                 *out = ptr.cast::<u8>();
                 *out_len = len;
             }
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(status) => status,
     }
@@ -123,17 +123,30 @@ pub unsafe extern "C" fn sillstone_video_free(ptr: *mut u8, len: usize) {
 
 /// The safe core of [`sillstone_video_fingerprint`]: decode, then
 /// serialize canonically. Decoding failures map to
-/// [`PITH_E_REJECTED`]. `pub(crate)`: the JNI surface
+/// [`SILLSTONE_E_REJECTED`]. `pub(crate)`: the JNI surface
 /// (`ffi_jni`) routes through the same core.
 pub(crate) fn fingerprint_and_serialize(bytes: &[u8]) -> Result<Vec<u8>, i32> {
-    let fp = decode(bytes, &Limits::default()).map_err(|_| PITH_E_REJECTED)?;
+    let fp = decode(bytes, &Limits::default()).map_err(|_| SILLSTONE_E_REJECTED)?;
     Ok(canonical_bytes(&fp))
 }
+
+// Deprecated pre-rename aliases: the `PITH_*` names the suite shipped before
+// it became `sillstone`. Each one is the same value as its `SILLSTONE_*` twin.
+
+/// Deprecated alias of [`SILLSTONE_OK`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_OK`")]
+pub const PITH_OK: i32 = SILLSTONE_OK;
+/// Deprecated alias of [`SILLSTONE_E_INVALID`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_INVALID`")]
+pub const PITH_E_INVALID: i32 = SILLSTONE_E_INVALID;
+/// Deprecated alias of [`SILLSTONE_E_REJECTED`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_REJECTED`")]
+pub const PITH_E_REJECTED: i32 = SILLSTONE_E_REJECTED;
 
 #[cfg(test)]
 mod tests {
     use super::{
-        PITH_E_INVALID, PITH_E_REJECTED, PITH_OK, fingerprint_and_serialize,
+        SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_OK, fingerprint_and_serialize,
         sillstone_video_fingerprint, sillstone_video_free,
     };
 
@@ -159,7 +172,7 @@ mod tests {
         let mut out_len: usize = 0;
         let status =
             unsafe { sillstone_video_fingerprint(mp4.as_ptr(), mp4.len(), &mut out, &mut out_len) };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(out_len, expected.len());
         let handed_back = unsafe { core::slice::from_raw_parts(out, out_len) };
         assert_eq!(handed_back, expected.as_slice());
@@ -182,15 +195,15 @@ mod tests {
         unsafe { sillstone_video_free(out, out_len) };
     }
 
-    /// Null pointers are [`PITH_E_INVALID`]; garbage input is
-    /// [`PITH_E_REJECTED`]; a null buffer is a legal free.
+    /// Null pointers are [`SILLSTONE_E_INVALID`]; garbage input is
+    /// [`SILLSTONE_E_REJECTED`]; a null buffer is a legal free.
     #[test]
     fn ffi_refusals() {
         let mut out: *mut u8 = core::ptr::null_mut();
         let mut out_len: usize = 0;
         let null_data =
             unsafe { sillstone_video_fingerprint(core::ptr::null(), 0, &mut out, &mut out_len) };
-        assert_eq!(null_data, PITH_E_INVALID);
+        assert_eq!(null_data, SILLSTONE_E_INVALID);
 
         let garbage_bytes = [0u8; 16];
         let null_out = unsafe {
@@ -201,7 +214,7 @@ mod tests {
                 &mut out_len,
             )
         };
-        assert_eq!(null_out, PITH_E_INVALID);
+        assert_eq!(null_out, SILLSTONE_E_INVALID);
 
         let null_out_len = unsafe {
             sillstone_video_fingerprint(
@@ -211,7 +224,7 @@ mod tests {
                 core::ptr::null_mut(),
             )
         };
-        assert_eq!(null_out_len, PITH_E_INVALID);
+        assert_eq!(null_out_len, SILLSTONE_E_INVALID);
 
         let garbage = unsafe {
             sillstone_video_fingerprint(
@@ -221,14 +234,15 @@ mod tests {
                 &mut out_len,
             )
         };
-        assert_eq!(garbage, PITH_E_REJECTED);
+        assert_eq!(garbage, SILLSTONE_E_REJECTED);
 
         // A non-null pointer over zero bytes is readable and decodes
         // far enough to be *rejected* (empty input: InvalidMagic), not
         // invalid.
-        let empty =
-            unsafe { sillstone_video_fingerprint(garbage_bytes.as_ptr(), 0, &mut out, &mut out_len) };
-        assert_eq!(empty, PITH_E_REJECTED);
+        let empty = unsafe {
+            sillstone_video_fingerprint(garbage_bytes.as_ptr(), 0, &mut out, &mut out_len)
+        };
+        assert_eq!(empty, SILLSTONE_E_REJECTED);
 
         unsafe { sillstone_video_free(core::ptr::null_mut(), 0) };
     }
@@ -239,8 +253,21 @@ mod tests {
     fn safe_core_rejects_garbage() {
         assert_eq!(
             fingerprint_and_serialize(&[0xAB; 4096]),
-            Err(PITH_E_REJECTED)
+            Err(SILLSTONE_E_REJECTED)
         );
-        assert_eq!(fingerprint_and_serialize(&[]), Err(PITH_E_REJECTED));
+        assert_eq!(fingerprint_and_serialize(&[]), Err(SILLSTONE_E_REJECTED));
+    }
+}
+
+#[cfg(test)]
+mod deprecated_alias_tests {
+    #![allow(deprecated)]
+    use super::*;
+
+    #[test]
+    fn pith_aliases_equal_their_sillstone_twins() {
+        assert_eq!(PITH_OK, SILLSTONE_OK);
+        assert_eq!(PITH_E_INVALID, SILLSTONE_E_INVALID);
+        assert_eq!(PITH_E_REJECTED, SILLSTONE_E_REJECTED);
     }
 }

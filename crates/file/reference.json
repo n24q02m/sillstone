@@ -1,9 +1,9 @@
 {
-  "suite": "pith",
-  "crate": "pith-file",
+  "suite": "sillstone",
+  "crate": "sillstone-file",
   "format_version": 1,
   "generator": "cargo run --bin gen-reference -- gen",
-  "description": "Hex-exact file-domain reference vectors for pith-file: raw-byte SHA-256, FastCDC chunk boundaries with per-chunk SHA-256 digests, unique chunk-digest set folds, exact Jaccard similarities (IEEE-754 bits), PDF text-extraction digests and exact PDF refusal messages over the committed fixture and inline corpus.",
+  "description": "Hex-exact file-domain reference vectors for sillstone-file: raw-byte SHA-256, FastCDC chunk boundaries with per-chunk SHA-256 digests, unique chunk-digest set folds, exact Jaccard similarities (IEEE-754 bits), PDF text-extraction digests and exact PDF refusal messages over the committed fixture and inline corpus.",
   "vectors": [
     {
       "name": "splitmix64-48kib",

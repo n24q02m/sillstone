@@ -1,6 +1,6 @@
 {
-  "suite": "pith",
-  "crate": "pith-png",
+  "suite": "sillstone",
+  "crate": "sillstone-png",
   "schema": 1,
   "generator": "cargo run --bin gen-reference -- gen",
   "vectors": {

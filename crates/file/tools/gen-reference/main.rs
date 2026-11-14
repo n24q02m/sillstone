@@ -344,11 +344,11 @@ fn reference_json() -> String {
 
     let mut s = String::new();
     s.push_str("{\n");
-    s.push_str("  \"suite\": \"pith\",\n");
-    s.push_str("  \"crate\": \"pith-file\",\n");
+    s.push_str("  \"suite\": \"sillstone\",\n");
+    s.push_str("  \"crate\": \"sillstone-file\",\n");
     s.push_str("  \"format_version\": 1,\n");
     s.push_str("  \"generator\": \"cargo run --bin gen-reference -- gen\",\n");
-    s.push_str("  \"description\": \"Hex-exact file-domain reference vectors for pith-file: raw-byte SHA-256, FastCDC chunk boundaries with per-chunk SHA-256 digests, unique chunk-digest set folds, exact Jaccard similarities (IEEE-754 bits), PDF text-extraction digests and exact PDF refusal messages over the committed fixture and inline corpus.\",\n");
+    s.push_str("  \"description\": \"Hex-exact file-domain reference vectors for sillstone-file: raw-byte SHA-256, FastCDC chunk boundaries with per-chunk SHA-256 digests, unique chunk-digest set folds, exact Jaccard similarities (IEEE-754 bits), PDF text-extraction digests and exact PDF refusal messages over the committed fixture and inline corpus.\",\n");
     s.push_str("  \"vectors\": [\n");
     s.push_str(&vectors.join(",\n"));
     s.push_str("\n  ]\n");
@@ -466,8 +466,8 @@ mod tests {
     #[test]
     fn json_carries_suite_identity() {
         let json = reference_json();
-        assert!(json.contains("\"suite\": \"pith\""));
-        assert!(json.contains("\"crate\": \"pith-file\""));
+        assert!(json.contains("\"suite\": \"sillstone\""));
+        assert!(json.contains("\"crate\": \"sillstone-file\""));
         assert!(json.contains("\"format_version\": 1"));
         assert!(json.ends_with("}\n"));
         assert!(json.contains("\"policy\": \"exact\""));

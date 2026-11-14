@@ -194,3 +194,18 @@ int format = SillstoneNative.detect(data);
 1. **Standalone Repositories**: The 19 repositories under `github.com/pith-hash/*` will have final redirect notices published to their README files and will subsequently be marked read-only / archived on GitHub.
 2. **Registry Notice**: Versions published under the legacy names on crates.io, PyPI, npm, and Maven Central remain accessible for existing builds, with deprecation warnings pointing to the unified `sillstone` packages.
 3. **Continuous Support**: All future feature development, bug fixes, performance optimizations, and security patches will be published exclusively through the `sillstone` monorepo.
+
+---
+
+## 5. Deprecated Pre-Rename Aliases
+
+The binaries still answer to the names they shipped under before the suite became `sillstone`, so existing callers keep working while they migrate. Every alias is marked deprecated (`#[deprecated]` in Rust, `@Deprecated` in Java) and forwards to its `sillstone` twin unchanged.
+
+| Surface | Deprecated name | Use instead |
+|---|---|---|
+| Rust status constants (each crate's `ffi` module) | `PITH_OK`, `PITH_E_INVALID`, `PITH_E_REJECTED`, and the other `PITH_*` constants | the same name with the `SILLSTONE_` prefix |
+| Java status constants | `SillstoneHash.PITH_OK`, `PITH_E_INVALID`, `PITH_E_REJECTED` | `SillstoneHash.SILLSTONE_OK`, `SILLSTONE_E_INVALID`, `SILLSTONE_E_REJECTED` |
+| JNI exports | `Java_hash_pith_PithHash_*`, `Java_hash_pith_PithFile_*`, `Java_hash_pith_PithVideo_*`, `Java_sillstone_math_PithMath_*`, `Java_hash_sillstone_<crate>_Pith<Crate>_*` | `Java_io_github_sillstone_Sillstone<Crate>_*` (class `io.github.sillstone.Sillstone<Crate>`) |
+| Java bundled natives | resource root `/hash/pith/native/<platform>/` (probed only when the canonical root has no match) | `/io/github/sillstone/native/<platform>/` |
+
+The deprecated `PithFile` and `PithVideo` JNI exports throw `hash.pith.PithFfiException` on refusal, as before, so old `catch` blocks still match; their canonical twins throw `io.github.sillstone.SillstoneFfiException`. Plan to drop the aliases in a future breaking release.

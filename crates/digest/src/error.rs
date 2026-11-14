@@ -2,7 +2,7 @@
 
 use core::fmt;
 
-/// The single error type of the `pith` suite.
+/// The single error type of the `sillstone` suite.
 ///
 /// Every fallible operation across the workspace returns
 /// [`Result<T>`](crate::Result), which uses this type, so a caller that

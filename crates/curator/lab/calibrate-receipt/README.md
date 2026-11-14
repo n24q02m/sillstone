@@ -58,6 +58,6 @@ counts: tp=16 fp=1 fn=0 tn=5
 ## Provenance
 
 - Generated 2026-10-07 on the R5 curator workstation; re-verified by
-  `cargo test -p pith-hash-cli --test calibrate_receipt`.
+  `cargo test -p sillstone-cli --test calibrate_receipt`.
 - The CSV sha256 at the time of pinning:
   616b481cca4bab8dfa6566aa385a17e4255e43105cc46780fd53df222a7135f5

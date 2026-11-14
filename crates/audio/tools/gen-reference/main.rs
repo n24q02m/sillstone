@@ -431,8 +431,8 @@ fn reference_json() -> String {
 
     let mut s = String::new();
     s.push_str("{\n");
-    s.push_str("  \"suite\": \"pith\",\n");
-    s.push_str("  \"crate\": \"pith-audio\",\n");
+    s.push_str("  \"suite\": \"sillstone\",\n");
+    s.push_str("  \"crate\": \"sillstone-audio\",\n");
     s.push_str("  \"format_version\": 1,\n");
     s.push_str("  \"generator\": \"cargo run --bin gen-reference -- gen\",\n");
     s.push_str("  \"vectors\": [\n");
@@ -793,7 +793,7 @@ mod tests {
     #[test]
     fn json_carries_fixture_identity_and_kinds() {
         let json = reference_json();
-        assert!(json.contains("\"suite\": \"pith\""));
+        assert!(json.contains("\"suite\": \"sillstone\""));
         assert!(json.contains(FIXTURE_SHA256));
         assert!(json.contains(FIXTURE_PCM_SHA256));
         // Every error kind the generator computes is one the mapping

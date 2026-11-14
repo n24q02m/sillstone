@@ -1,11 +1,11 @@
-//! The numeric kernel of the `pith` kit: Fourier transforms, the
+//! The numeric kernel of the `sillstone` kit: Fourier transforms, the
 //! DCT, order statistics, and the smallest linear algebra that tier 3
 //! needs — plus the tier-1 expansion: full complex arithmetic, the
 //! arbitrary-length (Bluestein) DFT, the DCT-III as a first-class
 //! transform, convolution/correlation, descriptive statistics,
 //! interpolation, RANSAC and dynamic time warping.
 //!
-//! Part of the `pith` zero-dependency hashing kit: every crate in
+//! Part of the `sillstone` zero-dependency hashing kit: every crate in
 //! this suite builds without a single registry package, enforced by
 //! `scripts/check-zero-deps.py`.
 //!
@@ -48,15 +48,15 @@ mod complex;
 mod conv;
 mod dct;
 mod dct3;
+mod dst;
 mod dtw;
 mod fft;
-mod interp;
-mod dst;
-mod linalg;
 mod integrate;
+mod interp;
+mod linalg;
 mod median;
-mod ransac;
 mod ode;
+mod ransac;
 mod solve3;
 mod stats;
 
@@ -69,13 +69,13 @@ pub use conv::{convolve, correlate};
 pub use dct::{dct2, dct2_2d, dct2_in_place, idct2, idct2_2d};
 pub use dct3::{dct3, dct3_2d};
 pub use dst::{dst1, dst1_orthonormal, dst2, dst2_orthonormal, dst3, dst3_orthonormal};
-pub use integrate::{gauss_legendre, simpson, simpson_38, trapezoid};
 pub use dtw::dtw_distance;
 pub use fft::{fft, fft_real, ifft};
+pub use integrate::{gauss_legendre, simpson, simpson_38, trapezoid};
 pub use interp::{lagrange_eval, lerp};
 pub use linalg::{IDENTITY3, det3, inverse3, mat3_mul, mat3_mul_vec, transpose3};
 pub use median::{median, median_copy};
-pub use ransac::{LineFit, SplitMix64, ransac_line};
 pub use ode::{ode_rk4, ode_rk45};
+pub use ransac::{LineFit, SplitMix64, ransac_line};
 pub use solve3::solve3;
 pub use stats::{covariance, mean, std_dev, variance};

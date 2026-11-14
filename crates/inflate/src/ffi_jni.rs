@@ -1,5 +1,5 @@
-//! The JNI surface of `sillstone-inflate`: the `Java_hash_sillstone_inflate_*`
-//! exports the Java SDK's `PithInflate` class binds through.
+//! The JNI surface of `sillstone-inflate`: the `Java_io_github_sillstone_SillstoneInflate_*`
+//! exports the Java SDK's `SillstoneInflate` class binds through.
 //!
 //! The C ABI of [`crate::ffi`] is untouched: JNI requires exports named
 //! `Java_<package>_<Class>_<method>`, so the Java-facing shims live
@@ -9,13 +9,13 @@
 //!   class second (static methods);
 //! * input bytes arrive as a `byte[]`, copied through the function
 //!   table before any decode runs;
-//! * the status (`PITH_OK`, `PITH_E_INVALID`, `PITH_E_REJECTED`)
+//! * the status (`SILLSTONE_OK`, `SILLSTONE_E_INVALID`, `SILLSTONE_E_REJECTED`)
 //!   crosses back through the first slot of an `int[]` the caller
 //!   provides;
 //! * the decompressed bytes cross back as a fresh `byte[]` (null when
-//!   the status is not [`PITH_OK`]); the Adler-32 crosses back
-//!   bit-cast to `jlong` (0 unless the status is [`PITH_OK`]);
-//! * a null `data` array maps to [`PITH_E_INVALID`] exactly as the C
+//!   the status is not [`SILLSTONE_OK`]); the Adler-32 crosses back
+//!   bit-cast to `jlong` (0 unless the status is [`SILLSTONE_OK`]);
+//! * a null `data` array maps to [`SILLSTONE_E_INVALID`] exactly as the C
 //!   ABI maps a null pointer; a null environment or status array
 //!   short-circuits to a zero return without touching memory (both
 //!   are unreachable through the Java wrapper, which always passes
@@ -37,7 +37,7 @@ use core::ffi::c_void;
 
 use sillstone_digest::Result as DecodeResult;
 
-use crate::ffi::{PITH_E_INVALID, PITH_E_REJECTED, PITH_OK};
+use crate::ffi::{SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_OK};
 use crate::{Limits, adler32, inflate_auto, inflate_gzip, inflate_raw, inflate_zlib};
 
 /// A JNI environment handle — C-mode `JNIEnv*`, a pointer to the
@@ -130,15 +130,15 @@ unsafe fn table<'a>(env: *mut JNIEnv) -> &'a JniTable {
 ///
 /// `env` must be a live JNI environment and `array` a live `byte[]`
 /// reference for the duration of the call; a null array is
-/// [`PITH_E_INVALID`], mirroring the C ABI's null-pointer rule.
+/// [`SILLSTONE_E_INVALID`], mirroring the C ABI's null-pointer rule.
 unsafe fn java_bytes(env: *mut JNIEnv, array: JArray) -> Result<Vec<u8>, i32> {
     if array.is_null() {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let functions = unsafe { table(env) };
     let len = unsafe { (functions.get_array_length)(env, array) };
     if len < 0 {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let mut bytes = vec![0u8; len as usize];
     unsafe { (functions.get_byte_array_region)(env, array, 0, len, bytes.as_mut_ptr().cast()) };
@@ -208,14 +208,14 @@ unsafe fn inflate_native(
     };
     match op(&bytes, &Limits::default()) {
         Ok(out) => {
-            unsafe { set_status(env, status_slot, PITH_OK) };
+            unsafe { set_status(env, status_slot, SILLSTONE_OK) };
             unsafe { jbyte_array(env, &out) }
         }
         Err(_) => {
             // Every decode refusal — malformed, truncated, over-limit,
-            // a framing the crate refuses — collapses to PITH_E_REJECTED
+            // a framing the crate refuses — collapses to SILLSTONE_E_REJECTED
             // at this boundary, exactly as the C ABI does.
-            unsafe { set_status(env, status_slot, PITH_E_REJECTED) };
+            unsafe { set_status(env, status_slot, SILLSTONE_E_REJECTED) };
             core::ptr::null_mut()
         }
     }
@@ -223,7 +223,7 @@ unsafe fn inflate_native(
 
 /// The Java binding of [`inflate_raw`]: a raw RFC 1951 DEFLATE stream
 /// in, the decompressed bytes out as a fresh `byte[]`, the status
-/// (`PITH_OK`, `PITH_E_INVALID` for a null array, `PITH_E_REJECTED`
+/// (`SILLSTONE_OK`, `SILLSTONE_E_INVALID` for a null array, `SILLSTONE_E_REJECTED`
 /// for a refused stream) through `status[0]`.
 ///
 /// # Safety
@@ -234,7 +234,7 @@ unsafe fn inflate_native(
 // Private: the JVM links the export by symbol name; a public Rust
 // signature over the private table type would trip `private_interfaces`.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_inflate_PithInflate_inflateRawNative(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneInflate_inflateRawNative(
     env: *mut JNIEnv,
     _class: JClass,
     data: JArray,
@@ -244,14 +244,14 @@ unsafe extern "system" fn Java_hash_sillstone_inflate_PithInflate_inflateRawNati
 }
 
 /// The Java binding of [`inflate_zlib`] — the wire contract of
-/// [`Java_hash_sillstone_inflate_PithInflate_inflateRawNative`].
+/// [`Java_io_github_sillstone_SillstoneInflate_inflateRawNative`].
 ///
 /// # Safety
 ///
 /// `env` must be a live JNI environment and `data`/`status` live Java
 /// array references for the duration of the call.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_inflate_PithInflate_inflateZlibNative(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneInflate_inflateZlibNative(
     env: *mut JNIEnv,
     _class: JClass,
     data: JArray,
@@ -261,14 +261,14 @@ unsafe extern "system" fn Java_hash_sillstone_inflate_PithInflate_inflateZlibNat
 }
 
 /// The Java binding of [`inflate_auto`] — the wire contract of
-/// [`Java_hash_sillstone_inflate_PithInflate_inflateRawNative`].
+/// [`Java_io_github_sillstone_SillstoneInflate_inflateRawNative`].
 ///
 /// # Safety
 ///
 /// `env` must be a live JNI environment and `data`/`status` live Java
 /// array references for the duration of the call.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_inflate_PithInflate_inflateAutoNative(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneInflate_inflateAutoNative(
     env: *mut JNIEnv,
     _class: JClass,
     data: JArray,
@@ -278,14 +278,14 @@ unsafe extern "system" fn Java_hash_sillstone_inflate_PithInflate_inflateAutoNat
 }
 
 /// The Java binding of [`inflate_gzip`] — the wire contract of
-/// [`Java_hash_sillstone_inflate_PithInflate_inflateRawNative`].
+/// [`Java_io_github_sillstone_SillstoneInflate_inflateRawNative`].
 ///
 /// # Safety
 ///
 /// `env` must be a live JNI environment and `data`/`status` live Java
 /// array references for the duration of the call.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_inflate_PithInflate_inflateGzipNative(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneInflate_inflateGzipNative(
     env: *mut JNIEnv,
     _class: JClass,
     data: JArray,
@@ -295,7 +295,7 @@ unsafe extern "system" fn Java_hash_sillstone_inflate_PithInflate_inflateGzipNat
 }
 
 /// The Java binding of [`adler32`]: the checksum bit-cast to `jlong`
-/// (0 unless the status is [`PITH_OK`]) and the status through
+/// (0 unless the status is [`SILLSTONE_OK`]) and the status through
 /// `status[0]`.
 ///
 /// # Safety
@@ -303,7 +303,7 @@ unsafe extern "system" fn Java_hash_sillstone_inflate_PithInflate_inflateGzipNat
 /// `env` must be a live JNI environment and `data`/`status` live Java
 /// array references for the duration of the call.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_inflate_PithInflate_adler32Native(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneInflate_adler32Native(
     env: *mut JNIEnv,
     _class: JClass,
     data: JArray,
@@ -319,8 +319,97 @@ unsafe extern "system" fn Java_hash_sillstone_inflate_PithInflate_adler32Native(
             0
         }
         Ok(bytes) => {
-            unsafe { set_status(env, status_slot, PITH_OK) };
+            unsafe { set_status(env, status_slot, SILLSTONE_OK) };
             i64::from(adler32(&bytes))
         }
     }
+}
+
+// Deprecated pre-rename JNI exports: the symbols Java classes compiled against the
+// suite's old class names resolve. Each one forwards to its canonical
+// `io.github.sillstone` export unchanged.
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneInflate_inflateRawNative`]: the export for the
+/// pre-rename `hash.sillstone.inflate.PithInflate` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneInflate_inflateRawNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneInflate_inflateRawNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_inflate_PithInflate_inflateRawNative(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    status: JIntArray,
+) -> JArray {
+    unsafe { Java_io_github_sillstone_SillstoneInflate_inflateRawNative(env, class, data, status) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneInflate_inflateZlibNative`]: the export for the
+/// pre-rename `hash.sillstone.inflate.PithInflate` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneInflate_inflateZlibNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneInflate_inflateZlibNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_inflate_PithInflate_inflateZlibNative(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    status: JIntArray,
+) -> JArray {
+    unsafe { Java_io_github_sillstone_SillstoneInflate_inflateZlibNative(env, class, data, status) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneInflate_inflateAutoNative`]: the export for the
+/// pre-rename `hash.sillstone.inflate.PithInflate` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneInflate_inflateAutoNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneInflate_inflateAutoNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_inflate_PithInflate_inflateAutoNative(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    status: JIntArray,
+) -> JArray {
+    unsafe { Java_io_github_sillstone_SillstoneInflate_inflateAutoNative(env, class, data, status) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneInflate_inflateGzipNative`]: the export for the
+/// pre-rename `hash.sillstone.inflate.PithInflate` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneInflate_inflateGzipNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneInflate_inflateGzipNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_inflate_PithInflate_inflateGzipNative(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    status: JIntArray,
+) -> JArray {
+    unsafe { Java_io_github_sillstone_SillstoneInflate_inflateGzipNative(env, class, data, status) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneInflate_adler32Native`]: the export for the
+/// pre-rename `hash.sillstone.inflate.PithInflate` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneInflate_adler32Native`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneInflate_adler32Native`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_inflate_PithInflate_adler32Native(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    status: JIntArray,
+) -> jlong {
+    unsafe { Java_io_github_sillstone_SillstoneInflate_adler32Native(env, class, data, status) }
 }

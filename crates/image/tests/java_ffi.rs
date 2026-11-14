@@ -18,7 +18,9 @@
 use core::ffi::c_void;
 use std::sync::{LazyLock, Mutex};
 
-use sillstone_image::ffi::{PITH_E_INVALID, PITH_LAYOUT_GRAY8, PITH_LAYOUT_RGB8, sillstone_image_phash};
+use sillstone_image::ffi::{
+    SILLSTONE_E_INVALID, SILLSTONE_LAYOUT_GRAY8, SILLSTONE_LAYOUT_RGB8, sillstone_image_phash,
+};
 
 type JNIEnv = *const FakeTable;
 type JArray = *mut c_void;
@@ -61,6 +63,17 @@ struct FakeTable {
 
 // The exported symbol under test (linked from the crate's rlib).
 unsafe extern "system" {
+    fn Java_io_github_sillstone_SillstoneImage_phashNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        width: jint,
+        height: jint,
+        layout: jint,
+        status: JIntArray,
+    ) -> jlong;
+
+    // The deprecated pre-rename twin (`hash.sillstone.image.PithImage`).
     fn Java_hash_sillstone_image_PithImage_phashNative(
         env: *mut JNIEnv,
         class: JClass,
@@ -194,13 +207,13 @@ fn jni_phash_matches_the_pinned_oracle() {
     let dump = base_444();
     let (hash, status) = with_fake_env(dump, false, |env| unsafe {
         let slot = status_slot();
-        let hash = Java_hash_sillstone_image_PithImage_phashNative(
+        let hash = Java_io_github_sillstone_SillstoneImage_phashNative(
             env,
             std::ptr::null_mut(),
             SOME_ARRAY,
             32,
             24,
-            PITH_LAYOUT_RGB8 as jint,
+            SILLSTONE_LAYOUT_RGB8 as jint,
             slot,
         );
         (hash, read_status(slot))
@@ -219,20 +232,20 @@ fn jni_phash_agrees_with_the_c_export_on_a_gradient() {
             dump.len(),
             8,
             8,
-            PITH_LAYOUT_GRAY8,
+            SILLSTONE_LAYOUT_GRAY8,
             &mut expected,
         )
     };
     assert_eq!(code, 0);
     let (hash, status) = with_fake_env(dump, false, |env| unsafe {
         let slot = status_slot();
-        let hash = Java_hash_sillstone_image_PithImage_phashNative(
+        let hash = Java_io_github_sillstone_SillstoneImage_phashNative(
             env,
             std::ptr::null_mut(),
             SOME_ARRAY,
             8,
             8,
-            PITH_LAYOUT_GRAY8 as jint,
+            SILLSTONE_LAYOUT_GRAY8 as jint,
             slot,
         );
         (hash, read_status(slot))
@@ -246,18 +259,18 @@ fn jni_null_data_array_is_invalid() {
     let dump = base_444();
     let (hash, status) = with_fake_env(dump, false, |env| unsafe {
         let slot = status_slot();
-        let hash = Java_hash_sillstone_image_PithImage_phashNative(
+        let hash = Java_io_github_sillstone_SillstoneImage_phashNative(
             env,
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             32,
             24,
-            PITH_LAYOUT_RGB8 as jint,
+            SILLSTONE_LAYOUT_RGB8 as jint,
             slot,
         );
         (hash, read_status(slot))
     });
-    assert_eq!(status, PITH_E_INVALID, "status");
+    assert_eq!(status, SILLSTONE_E_INVALID, "status");
     assert_eq!(hash, 0, "hash");
 }
 
@@ -266,7 +279,7 @@ fn jni_unknown_layout_is_invalid() {
     let dump = base_444();
     let (hash, status) = with_fake_env(dump, false, |env| unsafe {
         let slot = status_slot();
-        let hash = Java_hash_sillstone_image_PithImage_phashNative(
+        let hash = Java_io_github_sillstone_SillstoneImage_phashNative(
             env,
             std::ptr::null_mut(),
             SOME_ARRAY,
@@ -277,7 +290,7 @@ fn jni_unknown_layout_is_invalid() {
         );
         (hash, read_status(slot))
     });
-    assert_eq!(status, PITH_E_INVALID, "status");
+    assert_eq!(status, SILLSTONE_E_INVALID, "status");
     assert_eq!(hash, 0, "hash");
 }
 
@@ -286,18 +299,18 @@ fn jni_truncated_dump_is_invalid() {
     let dump = base_444();
     let (hash, status) = with_fake_env(dump[..dump.len() - 1].to_vec(), false, |env| unsafe {
         let slot = status_slot();
-        let hash = Java_hash_sillstone_image_PithImage_phashNative(
+        let hash = Java_io_github_sillstone_SillstoneImage_phashNative(
             env,
             std::ptr::null_mut(),
             SOME_ARRAY,
             32,
             24,
-            PITH_LAYOUT_RGB8 as jint,
+            SILLSTONE_LAYOUT_RGB8 as jint,
             slot,
         );
         (hash, read_status(slot))
     });
-    assert_eq!(status, PITH_E_INVALID, "status");
+    assert_eq!(status, SILLSTONE_E_INVALID, "status");
     assert_eq!(hash, 0, "hash");
 }
 
@@ -306,18 +319,18 @@ fn jni_negative_array_length_is_invalid() {
     let dump = base_444();
     let (hash, status) = with_fake_env(dump, true, |env| unsafe {
         let slot = status_slot();
-        let hash = Java_hash_sillstone_image_PithImage_phashNative(
+        let hash = Java_io_github_sillstone_SillstoneImage_phashNative(
             env,
             std::ptr::null_mut(),
             SOME_ARRAY,
             32,
             24,
-            PITH_LAYOUT_RGB8 as jint,
+            SILLSTONE_LAYOUT_RGB8 as jint,
             slot,
         );
         (hash, read_status(slot))
     });
-    assert_eq!(status, PITH_E_INVALID, "status");
+    assert_eq!(status, SILLSTONE_E_INVALID, "status");
     assert_eq!(hash, 0, "hash");
 }
 
@@ -325,13 +338,13 @@ fn jni_negative_array_length_is_invalid() {
 fn jni_null_status_array_short_circuits() {
     let dump = base_444();
     let hash = with_fake_env(dump, false, |env| unsafe {
-        Java_hash_sillstone_image_PithImage_phashNative(
+        Java_io_github_sillstone_SillstoneImage_phashNative(
             env,
             std::ptr::null_mut(),
             SOME_ARRAY,
             32,
             24,
-            PITH_LAYOUT_RGB8 as jint,
+            SILLSTONE_LAYOUT_RGB8 as jint,
             std::ptr::null_mut(),
         )
     });
@@ -343,17 +356,68 @@ fn jni_null_environment_short_circuits() {
     let dump = base_444();
     let (hash, status) = with_fake_env(dump, false, |_env| unsafe {
         let slot = status_slot();
-        let hash = Java_hash_sillstone_image_PithImage_phashNative(
+        let hash = Java_io_github_sillstone_SillstoneImage_phashNative(
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             SOME_ARRAY,
             32,
             24,
-            PITH_LAYOUT_RGB8 as jint,
+            SILLSTONE_LAYOUT_RGB8 as jint,
             slot,
         );
         (hash, read_status(slot))
     });
     assert_eq!(hash, 0);
     assert_eq!(status, i32::MIN, "status untouched without an environment");
+}
+
+/// The deprecated `PithImage.phashNative` export returns exactly what the
+/// canonical `SillstoneImage.phashNative` returns: the pinned oracle hash on
+/// the fixture, and the INVALID refusal on a null data array.
+#[test]
+fn jni_legacy_phash_alias_matches_the_canonical_export() {
+    type Phash = unsafe extern "system" fn(
+        *mut JNIEnv,
+        JClass,
+        JArray,
+        jint,
+        jint,
+        jint,
+        JIntArray,
+    ) -> jlong;
+    let exports: [(&str, Phash); 2] = [
+        (
+            "canonical",
+            Java_io_github_sillstone_SillstoneImage_phashNative,
+        ),
+        ("legacy", Java_hash_sillstone_image_PithImage_phashNative),
+    ];
+    let mut results = Vec::new();
+    for (name, phash) in exports {
+        for data in [SOME_ARRAY, std::ptr::null_mut()] {
+            let (hash, status) = with_fake_env(base_444(), false, |env| unsafe {
+                let slot = status_slot();
+                let hash = phash(
+                    env,
+                    std::ptr::null_mut(),
+                    data,
+                    32,
+                    24,
+                    SILLSTONE_LAYOUT_RGB8 as jint,
+                    slot,
+                );
+                (hash, read_status(slot))
+            });
+            results.push((name, hash as u64, status));
+        }
+    }
+    assert_eq!(
+        results,
+        vec![
+            ("canonical", 0x858a_3f41_1ef5_0f78, 0),
+            ("canonical", 0, SILLSTONE_E_INVALID),
+            ("legacy", 0x858a_3f41_1ef5_0f78, 0),
+            ("legacy", 0, SILLSTONE_E_INVALID),
+        ]
+    );
 }

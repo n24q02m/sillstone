@@ -1,4 +1,4 @@
-//! The JNI surface of `sillstone-unicode`: the `Java_hash_sillstone_unicode_PithUnicode_*`
+//! The JNI surface of `sillstone-unicode`: the `Java_io_github_sillstone_SillstoneUnicode_*`
 //! exports the Java SDK (`sdk/java`) binds its `native` methods through.
 //!
 //! The C ABI of [`crate::ffi`] is untouched: JNI requires exports named
@@ -15,15 +15,15 @@
 //! * the export takes the JNI environment first and the receiving
 //!   class second (the methods are static), then the Java arguments;
 //! * the status code crosses back through a trailing one-element
-//!   `int[]` — the same `PITH_OK` / `PITH_E_INVALID` / `PITH_E_REJECTED`
+//!   `int[]` — the same `SILLSTONE_OK` / `SILLSTONE_E_INVALID` / `SILLSTONE_E_REJECTED`
 //!   values the C ABI returns;
 //! * a normalization result crosses back as a fresh `jbyteArray` (a
-//!   null return whenever the status is not `PITH_OK`); the C export's
+//!   null return whenever the status is not `SILLSTONE_OK`); the C export's
 //!   handed-out buffer is copied into the Java array and released
 //!   through [`sillstone_unicode_free`] before returning;
 //! * the quick-check answer crosses back as a `jint` (0/1, 0 unless
-//!   the status is `PITH_OK`);
-//! * a null `data` array maps to `PITH_E_INVALID` exactly as the C ABI
+//!   the status is `SILLSTONE_OK`);
+//! * a null `data` array maps to `SILLSTONE_E_INVALID` exactly as the C ABI
 //!   maps a null pointer; a null environment or status array
 //!   short-circuits to a null/zero return without touching memory (both
 //!   are unreachable through the Java wrapper, which always passes live
@@ -43,9 +43,9 @@
 use core::ffi::c_void;
 
 use crate::ffi::{
-    PITH_E_INVALID, PITH_OK, sillstone_unicode_casefold, sillstone_unicode_casefold_simple,
-    sillstone_unicode_free, sillstone_unicode_is_normalized, sillstone_unicode_nfc, sillstone_unicode_nfd,
-    sillstone_unicode_nfkc, sillstone_unicode_nfkd,
+    SILLSTONE_E_INVALID, SILLSTONE_OK, sillstone_unicode_casefold,
+    sillstone_unicode_casefold_simple, sillstone_unicode_free, sillstone_unicode_is_normalized,
+    sillstone_unicode_nfc, sillstone_unicode_nfd, sillstone_unicode_nfkc, sillstone_unicode_nfkd,
 };
 
 /// A JNI environment handle — C-mode `JNIEnv*`, a pointer to the
@@ -136,15 +136,15 @@ unsafe fn table<'a>(env: *mut JNIEnv) -> &'a JniTable {
 ///
 /// `env` must be a live JNI environment and `array` a live `byte[]`
 /// reference for the duration of the call; a null array is
-/// [`PITH_E_INVALID`], mirroring the C ABI's null-pointer rule.
+/// [`SILLSTONE_E_INVALID`], mirroring the C ABI's null-pointer rule.
 unsafe fn java_bytes(env: *mut JNIEnv, array: JArray) -> Result<Vec<u8>, i32> {
     if array.is_null() {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let functions = unsafe { table(env) };
     let len = unsafe { (functions.get_array_length)(env, array) };
     if len < 0 {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     let mut bytes = vec![0u8; len as usize];
     unsafe { (functions.get_byte_array_region)(env, array, 0, len, bytes.as_mut_ptr().cast()) };
@@ -213,7 +213,7 @@ unsafe fn buffer_export(
     let mut out: *mut u8 = core::ptr::null_mut();
     let mut out_len: usize = 0;
     let code = unsafe { op(bytes.as_ptr(), bytes.len(), &mut out, &mut out_len) };
-    if code != PITH_OK {
+    if code != SILLSTONE_OK {
         unsafe { set_status(env, status, code) };
         return std::ptr::null_mut();
     }
@@ -222,7 +222,7 @@ unsafe fn buffer_export(
     let slice = unsafe { core::slice::from_raw_parts(out, out_len) };
     let result = unsafe { java_byte_array(env, slice) };
     unsafe { sillstone_unicode_free(out, out_len) };
-    unsafe { set_status(env, status, PITH_OK) };
+    unsafe { set_status(env, status, SILLSTONE_OK) };
     result
 }
 
@@ -251,32 +251,32 @@ macro_rules! jni_buffer_export {
 }
 
 jni_buffer_export!(
-    Java_hash_sillstone_unicode_PithUnicode_nfcNative,
+    Java_io_github_sillstone_SillstoneUnicode_nfcNative,
     sillstone_unicode_nfc,
     "The Java binding of [`sillstone_unicode_nfc`]: NFC over a Java `byte[]`."
 );
 jni_buffer_export!(
-    Java_hash_sillstone_unicode_PithUnicode_nfdNative,
+    Java_io_github_sillstone_SillstoneUnicode_nfdNative,
     sillstone_unicode_nfd,
     "The Java binding of [`sillstone_unicode_nfd`]: NFD over a Java `byte[]`."
 );
 jni_buffer_export!(
-    Java_hash_sillstone_unicode_PithUnicode_nfkcNative,
+    Java_io_github_sillstone_SillstoneUnicode_nfkcNative,
     sillstone_unicode_nfkc,
     "The Java binding of [`sillstone_unicode_nfkc`]: NFKC over a Java `byte[]`."
 );
 jni_buffer_export!(
-    Java_hash_sillstone_unicode_PithUnicode_nfkdNative,
+    Java_io_github_sillstone_SillstoneUnicode_nfkdNative,
     sillstone_unicode_nfkd,
     "The Java binding of [`sillstone_unicode_nfkd`]: NFKD over a Java `byte[]`."
 );
 jni_buffer_export!(
-    Java_hash_sillstone_unicode_PithUnicode_casefoldNative,
+    Java_io_github_sillstone_SillstoneUnicode_casefoldNative,
     sillstone_unicode_casefold,
     "The Java binding of [`sillstone_unicode_casefold`]: full case folding over a Java `byte[]`."
 );
 jni_buffer_export!(
-    Java_hash_sillstone_unicode_PithUnicode_casefoldSimpleNative,
+    Java_io_github_sillstone_SillstoneUnicode_casefoldSimpleNative,
     sillstone_unicode_casefold_simple,
     "The Java binding of [`sillstone_unicode_casefold_simple`]: simple case folding over a Java `byte[]`."
 );
@@ -284,8 +284,8 @@ jni_buffer_export!(
 /// The Java binding of [`sillstone_unicode_is_normalized`]: the exact UAX #15
 /// quick-check answer for `form` — 1 = NFC, 2 = NFD, 3 = NFKC, 4 =
 /// NFKD. The answer crosses back as a `jint` (0/1, 0 unless the status
-/// is [`PITH_OK`]); the status (`PITH_E_INVALID` for a null array or an
-/// out-of-range form, `PITH_E_REJECTED` for bytes that are not valid
+/// is [`SILLSTONE_OK`]); the status (`SILLSTONE_E_INVALID` for a null array or an
+/// out-of-range form, `SILLSTONE_E_REJECTED` for bytes that are not valid
 /// UTF-8) through `status[0]`.
 ///
 /// # Safety
@@ -297,7 +297,7 @@ jni_buffer_export!(
 // signature over the private table type would trip
 // `private_interfaces`.
 #[unsafe(no_mangle)]
-unsafe extern "system" fn Java_hash_sillstone_unicode_PithUnicode_isNormalizedNative(
+unsafe extern "system" fn Java_io_github_sillstone_SillstoneUnicode_isNormalizedNative(
     env: *mut JNIEnv,
     _class: JClass,
     form: jint,
@@ -324,5 +324,137 @@ unsafe extern "system" fn Java_hash_sillstone_unicode_PithUnicode_isNormalizedNa
         )
     };
     unsafe { set_status(env, status, code) };
-    if code == PITH_OK { answer as jint } else { 0 }
+    if code == SILLSTONE_OK {
+        answer as jint
+    } else {
+        0
+    }
+}
+
+// Deprecated pre-rename JNI exports: the symbols Java classes compiled against the
+// suite's old class names resolve. Each one forwards to its canonical
+// `io.github.sillstone` export unchanged.
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneUnicode_isNormalizedNative`]: the export for the
+/// pre-rename `hash.sillstone.unicode.PithUnicode` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneUnicode_isNormalizedNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneUnicode_isNormalizedNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_unicode_PithUnicode_isNormalizedNative(
+    env: *mut JNIEnv,
+    class: JClass,
+    form: jint,
+    data: JArray,
+    status: JIntArray,
+) -> jint {
+    unsafe {
+        Java_io_github_sillstone_SillstoneUnicode_isNormalizedNative(env, class, form, data, status)
+    }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneUnicode_nfcNative`]: the export for the
+/// pre-rename `hash.sillstone.unicode.PithUnicode` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneUnicode_nfcNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneUnicode_nfcNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_unicode_PithUnicode_nfcNative(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    status: JIntArray,
+) -> JArray {
+    unsafe { Java_io_github_sillstone_SillstoneUnicode_nfcNative(env, class, data, status) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneUnicode_nfdNative`]: the export for the
+/// pre-rename `hash.sillstone.unicode.PithUnicode` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneUnicode_nfdNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneUnicode_nfdNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_unicode_PithUnicode_nfdNative(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    status: JIntArray,
+) -> JArray {
+    unsafe { Java_io_github_sillstone_SillstoneUnicode_nfdNative(env, class, data, status) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneUnicode_nfkcNative`]: the export for the
+/// pre-rename `hash.sillstone.unicode.PithUnicode` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneUnicode_nfkcNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneUnicode_nfkcNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_unicode_PithUnicode_nfkcNative(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    status: JIntArray,
+) -> JArray {
+    unsafe { Java_io_github_sillstone_SillstoneUnicode_nfkcNative(env, class, data, status) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneUnicode_nfkdNative`]: the export for the
+/// pre-rename `hash.sillstone.unicode.PithUnicode` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneUnicode_nfkdNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneUnicode_nfkdNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_unicode_PithUnicode_nfkdNative(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    status: JIntArray,
+) -> JArray {
+    unsafe { Java_io_github_sillstone_SillstoneUnicode_nfkdNative(env, class, data, status) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneUnicode_casefoldNative`]: the export for the
+/// pre-rename `hash.sillstone.unicode.PithUnicode` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneUnicode_casefoldNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneUnicode_casefoldNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_unicode_PithUnicode_casefoldNative(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    status: JIntArray,
+) -> JArray {
+    unsafe { Java_io_github_sillstone_SillstoneUnicode_casefoldNative(env, class, data, status) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneUnicode_casefoldSimpleNative`]: the export for the
+/// pre-rename `hash.sillstone.unicode.PithUnicode` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneUnicode_casefoldSimpleNative`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneUnicode_casefoldSimpleNative`")]
+#[unsafe(no_mangle)]
+unsafe extern "system" fn Java_hash_sillstone_unicode_PithUnicode_casefoldSimpleNative(
+    env: *mut JNIEnv,
+    class: JClass,
+    data: JArray,
+    status: JIntArray,
+) -> JArray {
+    unsafe {
+        Java_io_github_sillstone_SillstoneUnicode_casefoldSimpleNative(env, class, data, status)
+    }
 }

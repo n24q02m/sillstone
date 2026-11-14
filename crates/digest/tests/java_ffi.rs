@@ -91,6 +91,124 @@ struct FakeTable {
 
 // The exported symbols under test (linked from the crate's rlib).
 unsafe extern "system" {
+    fn Java_io_github_sillstone_SillstoneDigest_sha256Native(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        status: JIntArray,
+    ) -> JArray;
+
+    fn Java_io_github_sillstone_SillstoneDigest_sha1Native(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        status: JIntArray,
+    ) -> JArray;
+
+    fn Java_io_github_sillstone_SillstoneDigest_sha512Native(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        status: JIntArray,
+    ) -> JArray;
+
+    fn Java_io_github_sillstone_SillstoneDigest_hmacSha1Native(
+        env: *mut JNIEnv,
+        class: JClass,
+        key: JArray,
+        data: JArray,
+        status: JIntArray,
+    ) -> JArray;
+
+    fn Java_io_github_sillstone_SillstoneDigest_hmacSha256Native(
+        env: *mut JNIEnv,
+        class: JClass,
+        key: JArray,
+        data: JArray,
+        status: JIntArray,
+    ) -> JArray;
+
+    fn Java_io_github_sillstone_SillstoneDigest_hmacSha512Native(
+        env: *mut JNIEnv,
+        class: JClass,
+        key: JArray,
+        data: JArray,
+        status: JIntArray,
+    ) -> JArray;
+
+    fn Java_io_github_sillstone_SillstoneDigest_crc32Native(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        status: JIntArray,
+    ) -> jint;
+
+    fn Java_io_github_sillstone_SillstoneDigest_adler32Native(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        status: JIntArray,
+    ) -> jint;
+    fn Java_io_github_sillstone_SillstoneDigest_fnv1a64Native(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        status: JIntArray,
+    ) -> jlong;
+    fn Java_io_github_sillstone_SillstoneDigest_crc32cNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        status: JIntArray,
+    ) -> jint;
+
+    fn Java_io_github_sillstone_SillstoneDigest_xxh64Native(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        seed: jlong,
+        status: JIntArray,
+    ) -> jlong;
+
+    fn Java_io_github_sillstone_SillstoneDigest_murmur3X64128Native(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        seed: jint,
+        status: JIntArray,
+    ) -> JArray;
+
+    fn Java_io_github_sillstone_SillstoneDigest_splitmix64FillNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        seed: jlong,
+        count: jint,
+        status: JIntArray,
+    ) -> JArray;
+
+    fn Java_io_github_sillstone_SillstoneDigest_xoshiro256FillNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        seed: jlong,
+        count: jint,
+        status: JIntArray,
+    ) -> JArray;
+
+    fn Java_io_github_sillstone_SillstoneDigest_base64EncodeNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        status: JIntArray,
+    ) -> JArray;
+
+    fn Java_io_github_sillstone_SillstoneDigest_base64DecodeNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        status: JIntArray,
+    ) -> JArray;
+
+    // The deprecated pre-rename twins of the exports above (same signatures).
     fn Java_hash_sillstone_digest_PithDigest_sha256Native(
         env: *mut JNIEnv,
         class: JClass,
@@ -453,8 +571,12 @@ fn jni_sha256_matches_the_library_and_the_reference() {
     let ((digest, status), written, _ints, _longs) = with_fake_env(|env| unsafe {
         let data = byte_array(input.clone());
         let slot = status_slot();
-        let digest =
-            Java_hash_sillstone_digest_PithDigest_sha256Native(env, std::ptr::null_mut(), data, slot);
+        let digest = Java_io_github_sillstone_SillstoneDigest_sha256Native(
+            env,
+            std::ptr::null_mut(),
+            data,
+            slot,
+        );
         (digest, read_status(slot))
     });
     assert_eq!(status, 0, "status");
@@ -483,8 +605,12 @@ fn jni_sha1_matches_the_library_and_the_reference() {
     let ((digest, status), written, _ints, _longs) = with_fake_env(|env| unsafe {
         let data = byte_array(input.clone());
         let slot = status_slot();
-        let digest =
-            Java_hash_sillstone_digest_PithDigest_sha1Native(env, std::ptr::null_mut(), data, slot);
+        let digest = Java_io_github_sillstone_SillstoneDigest_sha1Native(
+            env,
+            std::ptr::null_mut(),
+            data,
+            slot,
+        );
         (digest, read_status(slot))
     });
     assert_eq!(status, 0, "status");
@@ -514,8 +640,12 @@ fn jni_sha512_matches_the_library() {
     let ((_digest, status), written, _ints, _longs) = with_fake_env(|env| unsafe {
         let data = byte_array(input.clone());
         let slot = status_slot();
-        let digest =
-            Java_hash_sillstone_digest_PithDigest_sha512Native(env, std::ptr::null_mut(), data, slot);
+        let digest = Java_io_github_sillstone_SillstoneDigest_sha512Native(
+            env,
+            std::ptr::null_mut(),
+            data,
+            slot,
+        );
         (digest, read_status(slot))
     });
     assert_eq!(status, 0, "status");
@@ -537,7 +667,7 @@ fn jni_hmac_sha256_matches_the_library_and_the_reference() {
         let key = byte_array(key);
         let data = byte_array(data);
         let slot = status_slot();
-        let mac = Java_hash_sillstone_digest_PithDigest_hmacSha256Native(
+        let mac = Java_io_github_sillstone_SillstoneDigest_hmacSha256Native(
             env,
             std::ptr::null_mut(),
             key,
@@ -573,7 +703,7 @@ fn jni_hmac_sha1_matches_the_library() {
         let data = b"The quick brown fox jumps over the lazy dog".to_vec();
         let data = byte_array(data);
         let slot = status_slot();
-        let mac = Java_hash_sillstone_digest_PithDigest_hmacSha1Native(
+        let mac = Java_io_github_sillstone_SillstoneDigest_hmacSha1Native(
             env,
             std::ptr::null_mut(),
             key,
@@ -600,7 +730,7 @@ fn jni_hmac_sha512_matches_the_library() {
         let key = byte_array(b"Jefe".to_vec());
         let data = byte_array(b"what do ya want for nothing?".to_vec());
         let slot = status_slot();
-        let mac = Java_hash_sillstone_digest_PithDigest_hmacSha512Native(
+        let mac = Java_io_github_sillstone_SillstoneDigest_hmacSha512Native(
             env,
             std::ptr::null_mut(),
             key,
@@ -625,7 +755,7 @@ fn jni_murmur3_matches_the_library() {
     let ((digest, status), written, _ints, _longs) = with_fake_env(|env| unsafe {
         let data = byte_array(b"hello".to_vec());
         let slot = status_slot();
-        let digest = Java_hash_sillstone_digest_PithDigest_murmur3X64128Native(
+        let digest = Java_io_github_sillstone_SillstoneDigest_murmur3X64128Native(
             env,
             std::ptr::null_mut(),
             data,
@@ -650,8 +780,13 @@ fn jni_xxh64_matches_the_library() {
     let ((value, status), _written, _ints, _longs) = with_fake_env(|env| unsafe {
         let data = byte_array(b"foobar".to_vec());
         let slot = status_slot();
-        let value =
-            Java_hash_sillstone_digest_PithDigest_xxh64Native(env, std::ptr::null_mut(), data, 7, slot);
+        let value = Java_io_github_sillstone_SillstoneDigest_xxh64Native(
+            env,
+            std::ptr::null_mut(),
+            data,
+            7,
+            slot,
+        );
         (value, read_status(slot))
     });
     // The scalar exports carry the result in the return value and only
@@ -666,8 +801,12 @@ fn jni_crc32_matches_the_library_and_the_reference() {
     let ((value, status), _written, _ints, _longs) = with_fake_env(|env| unsafe {
         let data = byte_array(b"123456789".to_vec());
         let slot = status_slot();
-        let value =
-            Java_hash_sillstone_digest_PithDigest_crc32Native(env, std::ptr::null_mut(), data, slot);
+        let value = Java_io_github_sillstone_SillstoneDigest_crc32Native(
+            env,
+            std::ptr::null_mut(),
+            data,
+            slot,
+        );
         (value, read_status(slot))
     });
     assert_eq!(status, i32::MIN, "status slot untouched on success");
@@ -680,8 +819,12 @@ fn jni_crc32c_matches_the_library() {
     let ((value, status), _written, _ints, _longs) = with_fake_env(|env| unsafe {
         let data = byte_array(b"123456789".to_vec());
         let slot = status_slot();
-        let value =
-            Java_hash_sillstone_digest_PithDigest_crc32cNative(env, std::ptr::null_mut(), data, slot);
+        let value = Java_io_github_sillstone_SillstoneDigest_crc32cNative(
+            env,
+            std::ptr::null_mut(),
+            data,
+            slot,
+        );
         (value, read_status(slot))
     });
     assert_eq!(status, i32::MIN, "status slot untouched on success");
@@ -693,8 +836,12 @@ fn jni_adler32_matches_the_library() {
     let ((value, status), _written, _ints, _longs) = with_fake_env(|env| unsafe {
         let data = byte_array(b"Wikipedia".to_vec());
         let slot = status_slot();
-        let value =
-            Java_hash_sillstone_digest_PithDigest_adler32Native(env, std::ptr::null_mut(), data, slot);
+        let value = Java_io_github_sillstone_SillstoneDigest_adler32Native(
+            env,
+            std::ptr::null_mut(),
+            data,
+            slot,
+        );
         (value, read_status(slot))
     });
     assert_eq!(status, i32::MIN, "status slot untouched on success");
@@ -707,8 +854,12 @@ fn jni_fnv1a64_matches_the_library() {
     let ((value, status), _written, _ints, _longs) = with_fake_env(|env| unsafe {
         let data = byte_array(b"foobar".to_vec());
         let slot = status_slot();
-        let value =
-            Java_hash_sillstone_digest_PithDigest_fnv1a64Native(env, std::ptr::null_mut(), data, slot);
+        let value = Java_io_github_sillstone_SillstoneDigest_fnv1a64Native(
+            env,
+            std::ptr::null_mut(),
+            data,
+            slot,
+        );
         (value, read_status(slot))
     });
     assert_eq!(status, i32::MIN, "status slot untouched on success");
@@ -719,7 +870,7 @@ fn jni_fnv1a64_matches_the_library() {
 fn jni_splitmix64_fill_matches_the_safe_core() {
     let ((array, status), _written, _ints, longs) = with_fake_env(|env| unsafe {
         let slot = status_slot();
-        let array = Java_hash_sillstone_digest_PithDigest_splitmix64FillNative(
+        let array = Java_io_github_sillstone_SillstoneDigest_splitmix64FillNative(
             env,
             std::ptr::null_mut(),
             0x0000_D1CE,
@@ -739,7 +890,7 @@ fn jni_splitmix64_fill_matches_the_safe_core() {
 fn jni_xoshiro256_fill_matches_the_safe_core() {
     let ((array, status), _written, _ints, longs) = with_fake_env(|env| unsafe {
         let slot = status_slot();
-        let array = Java_hash_sillstone_digest_PithDigest_xoshiro256FillNative(
+        let array = Java_io_github_sillstone_SillstoneDigest_xoshiro256FillNative(
             env,
             std::ptr::null_mut(),
             0x0000_F00D,
@@ -762,7 +913,7 @@ fn jni_xoshiro256_fill_matches_the_safe_core() {
 fn jni_negative_fill_count_is_invalid() {
     let ((array, status), _written, _ints, longs) = with_fake_env(|env| unsafe {
         let slot = status_slot();
-        let array = Java_hash_sillstone_digest_PithDigest_splitmix64FillNative(
+        let array = Java_io_github_sillstone_SillstoneDigest_splitmix64FillNative(
             env,
             std::ptr::null_mut(),
             1,
@@ -781,7 +932,7 @@ fn jni_base64_round_trip_matches_the_reference() {
     let ((encoded, status), written, _ints, _longs) = with_fake_env(|env| unsafe {
         let data = byte_array(b"foobar".to_vec());
         let slot = status_slot();
-        let encoded = Java_hash_sillstone_digest_PithDigest_base64EncodeNative(
+        let encoded = Java_io_github_sillstone_SillstoneDigest_base64EncodeNative(
             env,
             std::ptr::null_mut(),
             data,
@@ -798,7 +949,7 @@ fn jni_base64_round_trip_matches_the_reference() {
     let ((decoded, status), written, _ints, _longs) = with_fake_env(|env| unsafe {
         let data = byte_array(encoded);
         let slot = status_slot();
-        let decoded = Java_hash_sillstone_digest_PithDigest_base64DecodeNative(
+        let decoded = Java_io_github_sillstone_SillstoneDigest_base64DecodeNative(
             env,
             std::ptr::null_mut(),
             data,
@@ -816,7 +967,7 @@ fn jni_base64_decode_non_canonical_is_rejected() {
     let ((decoded, status), _written, _ints, _longs) = with_fake_env(|env| unsafe {
         let data = byte_array(b"Zm9vYmF!".to_vec());
         let slot = status_slot();
-        let decoded = Java_hash_sillstone_digest_PithDigest_base64DecodeNative(
+        let decoded = Java_io_github_sillstone_SillstoneDigest_base64DecodeNative(
             env,
             std::ptr::null_mut(),
             data,
@@ -832,7 +983,7 @@ fn jni_base64_decode_non_canonical_is_rejected() {
 fn jni_digest_null_data_is_invalid() {
     let ((digest, status), _written, _ints, _longs) = with_fake_env(|env| unsafe {
         let slot = status_slot();
-        let digest = Java_hash_sillstone_digest_PithDigest_sha256Native(
+        let digest = Java_io_github_sillstone_SillstoneDigest_sha256Native(
             env,
             std::ptr::null_mut(),
             std::ptr::null_mut(),
@@ -850,8 +1001,12 @@ fn jni_environment_refusing_the_array_is_rejected() {
         let data = byte_array(b"abc".to_vec());
         let slot = status_slot();
         with_state(|state| state.fail_new_array = true);
-        let digest =
-            Java_hash_sillstone_digest_PithDigest_sha256Native(env, std::ptr::null_mut(), data, slot);
+        let digest = Java_io_github_sillstone_SillstoneDigest_sha256Native(
+            env,
+            std::ptr::null_mut(),
+            data,
+            slot,
+        );
         (digest, read_status(slot))
     });
     assert_eq!(status, -2, "status");
@@ -862,7 +1017,7 @@ fn jni_environment_refusing_the_array_is_rejected() {
 fn jni_digest_null_status_short_circuits() {
     let (digest, _written, _ints, _longs) = with_fake_env(|env| unsafe {
         let data = byte_array(b"abc".to_vec());
-        Java_hash_sillstone_digest_PithDigest_sha256Native(
+        Java_io_github_sillstone_SillstoneDigest_sha256Native(
             env,
             std::ptr::null_mut(),
             data,
@@ -877,27 +1032,27 @@ fn jni_null_environment_short_circuits() {
     let ((digest, mac, fill, crc), _written, _ints, _longs) = with_fake_env(|_env| unsafe {
         let data = byte_array(b"abc".to_vec());
         let slot = status_slot();
-        let digest = Java_hash_sillstone_digest_PithDigest_sha256Native(
+        let digest = Java_io_github_sillstone_SillstoneDigest_sha256Native(
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             data,
             slot,
         );
-        let mac = Java_hash_sillstone_digest_PithDigest_hmacSha256Native(
+        let mac = Java_io_github_sillstone_SillstoneDigest_hmacSha256Native(
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             data,
             data,
             slot,
         );
-        let fill = Java_hash_sillstone_digest_PithDigest_xoshiro256FillNative(
+        let fill = Java_io_github_sillstone_SillstoneDigest_xoshiro256FillNative(
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             1,
             4,
             slot,
         );
-        let crc = Java_hash_sillstone_digest_PithDigest_crc32Native(
+        let crc = Java_io_github_sillstone_SillstoneDigest_crc32Native(
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             data,
@@ -920,8 +1075,12 @@ fn jni_stale_array_handle_is_invalid() {
         let stale = data as usize;
         with_state(|state| state.byte_arrays.remove(&stale));
         let slot = status_slot();
-        let digest =
-            Java_hash_sillstone_digest_PithDigest_sha1Native(env, std::ptr::null_mut(), data, slot);
+        let digest = Java_io_github_sillstone_SillstoneDigest_sha1Native(
+            env,
+            std::ptr::null_mut(),
+            data,
+            slot,
+        );
         (digest, read_status(slot))
     });
     assert_eq!(status, -1, "status");
@@ -1013,17 +1172,17 @@ fn jni_hmac_exports_refuse_unusable_arrays() {
     let exports: [(&str, KeyDataFn, usize); 3] = [
         (
             "hmac_sha1",
-            Java_hash_sillstone_digest_PithDigest_hmacSha1Native,
+            Java_io_github_sillstone_SillstoneDigest_hmacSha1Native,
             20,
         ),
         (
             "hmac_sha256",
-            Java_hash_sillstone_digest_PithDigest_hmacSha256Native,
+            Java_io_github_sillstone_SillstoneDigest_hmacSha256Native,
             32,
         ),
         (
             "hmac_sha512",
-            Java_hash_sillstone_digest_PithDigest_hmacSha512Native,
+            Java_io_github_sillstone_SillstoneDigest_hmacSha512Native,
             64,
         ),
     ];
@@ -1066,25 +1225,29 @@ fn jni_hmac_exports_refuse_unusable_arrays() {
 #[test]
 fn jni_digest_exports_refuse_an_environment_that_cannot_allocate() {
     let exports: [(&str, DataFn, usize); 5] = [
-        ("sha1", Java_hash_sillstone_digest_PithDigest_sha1Native, 20),
+        (
+            "sha1",
+            Java_io_github_sillstone_SillstoneDigest_sha1Native,
+            20,
+        ),
         (
             "sha512",
-            Java_hash_sillstone_digest_PithDigest_sha512Native,
+            Java_io_github_sillstone_SillstoneDigest_sha512Native,
             64,
         ),
         (
             "base64_encode",
-            Java_hash_sillstone_digest_PithDigest_base64EncodeNative,
+            Java_io_github_sillstone_SillstoneDigest_base64EncodeNative,
             4,
         ),
         (
             "base64_decode",
-            Java_hash_sillstone_digest_PithDigest_base64DecodeNative,
+            Java_io_github_sillstone_SillstoneDigest_base64DecodeNative,
             3,
         ),
         (
             "sha256",
-            Java_hash_sillstone_digest_PithDigest_sha256Native,
+            Java_io_github_sillstone_SillstoneDigest_sha256Native,
             32,
         ),
     ];
@@ -1118,12 +1281,12 @@ fn jni_base64_exports_refuse_unusable_arrays_and_handles() {
     let exports: [(&str, DataFn, &[u8]); 2] = [
         (
             "base64_encode",
-            Java_hash_sillstone_digest_PithDigest_base64EncodeNative,
+            Java_io_github_sillstone_SillstoneDigest_base64EncodeNative,
             b"foo",
         ),
         (
             "base64_decode",
-            Java_hash_sillstone_digest_PithDigest_base64DecodeNative,
+            Java_io_github_sillstone_SillstoneDigest_base64DecodeNative,
             b"Zm9v",
         ),
     ];
@@ -1163,12 +1326,18 @@ fn jni_base64_exports_refuse_unusable_arrays_and_handles() {
 #[test]
 fn jni_checksum_exports_refuse_unusable_arrays() {
     let sums: [(&str, SumFn); 3] = [
-        ("crc32", Java_hash_sillstone_digest_PithDigest_crc32Native),
+        (
+            "crc32",
+            Java_io_github_sillstone_SillstoneDigest_crc32Native,
+        ),
         (
             "adler32",
-            Java_hash_sillstone_digest_PithDigest_adler32Native,
+            Java_io_github_sillstone_SillstoneDigest_adler32Native,
         ),
-        ("crc32c", Java_hash_sillstone_digest_PithDigest_crc32cNative),
+        (
+            "crc32c",
+            Java_io_github_sillstone_SillstoneDigest_crc32cNative,
+        ),
     ];
     for (name, f) in sums {
         for (label, data) in [("null data", Arg::Null), ("stale data", Arg::Stale)] {
@@ -1195,8 +1364,8 @@ fn jni_checksum_exports_refuse_unusable_arrays() {
 
 #[test]
 fn jni_hash64_exports_refuse_unusable_arrays() {
-    let fnv: HashFn = Java_hash_sillstone_digest_PithDigest_fnv1a64Native;
-    let xxh: SeededFn = Java_hash_sillstone_digest_PithDigest_xxh64Native;
+    let fnv: HashFn = Java_io_github_sillstone_SillstoneDigest_fnv1a64Native;
+    let xxh: SeededFn = Java_io_github_sillstone_SillstoneDigest_xxh64Native;
     for (label, data) in [("null data", Arg::Null), ("stale data", Arg::Stale)] {
         let ((fnv_value, fnv_status, xxh_value, xxh_status), _w, _i, _l) =
             with_fake_env(|env| unsafe {
@@ -1255,11 +1424,11 @@ fn jni_fill_exports_refuse_an_environment_that_cannot_allocate() {
     let fills: [(&str, FillFn); 2] = [
         (
             "splitmix64",
-            Java_hash_sillstone_digest_PithDigest_splitmix64FillNative,
+            Java_io_github_sillstone_SillstoneDigest_splitmix64FillNative,
         ),
         (
             "xoshiro256",
-            Java_hash_sillstone_digest_PithDigest_xoshiro256FillNative,
+            Java_io_github_sillstone_SillstoneDigest_xoshiro256FillNative,
         ),
     ];
     for (name, f) in fills {
@@ -1282,5 +1451,242 @@ fn jni_fill_exports_refuse_an_environment_that_cannot_allocate() {
         assert_eq!(status, 0, "{name} control");
         assert!(!array.is_null(), "{name} control returns an array");
         assert_eq!(longs.len(), 4, "{name} control fills four values");
+    }
+}
+
+// ---------------------------------------------------------------------
+// Deprecated pre-rename aliases: every `PithDigest` export must behave
+// exactly like its `SillstoneDigest` twin, on a happy path and on a
+// refusal path.
+// ---------------------------------------------------------------------
+
+type MurmurFn = unsafe extern "system" fn(*mut JNIEnv, JClass, JArray, jint, JIntArray) -> JArray;
+
+/// Everything one call leaves observable: the returned value (array
+/// references reduced to null / non-null), the status slot and every
+/// value the glue wrote into Java arrays.
+#[derive(Debug, PartialEq)]
+struct Observed {
+    ret: i128,
+    status: i32,
+    bytes: Vec<u8>,
+    ints: Vec<i32>,
+    longs: Vec<i64>,
+}
+
+/// Runs one call against a fresh synthetic environment and a fresh
+/// status slot.
+fn observe(f: impl FnOnce(*mut JNIEnv, JIntArray) -> i128) -> Observed {
+    let ((ret, status), bytes, ints, longs) = with_fake_env(|env| {
+        let slot = status_slot();
+        let ret = f(env, slot);
+        (ret, read_status(slot))
+    });
+    Observed {
+        ret,
+        status,
+        bytes,
+        ints,
+        longs,
+    }
+}
+
+/// An array reference as an observation: non-null or null.
+fn non_null(array: JArray) -> i128 {
+    i128::from(!array.is_null())
+}
+
+/// Asserts the alias matches the canonical export on both observations
+/// and that the two observations really are a success and a refusal.
+fn assert_alias_matches(name: &str, ok: [Observed; 2], refused: [Observed; 2]) {
+    let [ok_canonical, ok_alias] = ok;
+    let [refused_canonical, refused_alias] = refused;
+    assert_eq!(ok_alias, ok_canonical, "{name} happy path");
+    assert_eq!(refused_alias, refused_canonical, "{name} refusal");
+    assert_ne!(ok_canonical.status, -1, "{name} happy path succeeds");
+    assert_eq!(refused_canonical.status, -1, "{name} refusal is invalid");
+}
+
+#[test]
+fn legacy_data_aliases_match_the_canonical_exports() {
+    let exports: [(&str, DataFn, DataFn, &[u8]); 5] = [
+        (
+            "sha256",
+            Java_io_github_sillstone_SillstoneDigest_sha256Native,
+            Java_hash_sillstone_digest_PithDigest_sha256Native,
+            b"abc",
+        ),
+        (
+            "sha1",
+            Java_io_github_sillstone_SillstoneDigest_sha1Native,
+            Java_hash_sillstone_digest_PithDigest_sha1Native,
+            b"abc",
+        ),
+        (
+            "sha512",
+            Java_io_github_sillstone_SillstoneDigest_sha512Native,
+            Java_hash_sillstone_digest_PithDigest_sha512Native,
+            b"abc",
+        ),
+        (
+            "base64_encode",
+            Java_io_github_sillstone_SillstoneDigest_base64EncodeNative,
+            Java_hash_sillstone_digest_PithDigest_base64EncodeNative,
+            b"foo",
+        ),
+        (
+            "base64_decode",
+            Java_io_github_sillstone_SillstoneDigest_base64DecodeNative,
+            Java_hash_sillstone_digest_PithDigest_base64DecodeNative,
+            b"Zm9v",
+        ),
+    ];
+    for (name, canonical, alias, good) in exports {
+        let run = |f: DataFn, data: Arg| {
+            observe(|env, slot| unsafe {
+                non_null(f(env, std::ptr::null_mut(), make_arg(&data), slot))
+            })
+        };
+        let ok = [canonical, alias].map(|f| run(f, live(good)));
+        assert!(!ok[0].bytes.is_empty(), "{name} writes a result");
+        let refused = [canonical, alias].map(|f| run(f, Arg::Null));
+        assert_alias_matches(name, ok, refused);
+    }
+}
+
+#[test]
+fn legacy_hmac_aliases_match_the_canonical_exports() {
+    let exports: [(&str, KeyDataFn, KeyDataFn); 3] = [
+        (
+            "hmac_sha1",
+            Java_io_github_sillstone_SillstoneDigest_hmacSha1Native,
+            Java_hash_sillstone_digest_PithDigest_hmacSha1Native,
+        ),
+        (
+            "hmac_sha256",
+            Java_io_github_sillstone_SillstoneDigest_hmacSha256Native,
+            Java_hash_sillstone_digest_PithDigest_hmacSha256Native,
+        ),
+        (
+            "hmac_sha512",
+            Java_io_github_sillstone_SillstoneDigest_hmacSha512Native,
+            Java_hash_sillstone_digest_PithDigest_hmacSha512Native,
+        ),
+    ];
+    for (name, canonical, alias) in exports {
+        let run = |f: KeyDataFn, key: Arg| {
+            observe(|env, slot| unsafe {
+                let key = make_arg(&key);
+                let data = byte_array(b"what do ya want for nothing?".to_vec());
+                non_null(f(env, std::ptr::null_mut(), key, data, slot))
+            })
+        };
+        let ok = [canonical, alias].map(|f| run(f, live(b"Jefe")));
+        assert!(!ok[0].bytes.is_empty(), "{name} writes a MAC");
+        let refused = [canonical, alias].map(|f| run(f, Arg::Null));
+        assert_alias_matches(name, ok, refused);
+    }
+}
+
+#[test]
+fn legacy_checksum_aliases_match_the_canonical_exports() {
+    let exports: [(&str, SumFn, SumFn); 3] = [
+        (
+            "crc32",
+            Java_io_github_sillstone_SillstoneDigest_crc32Native,
+            Java_hash_sillstone_digest_PithDigest_crc32Native,
+        ),
+        (
+            "adler32",
+            Java_io_github_sillstone_SillstoneDigest_adler32Native,
+            Java_hash_sillstone_digest_PithDigest_adler32Native,
+        ),
+        (
+            "crc32c",
+            Java_io_github_sillstone_SillstoneDigest_crc32cNative,
+            Java_hash_sillstone_digest_PithDigest_crc32cNative,
+        ),
+    ];
+    for (name, canonical, alias) in exports {
+        let run = |f: SumFn, data: Arg| {
+            observe(|env, slot| unsafe {
+                i128::from(f(env, std::ptr::null_mut(), make_arg(&data), slot))
+            })
+        };
+        let ok = [canonical, alias].map(|f| run(f, live(b"123456789")));
+        assert_ne!(ok[0].ret, 0, "{name} returns the checksum");
+        let refused = [canonical, alias].map(|f| run(f, Arg::Null));
+        assert_alias_matches(name, ok, refused);
+    }
+}
+
+#[test]
+fn legacy_hash_aliases_match_the_canonical_exports() {
+    let fnv = |f: HashFn, data: Arg| {
+        observe(|env, slot| unsafe {
+            i128::from(f(env, std::ptr::null_mut(), make_arg(&data), slot))
+        })
+    };
+    let fnv_pair: [HashFn; 2] = [
+        Java_io_github_sillstone_SillstoneDigest_fnv1a64Native,
+        Java_hash_sillstone_digest_PithDigest_fnv1a64Native,
+    ];
+    let ok = fnv_pair.map(|f| fnv(f, live(b"foobar")));
+    assert_eq!(ok[0].ret as u64, 0x8594_4171_f739_67e8, "fnv1a64 value");
+    let refused = fnv_pair.map(|f| fnv(f, Arg::Null));
+    assert_alias_matches("fnv1a64", ok, refused);
+
+    let xxh = |f: SeededFn, data: Arg| {
+        observe(|env, slot| unsafe {
+            i128::from(f(env, std::ptr::null_mut(), make_arg(&data), 7, slot))
+        })
+    };
+    let xxh_pair: [SeededFn; 2] = [
+        Java_io_github_sillstone_SillstoneDigest_xxh64Native,
+        Java_hash_sillstone_digest_PithDigest_xxh64Native,
+    ];
+    let ok = xxh_pair.map(|f| xxh(f, live(b"foobar")));
+    assert_eq!(ok[0].ret as u64, xxh64(b"foobar", 7), "xxh64 value");
+    let refused = xxh_pair.map(|f| xxh(f, Arg::Null));
+    assert_alias_matches("xxh64", ok, refused);
+
+    let murmur = |f: MurmurFn, data: Arg| {
+        observe(|env, slot| unsafe {
+            non_null(f(env, std::ptr::null_mut(), make_arg(&data), 0, slot))
+        })
+    };
+    let murmur_pair: [MurmurFn; 2] = [
+        Java_io_github_sillstone_SillstoneDigest_murmur3X64128Native,
+        Java_hash_sillstone_digest_PithDigest_murmur3X64128Native,
+    ];
+    let ok = murmur_pair.map(|f| murmur(f, live(b"hello")));
+    let expected: Digest<16> = murmur3_x64_128(b"hello", 0);
+    assert_eq!(ok[0].bytes, expected.as_bytes().to_vec(), "murmur3 digest");
+    let refused = murmur_pair.map(|f| murmur(f, Arg::Null));
+    assert_alias_matches("murmur3_x64_128", ok, refused);
+}
+
+#[test]
+fn legacy_fill_aliases_match_the_canonical_exports() {
+    let exports: [(&str, FillFn, FillFn); 2] = [
+        (
+            "splitmix64",
+            Java_io_github_sillstone_SillstoneDigest_splitmix64FillNative,
+            Java_hash_sillstone_digest_PithDigest_splitmix64FillNative,
+        ),
+        (
+            "xoshiro256",
+            Java_io_github_sillstone_SillstoneDigest_xoshiro256FillNative,
+            Java_hash_sillstone_digest_PithDigest_xoshiro256FillNative,
+        ),
+    ];
+    for (name, canonical, alias) in exports {
+        let run = |f: FillFn, count: jint| {
+            observe(|env, slot| unsafe { non_null(f(env, std::ptr::null_mut(), 5, count, slot)) })
+        };
+        let ok = [canonical, alias].map(|f| run(f, 4));
+        assert_eq!(ok[0].longs.len(), 4, "{name} fills four values");
+        let refused = [canonical, alias].map(|f| run(f, -1));
+        assert_alias_matches(name, ok, refused);
     }
 }

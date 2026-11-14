@@ -1,8 +1,8 @@
 //! ISO base media file format demuxing, `avcC` records and sample tables
 //! (ISO/IEC 14496-12; AVC codec configuration per ISO/IEC 14496-15 §5.3.3).
 //!
-//! Part of the `pith` suite: every crate in the suite depends only on other
-//! `pith-*` crates plus `std`, so the whole suite resolves without a single
+//! Part of the `sillstone` suite: every crate in the suite depends only on other
+//! `sillstone-*` crates plus `std`, so the whole suite resolves without a single
 //! registry package.
 //!
 //! This crate **demuxes only**. It walks the ISO-BMFF box tree, resolves the
@@ -32,8 +32,8 @@ extern crate alloc;
 
 mod boxes;
 mod demux;
-mod sample_table;
 pub mod fragmented;
+mod sample_table;
 
 pub mod ffi;
 

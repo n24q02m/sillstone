@@ -1,5 +1,5 @@
 //! `gen-ucd` — regenerate `data/ucd.bin`, the embedded UCD table blob of
-//! `pith-unicode`, from the committed Unicode Character Database source
+//! `sillstone-unicode`, from the committed Unicode Character Database source
 //! files in `data/ucd/`.
 //!
 //! Sources (pinned UCD 15.1.0, downloaded from unicode.org — the exact

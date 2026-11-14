@@ -2,7 +2,7 @@
 //! (ctypes), Node (koffi) and Go (cgo) SDKs bind through.
 //!
 //! The suite's FFI convention, defined by this module and mirrored by
-//! every `pith-*` cdylib:
+//! every `sillstone-*` cdylib:
 //!
 //! * one flat set of `#[unsafe(no_mangle)] pub unsafe extern "C"`
 //!   functions — raw pointers plus lengths, no structs across the
@@ -55,14 +55,14 @@ use crate::wav;
 use crate::{Signature, build_index, match_signature, signature, signature_of_wav};
 
 /// Status: success.
-pub const PITH_OK: i32 = 0;
+pub const SILLSTONE_OK: i32 = 0;
 /// Status: a caller argument is invalid — a null pointer, a length
 /// that is not a whole number of `i32` samples, or a zero/oversized
 /// channel count.
-pub const PITH_E_INVALID: i32 = -1;
+pub const SILLSTONE_E_INVALID: i32 = -1;
 /// Status: the core pipeline refused the input (malformed WAV, or PCM
 /// the signature stage rejects).
-pub const PITH_E_REJECTED: i32 = -2;
+pub const SILLSTONE_E_REJECTED: i32 = -2;
 
 /// The incremental signature index behind the `sillstone_audio_index_*`
 /// handles: signatures accumulate in insertion order, and the id a
@@ -99,11 +99,11 @@ fn i32_le_bytes(samples: &[i32]) -> Vec<u8> {
 /// samples and a channel count that fits `u16` and is nonzero.
 fn pcm_args(len: usize, channels: u32) -> Result<u16, i32> {
     if len % 4 != 0 {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
-    let channels = u16::try_from(channels).map_err(|_| PITH_E_INVALID)?;
+    let channels = u16::try_from(channels).map_err(|_| SILLSTONE_E_INVALID)?;
     if channels == 0 {
-        return Err(PITH_E_INVALID);
+        return Err(SILLSTONE_E_INVALID);
     }
     Ok(channels)
 }
@@ -120,22 +120,22 @@ fn hand_out(stream: Vec<u8>, out: *mut *mut u8, out_len: *mut usize) -> i32 {
         *out = ptr.cast::<u8>();
         *out_len = len;
     }
-    PITH_OK
+    SILLSTONE_OK
 }
 
 /// The safe core of [`sillstone_audio_decode_wav`]: decode, then serialize
 /// into the decode stream. Decoding failures map to
-/// [`PITH_E_REJECTED`].
+/// [`SILLSTONE_E_REJECTED`].
 fn decode_and_stream(bytes: &[u8]) -> Result<Vec<u8>, i32> {
-    let decoded = wav::decode(bytes).map_err(|_| PITH_E_REJECTED)?;
+    let decoded = wav::decode(bytes).map_err(|_| SILLSTONE_E_REJECTED)?;
     Ok(decode_stream(&decoded))
 }
 
 /// The safe core of [`sillstone_audio_signature_pcm`]: LE samples through
 /// the signature stage, then the signature stream. Core refusals map
-/// to [`PITH_E_REJECTED`].
+/// to [`SILLSTONE_E_REJECTED`].
 fn signature_pcm_stream(samples: &[i32], channels: u16) -> Result<Vec<u8>, i32> {
-    let sig = signature(samples, channels).map_err(|_| PITH_E_REJECTED)?;
+    let sig = signature(samples, channels).map_err(|_| SILLSTONE_E_REJECTED)?;
     Ok(signature_stream(&sig))
 }
 
@@ -144,7 +144,7 @@ fn signature_pcm_stream(samples: &[i32], channels: u16) -> Result<Vec<u8>, i32> 
 ///
 /// `data` points at `len` bytes of the complete WAV file. On success
 /// the function allocates a buffer, writes its address through `out`,
-/// its length through `out_len`, and returns [`PITH_OK`]; the caller
+/// its length through `out_len`, and returns [`SILLSTONE_OK`]; the caller
 /// owns the buffer and must release it with [`sillstone_audio_free`],
 /// passing back the same pointer *and* length.
 ///
@@ -161,7 +161,7 @@ pub unsafe extern "C" fn sillstone_audio_decode_wav(
     out_len: *mut usize,
 ) -> i32 {
     if data.is_null() || out.is_null() || out_len.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let bytes = unsafe { core::slice::from_raw_parts(data, len) };
     match decode_and_stream(bytes) {
@@ -190,12 +190,12 @@ pub unsafe extern "C" fn sillstone_audio_signature_wav(
     out_len: *mut usize,
 ) -> i32 {
     if data.is_null() || out.is_null() || out_len.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let bytes = unsafe { core::slice::from_raw_parts(data, len) };
     match signature_of_wav(bytes) {
         Ok(sig) => hand_out(signature_stream(&sig), out, out_len),
-        Err(_) => PITH_E_REJECTED,
+        Err(_) => SILLSTONE_E_REJECTED,
     }
 }
 
@@ -216,7 +216,7 @@ pub unsafe extern "C" fn sillstone_audio_signature_pcm(
     out_len: *mut usize,
 ) -> i32 {
     if data.is_null() || out.is_null() || out_len.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let channels = match pcm_args(len, channels) {
         Ok(channels) => channels,
@@ -245,7 +245,7 @@ pub unsafe extern "C" fn sillstone_audio_voices_pcm(
     out_len: *mut usize,
 ) -> i32 {
     if out.is_null() || out_len.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     hand_out(i32_le_bytes(&voices_samples(seed, n_samples)), out, out_len)
 }
@@ -281,7 +281,7 @@ pub unsafe extern "C" fn sillstone_audio_index_add(
     channels: u32,
 ) -> i32 {
     if idx.is_null() || data.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let channels = match pcm_args(len, channels) {
         Ok(channels) => channels,
@@ -292,9 +292,9 @@ pub unsafe extern "C" fn sillstone_audio_index_add(
         Ok(sig) => {
             let builder = unsafe { &mut *idx };
             builder.sigs.push(sig);
-            PITH_OK
+            SILLSTONE_OK
         }
-        Err(_) => PITH_E_REJECTED,
+        Err(_) => SILLSTONE_E_REJECTED,
     }
 }
 
@@ -321,7 +321,7 @@ pub unsafe extern "C" fn sillstone_audio_match(
     out_len: *mut usize,
 ) -> i32 {
     if idx.is_null() || data.is_null() || out.is_null() || out_len.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let channels = match pcm_args(len, channels) {
         Ok(channels) => channels,
@@ -330,7 +330,7 @@ pub unsafe extern "C" fn sillstone_audio_match(
     let bytes = unsafe { core::slice::from_raw_parts(data, len) };
     let query = match signature(&pcm_i32_le(bytes), channels) {
         Ok(sig) => sig,
-        Err(_) => return PITH_E_REJECTED,
+        Err(_) => return SILLSTONE_E_REJECTED,
     };
     let builder = unsafe { &*idx };
     let index = build_index(&builder.sigs);
@@ -372,13 +372,27 @@ pub unsafe extern "C" fn sillstone_audio_free(ptr: *mut u8, len: usize) {
     drop(unsafe { Box::from_raw(slice) });
 }
 
+// Deprecated pre-rename aliases: the `PITH_*` names the suite shipped before
+// it became `sillstone`. Each one is the same value as its `SILLSTONE_*` twin.
+
+/// Deprecated alias of [`SILLSTONE_OK`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_OK`")]
+pub const PITH_OK: i32 = SILLSTONE_OK;
+/// Deprecated alias of [`SILLSTONE_E_INVALID`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_INVALID`")]
+pub const PITH_E_INVALID: i32 = SILLSTONE_E_INVALID;
+/// Deprecated alias of [`SILLSTONE_E_REJECTED`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_REJECTED`")]
+pub const PITH_E_REJECTED: i32 = SILLSTONE_E_REJECTED;
+
 #[cfg(test)]
 mod tests {
     use super::{
-        PITH_E_INVALID, PITH_E_REJECTED, PITH_OK, decode_and_stream, i32_le_bytes, pcm_args,
-        pcm_i32_le, sillstone_audio_decode_wav, sillstone_audio_free, sillstone_audio_index_add,
-        sillstone_audio_index_free, sillstone_audio_index_new, sillstone_audio_match, sillstone_audio_signature_pcm,
-        sillstone_audio_signature_wav, sillstone_audio_voices_pcm, signature_pcm_stream,
+        SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_OK, decode_and_stream, i32_le_bytes,
+        pcm_args, pcm_i32_le, signature_pcm_stream, sillstone_audio_decode_wav,
+        sillstone_audio_free, sillstone_audio_index_add, sillstone_audio_index_free,
+        sillstone_audio_index_new, sillstone_audio_match, sillstone_audio_signature_pcm,
+        sillstone_audio_signature_wav, sillstone_audio_voices_pcm,
     };
     use crate::reference::voices_samples;
 
@@ -420,7 +434,7 @@ mod tests {
         let mut out_len: usize = 0;
         let status =
             unsafe { sillstone_audio_decode_wav(wav.as_ptr(), wav.len(), &mut out, &mut out_len) };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(out_len, expected.len());
         let handed = unsafe { core::slice::from_raw_parts(out, out_len) };
         assert_eq!(handed, expected.as_slice());
@@ -442,9 +456,10 @@ mod tests {
         let wav = fixture();
         let mut out: *mut u8 = core::ptr::null_mut();
         let mut out_len: usize = 0;
-        let status =
-            unsafe { sillstone_audio_signature_wav(wav.as_ptr(), wav.len(), &mut out, &mut out_len) };
-        assert_eq!(status, PITH_OK);
+        let status = unsafe {
+            sillstone_audio_signature_wav(wav.as_ptr(), wav.len(), &mut out, &mut out_len)
+        };
+        assert_eq!(status, SILLSTONE_OK);
         let handed = unsafe { core::slice::from_raw_parts(out, out_len) };
         assert_eq!(be32(handed, 0), 20);
         assert_eq!(be32(handed, 4), 42);
@@ -461,8 +476,9 @@ mod tests {
         let pcm = mono_corpus();
         let mut out: *mut u8 = core::ptr::null_mut();
         let mut out_len: usize = 0;
-        let status = unsafe { sillstone_audio_voices_pcm(0xC0_FFEE, 66_150, &mut out, &mut out_len) };
-        assert_eq!(status, PITH_OK);
+        let status =
+            unsafe { sillstone_audio_voices_pcm(0xC0_FFEE, 66_150, &mut out, &mut out_len) };
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(out_len, pcm.len());
         let handed = unsafe { core::slice::from_raw_parts(out, out_len) };
         assert_eq!(handed, pcm.as_slice());
@@ -490,15 +506,15 @@ mod tests {
         let idx = unsafe { sillstone_audio_index_new() };
         assert_eq!(
             unsafe { sillstone_audio_index_add(idx, content.as_ptr(), content.len(), 1) },
-            PITH_OK
+            SILLSTONE_OK
         );
         assert_eq!(
             unsafe { sillstone_audio_index_add(idx, other.as_ptr(), other.len(), 1) },
-            PITH_OK
+            SILLSTONE_OK
         );
         assert_eq!(
             unsafe { sillstone_audio_index_add(idx, filler.as_ptr(), filler.len(), 1) },
-            PITH_OK
+            SILLSTONE_OK
         );
 
         let mut out: *mut u8 = core::ptr::null_mut();
@@ -506,7 +522,7 @@ mod tests {
         let status = unsafe {
             sillstone_audio_match(idx, query.as_ptr(), query.len(), 1, &mut out, &mut out_len)
         };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         let handed = unsafe { core::slice::from_raw_parts(out, out_len) };
         assert_eq!(be32(handed, 0), 106); // query_frames
         assert_eq!(be32(handed, 4), 156); // query_peak_count
@@ -529,9 +545,10 @@ mod tests {
         let idx = unsafe { sillstone_audio_index_new() };
         let mut out: *mut u8 = core::ptr::null_mut();
         let mut out_len: usize = 0;
-        let status =
-            unsafe { sillstone_audio_match(idx, pcm.as_ptr(), pcm.len(), 1, &mut out, &mut out_len) };
-        assert_eq!(status, PITH_OK);
+        let status = unsafe {
+            sillstone_audio_match(idx, pcm.as_ptr(), pcm.len(), 1, &mut out, &mut out_len)
+        };
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(out_len, 12);
         let handed = unsafe { core::slice::from_raw_parts(out, out_len) };
         assert_eq!(be32(handed, 8), 0);
@@ -539,8 +556,8 @@ mod tests {
         unsafe { sillstone_audio_index_free(idx) };
     }
 
-    /// Null pointers are [`PITH_E_INVALID`]; malformed input is
-    /// [`PITH_E_REJECTED`]; null frees are legal no-ops; a failed add
+    /// Null pointers are [`SILLSTONE_E_INVALID`]; malformed input is
+    /// [`SILLSTONE_E_REJECTED`]; null frees are legal no-ops; a failed add
     /// leaves the handle alive.
     #[test]
     fn ffi_refusals() {
@@ -551,30 +568,32 @@ mod tests {
         // Null-pointer geometry.
         let null_data =
             unsafe { sillstone_audio_decode_wav(core::ptr::null(), 0, &mut out, &mut out_len) };
-        assert_eq!(null_data, PITH_E_INVALID);
+        assert_eq!(null_data, SILLSTONE_E_INVALID);
         let null_out = unsafe {
             sillstone_audio_decode_wav(wav.as_ptr(), wav.len(), core::ptr::null_mut(), &mut out_len)
         };
-        assert_eq!(null_out, PITH_E_INVALID);
+        assert_eq!(null_out, SILLSTONE_E_INVALID);
         let null_out_len = unsafe {
             sillstone_audio_decode_wav(wav.as_ptr(), wav.len(), &mut out, core::ptr::null_mut())
         };
-        assert_eq!(null_out_len, PITH_E_INVALID);
+        assert_eq!(null_out_len, SILLSTONE_E_INVALID);
         assert_eq!(
             unsafe { sillstone_audio_signature_wav(core::ptr::null(), 0, &mut out, &mut out_len) },
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
-            unsafe { sillstone_audio_signature_pcm(core::ptr::null(), 0, 1, &mut out, &mut out_len) },
-            PITH_E_INVALID
+            unsafe {
+                sillstone_audio_signature_pcm(core::ptr::null(), 0, 1, &mut out, &mut out_len)
+            },
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             unsafe { sillstone_audio_voices_pcm(1, 8, core::ptr::null_mut(), &mut out_len) },
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             unsafe { sillstone_audio_voices_pcm(1, 8, &mut out, core::ptr::null_mut()) },
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
 
         // Core refusals surface as REJECTED.
@@ -583,13 +602,13 @@ mod tests {
             unsafe {
                 sillstone_audio_decode_wav(garbage.as_ptr(), garbage.len(), &mut out, &mut out_len)
             },
-            PITH_E_REJECTED
+            SILLSTONE_E_REJECTED
         );
         assert_eq!(
             unsafe {
                 sillstone_audio_signature_wav(garbage.as_ptr(), garbage.len(), &mut out, &mut out_len)
             },
-            PITH_E_REJECTED
+            SILLSTONE_E_REJECTED
         );
 
         // PCM geometry: partial samples and bad channel counts are
@@ -597,15 +616,17 @@ mod tests {
         // reaches the core and is REJECTED.
         let odd = [0u8; 6];
         assert_eq!(
-            unsafe { sillstone_audio_signature_pcm(odd.as_ptr(), odd.len(), 1, &mut out, &mut out_len) },
-            PITH_E_INVALID
+            unsafe {
+                sillstone_audio_signature_pcm(odd.as_ptr(), odd.len(), 1, &mut out, &mut out_len)
+            },
+            SILLSTONE_E_INVALID
         );
         let small = [0u8; 4]; // exactly one sample
         assert_eq!(
             unsafe {
                 sillstone_audio_signature_pcm(small.as_ptr(), small.len(), 0, &mut out, &mut out_len)
             },
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             unsafe {
@@ -617,20 +638,20 @@ mod tests {
                     &mut out_len,
                 )
             },
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             unsafe {
                 sillstone_audio_signature_pcm(small.as_ptr(), small.len(), 2, &mut out, &mut out_len)
             },
-            PITH_E_REJECTED
+            SILLSTONE_E_REJECTED
         );
         // Below one analysis window is legal: an empty signature.
         assert_eq!(
             unsafe {
                 sillstone_audio_signature_pcm(small.as_ptr(), small.len(), 1, &mut out, &mut out_len)
             },
-            PITH_OK
+            SILLSTONE_OK
         );
         assert_eq!(out_len, 16); // header only, zero peaks
         let handed = unsafe { core::slice::from_raw_parts(out, out_len) };
@@ -642,25 +663,25 @@ mod tests {
         let idx = unsafe { sillstone_audio_index_new() };
         assert_eq!(
             unsafe { sillstone_audio_index_add(core::ptr::null_mut(), small.as_ptr(), 4, 1) },
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             unsafe { sillstone_audio_index_add(idx, core::ptr::null(), 4, 1) },
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             unsafe { sillstone_audio_index_add(idx, small.as_ptr(), 4, 0) },
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             unsafe { sillstone_audio_index_add(idx, small.as_ptr(), 6, 1) },
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         // One sample against 2 channels: a partial interleaved frame,
         // refused by the signature stage (the handle stays alive).
         assert_eq!(
             unsafe { sillstone_audio_index_add(idx, small.as_ptr(), 4, 2) },
-            PITH_E_REJECTED
+            SILLSTONE_E_REJECTED
         );
         assert_eq!(
             unsafe {
@@ -673,7 +694,7 @@ mod tests {
                     &mut out_len,
                 )
             },
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             unsafe {
@@ -686,17 +707,17 @@ mod tests {
                     &mut out_len,
                 )
             },
-            PITH_E_INVALID
+            SILLSTONE_E_INVALID
         );
         assert_eq!(
             unsafe { sillstone_audio_match(idx, small.as_ptr(), 4, 2, &mut out, &mut out_len) },
-            PITH_E_REJECTED
+            SILLSTONE_E_REJECTED
         );
         // Survived every failed add: a real corpus still lands.
         let pcm = mono_corpus();
         assert_eq!(
             unsafe { sillstone_audio_index_add(idx, pcm.as_ptr(), pcm.len(), 1) },
-            PITH_OK
+            SILLSTONE_OK
         );
         unsafe { sillstone_audio_index_free(idx) };
 
@@ -708,9 +729,9 @@ mod tests {
     /// The safe cores reject malformed input instead of panicking.
     #[test]
     fn safe_cores_reject_garbage() {
-        assert_eq!(decode_and_stream(b"RIFF"), Err(PITH_E_REJECTED));
+        assert_eq!(decode_and_stream(b"RIFF"), Err(SILLSTONE_E_REJECTED));
         // One sample against 2 channels: a partial interleaved frame.
-        assert_eq!(signature_pcm_stream(&[0], 2), Err(PITH_E_REJECTED));
+        assert_eq!(signature_pcm_stream(&[0], 2), Err(SILLSTONE_E_REJECTED));
     }
 
     /// The argument-shape gate: sample-count geometry and channel
@@ -718,9 +739,22 @@ mod tests {
     #[test]
     fn pcm_args_gate() {
         assert_eq!(pcm_args(8, 2), Ok(2));
-        assert_eq!(pcm_args(6, 1), Err(PITH_E_INVALID));
-        assert_eq!(pcm_args(8, 0), Err(PITH_E_INVALID));
-        assert_eq!(pcm_args(8, 65_536), Err(PITH_E_INVALID));
+        assert_eq!(pcm_args(6, 1), Err(SILLSTONE_E_INVALID));
+        assert_eq!(pcm_args(8, 0), Err(SILLSTONE_E_INVALID));
+        assert_eq!(pcm_args(8, 65_536), Err(SILLSTONE_E_INVALID));
         assert_eq!(pcm_args(8, 65_535), Ok(65_535));
+    }
+}
+
+#[cfg(test)]
+mod deprecated_alias_tests {
+    #![allow(deprecated)]
+    use super::*;
+
+    #[test]
+    fn pith_aliases_equal_their_sillstone_twins() {
+        assert_eq!(PITH_OK, SILLSTONE_OK);
+        assert_eq!(PITH_E_INVALID, SILLSTONE_E_INVALID);
+        assert_eq!(PITH_E_REJECTED, SILLSTONE_E_REJECTED);
     }
 }

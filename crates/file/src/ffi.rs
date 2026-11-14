@@ -2,7 +2,7 @@
 //! (ctypes), Node (koffi) and Go (cgo) SDKs bind through.
 //!
 //! The suite's FFI convention, defined by this module and mirrored by
-//! every `pith-*` cdylib:
+//! every `sillstone-*` cdylib:
 //!
 //! * one flat set of `#[unsafe(no_mangle)] pub unsafe extern "C"`
 //!   functions — raw pointers plus lengths, no structs across the
@@ -22,7 +22,7 @@
 //! SHA-256 chunk digests — exactly the bytes the recorded
 //! `chunk_digests_*` folds cover. Jaccard takes raw bytes (both
 //! signatures are computed inside the cdylib), and text extraction
-//! speaks one format wire code ([`PITH_FILE_FORMAT_PDF`], the single
+//! speaks one format wire code ([`SILLSTONE_FILE_FORMAT_PDF`], the single
 //! lane the suite's file slice routes to `sillstone_pdf`).
 //!
 //! # Test builds
@@ -38,20 +38,20 @@
 use crate::{Format, binary_signature, text_content};
 
 /// Status: success.
-pub const PITH_OK: i32 = 0;
+pub const SILLSTONE_OK: i32 = 0;
 /// Status: a caller argument is invalid — a null pointer or an unknown
 /// format wire code.
-pub const PITH_E_INVALID: i32 = -1;
+pub const SILLSTONE_E_INVALID: i32 = -1;
 /// Status: the core pipeline refused the input. With the spec-pinned
 /// chunking parameters the signature paths cannot refuse; the code is
 /// exercised by the PDF text layer (a malformed container refuses with
 /// a typed error), so a foreign caller never has to reason about a
 /// panic.
-pub const PITH_E_REJECTED: i32 = -2;
+pub const SILLSTONE_E_REJECTED: i32 = -2;
 
 /// Format wire code: a PDF container ([`Format::Pdf`]) — the single
 /// extraction lane [`sillstone_file_text_content`] exposes.
-pub const PITH_FILE_FORMAT_PDF: u32 = 0;
+pub const SILLSTONE_FILE_FORMAT_PDF: u32 = 0;
 
 /// Computes the binary tier-2 signature of `data` and hands out the
 /// canonical chunk-set stream the `reference.json` signature vectors
@@ -66,7 +66,7 @@ pub const PITH_FILE_FORMAT_PDF: u32 = 0;
 ///
 /// On success the function allocates the stream, writes its address
 /// through `out`, its length through `out_len`, and returns
-/// [`PITH_OK`]; the caller owns the buffer and must release it with
+/// [`SILLSTONE_OK`]; the caller owns the buffer and must release it with
 /// [`sillstone_file_free`], passing back the same pointer *and* length.
 ///
 /// # Safety
@@ -82,7 +82,7 @@ pub unsafe extern "C" fn sillstone_file_binary_signature(
     out_len: *mut usize,
 ) -> i32 {
     if data.is_null() || out.is_null() || out_len.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let bytes = unsafe { core::slice::from_raw_parts(data, len) };
     match signature_stream(bytes) {
@@ -95,7 +95,7 @@ pub unsafe extern "C" fn sillstone_file_binary_signature(
                 *out = ptr.cast::<u8>();
                 *out_len = len;
             }
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(status) => status,
     }
@@ -124,14 +124,14 @@ pub unsafe extern "C" fn sillstone_file_jaccard(
     out_bits: *mut u64,
 ) -> i32 {
     if a.is_null() || b.is_null() || out_bits.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let lhs = unsafe { core::slice::from_raw_parts(a, a_len) };
     let rhs = unsafe { core::slice::from_raw_parts(b, b_len) };
     match jaccard_bits(lhs, rhs) {
         Ok(bits) => {
             unsafe { *out_bits = bits };
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(status) => status,
     }
@@ -139,13 +139,13 @@ pub unsafe extern "C" fn sillstone_file_jaccard(
 
 /// Extracts the container text of `data` and hands out the extracted
 /// bytes — `sillstone_pdf::extract_text` output for the
-/// [`PITH_FILE_FORMAT_PDF`] wire code. An unknown wire code is
-/// [`PITH_E_INVALID`]; a container the text layer refuses is
-/// [`PITH_E_REJECTED`].
+/// [`SILLSTONE_FILE_FORMAT_PDF`] wire code. An unknown wire code is
+/// [`SILLSTONE_E_INVALID`]; a container the text layer refuses is
+/// [`SILLSTONE_E_REJECTED`].
 ///
 /// On success the function allocates the output, writes its address
 /// through `out`, its length through `out_len`, and returns
-/// [`PITH_OK`]; the caller owns the buffer and must release it with
+/// [`SILLSTONE_OK`]; the caller owns the buffer and must release it with
 /// [`sillstone_file_free`], passing back the same pointer *and* length.
 ///
 /// # Safety
@@ -162,10 +162,10 @@ pub unsafe extern "C" fn sillstone_file_text_content(
     out_len: *mut usize,
 ) -> i32 {
     if data.is_null() || out.is_null() || out_len.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     let Some(format) = wire_format(format) else {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     };
     let bytes = unsafe { core::slice::from_raw_parts(data, len) };
     match extract(bytes, format) {
@@ -176,7 +176,7 @@ pub unsafe extern "C" fn sillstone_file_text_content(
                 *out = ptr.cast::<u8>();
                 *out_len = len;
             }
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(status) => status,
     }
@@ -205,18 +205,18 @@ pub unsafe extern "C" fn sillstone_file_free(ptr: *mut u8, len: usize) {
 /// `pub(crate)`: the JNI surface (`ffi_jni`) routes through the same core.
 pub(crate) fn wire_format(code: u32) -> Option<Format> {
     match code {
-        PITH_FILE_FORMAT_PDF => Some(Format::Pdf),
+        SILLSTONE_FILE_FORMAT_PDF => Some(Format::Pdf),
         _ => None,
     }
 }
 
 /// The safe core of [`sillstone_file_binary_signature`]: sign, then
 /// serialize the canonical chunk-set stream. Signature failures map to
-/// [`PITH_E_REJECTED`] (unreachable with the spec-pinned parameters).
+/// [`SILLSTONE_E_REJECTED`] (unreachable with the spec-pinned parameters).
 /// `pub(crate)`: the JNI surface (`ffi_jni`) routes through the same core.
 pub(crate) fn signature_stream(bytes: &[u8]) -> Result<alloc::vec::Vec<u8>, i32> {
     let digests = binary_signature(bytes)
-        .map_err(|_| PITH_E_REJECTED)?
+        .map_err(|_| SILLSTONE_E_REJECTED)?
         .chunks();
     let mut stream = alloc::vec::Vec::with_capacity(8 + digests.len() * 32);
     stream.extend_from_slice(&(digests.len() as u64).to_be_bytes());
@@ -230,26 +230,42 @@ pub(crate) fn signature_stream(bytes: &[u8]) -> Result<alloc::vec::Vec<u8>, i32>
 /// exact similarity as its IEEE-754 bit pattern.
 /// `pub(crate)`: the JNI surface (`ffi_jni`) routes through the same core.
 pub(crate) fn jaccard_bits(a: &[u8], b: &[u8]) -> Result<u64, i32> {
-    let lhs = binary_signature(a).map_err(|_| PITH_E_REJECTED)?;
-    let rhs = binary_signature(b).map_err(|_| PITH_E_REJECTED)?;
+    let lhs = binary_signature(a).map_err(|_| SILLSTONE_E_REJECTED)?;
+    let rhs = binary_signature(b).map_err(|_| SILLSTONE_E_REJECTED)?;
     Ok(lhs.jaccard(&rhs).to_bits())
 }
 
 /// The safe core of [`sillstone_file_text_content`]: extraction failures
-/// map to [`PITH_E_REJECTED`].
+/// map to [`SILLSTONE_E_REJECTED`].
 /// `pub(crate)`: the JNI surface (`ffi_jni`) routes through the same core.
 pub(crate) fn extract(bytes: &[u8], format: Format) -> Result<alloc::vec::Vec<u8>, i32> {
     text_content(bytes, format)
         .map(alloc::borrow::Cow::into_owned)
-        .map_err(|_| PITH_E_REJECTED)
+        .map_err(|_| SILLSTONE_E_REJECTED)
 }
+
+// Deprecated pre-rename aliases: the `PITH_*` names the suite shipped before
+// it became `sillstone`. Each one is the same value as its `SILLSTONE_*` twin.
+
+/// Deprecated alias of [`SILLSTONE_OK`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_OK`")]
+pub const PITH_OK: i32 = SILLSTONE_OK;
+/// Deprecated alias of [`SILLSTONE_E_INVALID`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_INVALID`")]
+pub const PITH_E_INVALID: i32 = SILLSTONE_E_INVALID;
+/// Deprecated alias of [`SILLSTONE_E_REJECTED`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_REJECTED`")]
+pub const PITH_E_REJECTED: i32 = SILLSTONE_E_REJECTED;
+/// Deprecated alias of [`SILLSTONE_FILE_FORMAT_PDF`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_FILE_FORMAT_PDF`")]
+pub const PITH_FILE_FORMAT_PDF: u32 = SILLSTONE_FILE_FORMAT_PDF;
 
 #[cfg(test)]
 mod tests {
     use super::{
-        PITH_E_INVALID, PITH_E_REJECTED, PITH_FILE_FORMAT_PDF, PITH_OK, extract,
-        sillstone_file_binary_signature, sillstone_file_free, sillstone_file_jaccard, sillstone_file_text_content,
-        signature_stream, wire_format,
+        SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_FILE_FORMAT_PDF, SILLSTONE_OK,
+        extract, signature_stream, sillstone_file_binary_signature, sillstone_file_free,
+        sillstone_file_jaccard, sillstone_file_text_content, wire_format,
     };
     use sillstone_digest::{SplitMix64, fnv1a64, sha256};
 
@@ -302,8 +318,9 @@ mod tests {
 
         let mut out: *mut u8 = core::ptr::null_mut();
         let mut out_len: usize = 0;
-        let status = unsafe { sillstone_file_binary_signature(b"".as_ptr(), 0, &mut out, &mut out_len) };
-        assert_eq!(status, PITH_OK);
+        let status =
+            unsafe { sillstone_file_binary_signature(b"".as_ptr(), 0, &mut out, &mut out_len) };
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(out_len, 8);
         let handed_back = unsafe { core::slice::from_raw_parts(out, out_len) };
         assert_eq!(handed_back, &[0u8; 8]);
@@ -326,7 +343,7 @@ mod tests {
         let status = unsafe {
             sillstone_file_binary_signature(input.as_ptr(), input.len(), &mut out, &mut out_len)
         };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         let stream = unsafe { core::slice::from_raw_parts(out, out_len) }.to_vec();
         unsafe { sillstone_file_free(out, out_len) };
 
@@ -361,11 +378,11 @@ mod tests {
                 &mut bits,
             )
         };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(bits, 0x3ff0_0000_0000_0000);
 
         let status = unsafe { sillstone_file_jaccard(b"".as_ptr(), 0, b"".as_ptr(), 0, &mut bits) };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(bits, 0x3ff0_0000_0000_0000);
 
         let status = unsafe {
@@ -377,7 +394,7 @@ mod tests {
                 &mut bits,
             )
         };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(bits, 0x0000_0000_0000_0000);
     }
 
@@ -396,12 +413,12 @@ mod tests {
             sillstone_file_text_content(
                 pdf.as_ptr(),
                 pdf.len(),
-                PITH_FILE_FORMAT_PDF,
+                SILLSTONE_FILE_FORMAT_PDF,
                 &mut out,
                 &mut out_len,
             )
         };
-        assert_eq!(status, PITH_OK);
+        assert_eq!(status, SILLSTONE_OK);
         assert_eq!(out_len, 9);
         let text = unsafe { core::slice::from_raw_parts(out, out_len) };
         assert_eq!(
@@ -412,8 +429,8 @@ mod tests {
     }
 
     /// Refusals: a malformed (and an empty) PDF container reject with
-    /// [`PITH_E_REJECTED`], never a crash; unknown wire codes and null
-    /// pointers reject with [`PITH_E_INVALID`]; freeing a null pointer
+    /// [`SILLSTONE_E_REJECTED`], never a crash; unknown wire codes and null
+    /// pointers reject with [`SILLSTONE_E_INVALID`]; freeing a null pointer
     /// is a no-op.
     #[test]
     fn ffi_refusals() {
@@ -424,65 +441,67 @@ mod tests {
             sillstone_file_text_content(
                 gutted.as_ptr(),
                 gutted.len(),
-                PITH_FILE_FORMAT_PDF,
+                SILLSTONE_FILE_FORMAT_PDF,
                 &mut out,
                 &mut out_len,
             )
         };
-        assert_eq!(status, PITH_E_REJECTED);
+        assert_eq!(status, SILLSTONE_E_REJECTED);
 
         let status = unsafe {
             sillstone_file_text_content(
                 b"".as_ptr(),
                 0,
-                PITH_FILE_FORMAT_PDF,
+                SILLSTONE_FILE_FORMAT_PDF,
                 &mut out,
                 &mut out_len,
             )
         };
-        assert_eq!(status, PITH_E_REJECTED);
+        assert_eq!(status, SILLSTONE_E_REJECTED);
 
         let status = unsafe {
             sillstone_file_text_content(gutted.as_ptr(), gutted.len(), 99, &mut out, &mut out_len)
         };
-        assert_eq!(status, PITH_E_INVALID);
+        assert_eq!(status, SILLSTONE_E_INVALID);
 
         let data = [0u8; 4];
         let null_data = unsafe {
             sillstone_file_text_content(
                 core::ptr::null(),
                 0,
-                PITH_FILE_FORMAT_PDF,
+                SILLSTONE_FILE_FORMAT_PDF,
                 &mut out,
                 &mut out_len,
             )
         };
-        assert_eq!(null_data, PITH_E_INVALID);
+        assert_eq!(null_data, SILLSTONE_E_INVALID);
         let null_out = unsafe {
             sillstone_file_text_content(
                 data.as_ptr(),
                 data.len(),
-                PITH_FILE_FORMAT_PDF,
+                SILLSTONE_FILE_FORMAT_PDF,
                 core::ptr::null_mut(),
                 &mut out_len,
             )
         };
-        assert_eq!(null_out, PITH_E_INVALID);
+        assert_eq!(null_out, SILLSTONE_E_INVALID);
 
         let mut bits: u64 = 0;
         let null_a =
             unsafe { sillstone_file_jaccard(core::ptr::null(), 0, data.as_ptr(), 4, &mut bits) };
-        assert_eq!(null_a, PITH_E_INVALID);
+        assert_eq!(null_a, SILLSTONE_E_INVALID);
         let null_b =
             unsafe { sillstone_file_jaccard(data.as_ptr(), 4, core::ptr::null(), 0, &mut bits) };
-        assert_eq!(null_b, PITH_E_INVALID);
-        let null_bits =
-            unsafe { sillstone_file_jaccard(data.as_ptr(), 4, data.as_ptr(), 4, core::ptr::null_mut()) };
-        assert_eq!(null_bits, PITH_E_INVALID);
+        assert_eq!(null_b, SILLSTONE_E_INVALID);
+        let null_bits = unsafe {
+            sillstone_file_jaccard(data.as_ptr(), 4, data.as_ptr(), 4, core::ptr::null_mut())
+        };
+        assert_eq!(null_bits, SILLSTONE_E_INVALID);
 
-        let null_sig_data =
-            unsafe { sillstone_file_binary_signature(core::ptr::null(), 0, &mut out, &mut out_len) };
-        assert_eq!(null_sig_data, PITH_E_INVALID);
+        let null_sig_data = unsafe {
+            sillstone_file_binary_signature(core::ptr::null(), 0, &mut out, &mut out_len)
+        };
+        assert_eq!(null_sig_data, SILLSTONE_E_INVALID);
         let null_sig_out = unsafe {
             sillstone_file_binary_signature(
                 data.as_ptr(),
@@ -491,22 +510,39 @@ mod tests {
                 &mut out_len,
             )
         };
-        assert_eq!(null_sig_out, PITH_E_INVALID);
+        assert_eq!(null_sig_out, SILLSTONE_E_INVALID);
         let null_sig_len = unsafe {
             sillstone_file_binary_signature(data.as_ptr(), data.len(), &mut out, core::ptr::null_mut())
         };
-        assert_eq!(null_sig_len, PITH_E_INVALID);
+        assert_eq!(null_sig_len, SILLSTONE_E_INVALID);
 
         unsafe { sillstone_file_free(core::ptr::null_mut(), 0) };
 
-        assert!(wire_format(PITH_FILE_FORMAT_PDF).is_some());
+        assert!(wire_format(SILLSTONE_FILE_FORMAT_PDF).is_some());
         assert!(wire_format(1).is_none());
-        assert_eq!(extract(gutted, crate::Format::Pdf), Err(PITH_E_REJECTED));
+        assert_eq!(
+            extract(gutted, crate::Format::Pdf),
+            Err(SILLSTONE_E_REJECTED)
+        );
         assert_eq!(
             signature_stream(&splitmix_bytes(9, 1024))
                 .expect("stream")
                 .len(),
             8 + 32
         );
+    }
+}
+
+#[cfg(test)]
+mod deprecated_alias_tests {
+    #![allow(deprecated)]
+    use super::*;
+
+    #[test]
+    fn pith_aliases_equal_their_sillstone_twins() {
+        assert_eq!(PITH_OK, SILLSTONE_OK);
+        assert_eq!(PITH_E_INVALID, SILLSTONE_E_INVALID);
+        assert_eq!(PITH_E_REJECTED, SILLSTONE_E_REJECTED);
+        assert_eq!(PITH_FILE_FORMAT_PDF, SILLSTONE_FILE_FORMAT_PDF);
     }
 }

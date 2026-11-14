@@ -77,6 +77,66 @@ struct FakeTable {
 
 // The exported symbols under test (linked from the crate's rlib).
 unsafe extern "system" {
+    fn Java_io_github_sillstone_SillstoneAudio_decodeWavNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        status: JIntArray,
+    ) -> JArray;
+
+    fn Java_io_github_sillstone_SillstoneAudio_signatureWavNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        status: JIntArray,
+    ) -> JArray;
+
+    fn Java_io_github_sillstone_SillstoneAudio_signaturePcmNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        channels: jint,
+        status: JIntArray,
+    ) -> JArray;
+
+    fn Java_io_github_sillstone_SillstoneAudio_voicesPcmNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        seed: jlong,
+        n_samples: jint,
+        status: JIntArray,
+    ) -> JArray;
+
+    fn Java_io_github_sillstone_SillstoneAudio_indexNewNative(
+        env: *mut JNIEnv,
+        class: JClass,
+    ) -> jlong;
+
+    fn Java_io_github_sillstone_SillstoneAudio_indexAddNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        idx: jlong,
+        data: JArray,
+        channels: jint,
+        status: JIntArray,
+    );
+
+    fn Java_io_github_sillstone_SillstoneAudio_matchNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        idx: jlong,
+        data: JArray,
+        channels: jint,
+        status: JIntArray,
+    ) -> JArray;
+
+    fn Java_io_github_sillstone_SillstoneAudio_indexFreeNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        idx: jlong,
+    );
+
+    // The deprecated pre-rename twins (`hash.sillstone.audio.PithAudio`).
     fn Java_hash_sillstone_audio_PithAudio_decodeWavNative(
         env: *mut JNIEnv,
         class: JClass,
@@ -314,8 +374,12 @@ fn jni_decode_matches_the_c_export() {
     let ((stream, status), produced, _recorded) = with_fake_env(|env| unsafe {
         let data = byte_array(input);
         let slot = status_slot();
-        let stream =
-            Java_hash_sillstone_audio_PithAudio_decodeWavNative(env, std::ptr::null_mut(), data, slot);
+        let stream = Java_io_github_sillstone_SillstoneAudio_decodeWavNative(
+            env,
+            std::ptr::null_mut(),
+            data,
+            slot,
+        );
         (stream, read_status(slot))
     });
     assert_eq!(status, 0, "status");
@@ -338,7 +402,7 @@ fn jni_voices_matches_the_c_export() {
     };
     let ((stream, status), produced, _recorded) = with_fake_env(|env| unsafe {
         let slot = status_slot();
-        let stream = Java_hash_sillstone_audio_PithAudio_voicesPcmNative(
+        let stream = Java_io_github_sillstone_SillstoneAudio_voicesPcmNative(
             env,
             std::ptr::null_mut(),
             7,
@@ -358,7 +422,7 @@ fn jni_signature_wav_non_wav_is_rejected() {
     let ((stream, status), _produced, _recorded) = with_fake_env(|env| unsafe {
         let data = byte_array(b"not a wav file at all........".to_vec());
         let slot = status_slot();
-        let stream = Java_hash_sillstone_audio_PithAudio_signatureWavNative(
+        let stream = Java_io_github_sillstone_SillstoneAudio_signatureWavNative(
             env,
             std::ptr::null_mut(),
             data,
@@ -375,7 +439,7 @@ fn jni_signature_pcm_partial_sample_is_invalid() {
     let ((stream, status), _produced, _recorded) = with_fake_env(|env| unsafe {
         let data = byte_array(vec![1, 0, 0]);
         let slot = status_slot();
-        let stream = Java_hash_sillstone_audio_PithAudio_signaturePcmNative(
+        let stream = Java_io_github_sillstone_SillstoneAudio_signaturePcmNative(
             env,
             std::ptr::null_mut(),
             data,
@@ -393,7 +457,7 @@ fn jni_signature_pcm_zero_channels_is_invalid() {
     let ((stream, status), _produced, _recorded) = with_fake_env(|env| unsafe {
         let data = byte_array(vec![0, 0, 0, 0]);
         let slot = status_slot();
-        let stream = Java_hash_sillstone_audio_PithAudio_signaturePcmNative(
+        let stream = Java_io_github_sillstone_SillstoneAudio_signaturePcmNative(
             env,
             std::ptr::null_mut(),
             data,
@@ -410,7 +474,7 @@ fn jni_signature_pcm_zero_channels_is_invalid() {
 fn jni_decode_null_data_is_invalid() {
     let ((stream, status), _produced, _recorded) = with_fake_env(|env| unsafe {
         let slot = status_slot();
-        let stream = Java_hash_sillstone_audio_PithAudio_decodeWavNative(
+        let stream = Java_io_github_sillstone_SillstoneAudio_decodeWavNative(
             env,
             std::ptr::null_mut(),
             std::ptr::null_mut(),
@@ -428,8 +492,12 @@ fn jni_decode_environment_refusing_the_array_is_rejected() {
         let data = byte_array(tone_wav());
         let slot = status_slot();
         with_state(|state| state.fail_new_byte_array = true);
-        let stream =
-            Java_hash_sillstone_audio_PithAudio_decodeWavNative(env, std::ptr::null_mut(), data, slot);
+        let stream = Java_io_github_sillstone_SillstoneAudio_decodeWavNative(
+            env,
+            std::ptr::null_mut(),
+            data,
+            slot,
+        );
         (stream, read_status(slot))
     });
     assert_eq!(status, -2, "status");
@@ -440,7 +508,7 @@ fn jni_decode_environment_refusing_the_array_is_rejected() {
 fn jni_decode_null_status_short_circuits() {
     let (stream, _produced, _recorded) = with_fake_env(|env| unsafe {
         let data = byte_array(tone_wav());
-        Java_hash_sillstone_audio_PithAudio_decodeWavNative(
+        Java_io_github_sillstone_SillstoneAudio_decodeWavNative(
             env,
             std::ptr::null_mut(),
             data,
@@ -455,13 +523,13 @@ fn jni_null_environment_short_circuits() {
     let ((stream, handle), _produced, _recorded) = with_fake_env(|_env| unsafe {
         let slot = status_slot();
         let data = byte_array(tone_wav());
-        let stream = Java_hash_sillstone_audio_PithAudio_decodeWavNative(
+        let stream = Java_io_github_sillstone_SillstoneAudio_decodeWavNative(
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             data,
             slot,
         );
-        let handle = Java_hash_sillstone_audio_PithAudio_indexNewNative(
+        let handle = Java_io_github_sillstone_SillstoneAudio_indexNewNative(
             std::ptr::null_mut(),
             std::ptr::null_mut(),
         );
@@ -500,12 +568,12 @@ fn jni_index_lifecycle_matches_the_safe_core() {
     };
 
     let ((stream, status), produced, _recorded) = with_fake_env(|env| unsafe {
-        let idx = Java_hash_sillstone_audio_PithAudio_indexNewNative(env, std::ptr::null_mut());
+        let idx = Java_io_github_sillstone_SillstoneAudio_indexNewNative(env, std::ptr::null_mut());
         assert!(idx != 0, "index handle");
         for pcm in [&member, &other] {
             let slot = status_slot();
             let data = byte_array(pcm_bytes(pcm));
-            Java_hash_sillstone_audio_PithAudio_indexAddNative(
+            Java_io_github_sillstone_SillstoneAudio_indexAddNative(
                 env,
                 std::ptr::null_mut(),
                 idx,
@@ -517,7 +585,7 @@ fn jni_index_lifecycle_matches_the_safe_core() {
         }
         let slot = status_slot();
         let data = byte_array(pcm_bytes(&query_samples));
-        let stream = Java_hash_sillstone_audio_PithAudio_matchNative(
+        let stream = Java_io_github_sillstone_SillstoneAudio_matchNative(
             env,
             std::ptr::null_mut(),
             idx,
@@ -526,7 +594,7 @@ fn jni_index_lifecycle_matches_the_safe_core() {
             slot,
         );
         let status = read_status(slot);
-        Java_hash_sillstone_audio_PithAudio_indexFreeNative(env, std::ptr::null_mut(), idx);
+        Java_io_github_sillstone_SillstoneAudio_indexFreeNative(env, std::ptr::null_mut(), idx);
         (stream, status)
     });
     assert_eq!(status, 0, "match status");
@@ -539,8 +607,14 @@ fn jni_index_null_handle_is_invalid() {
     let ((_stream, status), _produced, _recorded) = with_fake_env(|env| unsafe {
         let slot = status_slot();
         let data = byte_array(vec![0, 0, 0, 0]);
-        let stream =
-            Java_hash_sillstone_audio_PithAudio_matchNative(env, std::ptr::null_mut(), 0, data, 1, slot);
+        let stream = Java_io_github_sillstone_SillstoneAudio_matchNative(
+            env,
+            std::ptr::null_mut(),
+            0,
+            data,
+            1,
+            slot,
+        );
         (stream, read_status(slot))
     });
     assert_eq!(status, -1, "status");
@@ -551,7 +625,14 @@ fn jni_index_add_null_handle_is_invalid() {
     let ((status,), _produced, _recorded) = with_fake_env(|env| unsafe {
         let slot = status_slot();
         let data = byte_array(vec![0, 0, 0, 0]);
-        Java_hash_sillstone_audio_PithAudio_indexAddNative(env, std::ptr::null_mut(), 0, data, 1, slot);
+        Java_io_github_sillstone_SillstoneAudio_indexAddNative(
+            env,
+            std::ptr::null_mut(),
+            0,
+            data,
+            1,
+            slot,
+        );
         (read_status(slot),)
     });
     assert_eq!(status, -1, "status");
@@ -566,8 +647,12 @@ fn jni_stale_array_handle_is_invalid() {
         let stale = data as usize;
         with_state(|state| state.arrays.remove(&stale));
         let slot = status_slot();
-        let stream =
-            Java_hash_sillstone_audio_PithAudio_decodeWavNative(env, std::ptr::null_mut(), data, slot);
+        let stream = Java_io_github_sillstone_SillstoneAudio_decodeWavNative(
+            env,
+            std::ptr::null_mut(),
+            data,
+            slot,
+        );
         (stream, read_status(slot))
     });
     assert_eq!(status, -1, "status");
@@ -579,27 +664,27 @@ fn jni_remaining_streams_null_status_short_circuit() {
     let ((wav, pcm, voices, matched), _produced, _recorded) = with_fake_env(|env| unsafe {
         let data = byte_array(tone_wav());
         let pcm_data = byte_array(vec![0, 0, 0, 0]);
-        let wav = Java_hash_sillstone_audio_PithAudio_signatureWavNative(
+        let wav = Java_io_github_sillstone_SillstoneAudio_signatureWavNative(
             env,
             std::ptr::null_mut(),
             data,
             std::ptr::null_mut(),
         );
-        let pcm = Java_hash_sillstone_audio_PithAudio_signaturePcmNative(
+        let pcm = Java_io_github_sillstone_SillstoneAudio_signaturePcmNative(
             env,
             std::ptr::null_mut(),
             pcm_data,
             1,
             std::ptr::null_mut(),
         );
-        let voices = Java_hash_sillstone_audio_PithAudio_voicesPcmNative(
+        let voices = Java_io_github_sillstone_SillstoneAudio_voicesPcmNative(
             env,
             std::ptr::null_mut(),
             7,
             128,
             std::ptr::null_mut(),
         );
-        let matched = Java_hash_sillstone_audio_PithAudio_matchNative(
+        let matched = Java_io_github_sillstone_SillstoneAudio_matchNative(
             env,
             std::ptr::null_mut(),
             0,
@@ -619,7 +704,7 @@ fn jni_remaining_streams_null_status_short_circuit() {
 fn jni_index_add_null_status_short_circuits() {
     let ((), _produced, recorded) = with_fake_env(|env| unsafe {
         let data = byte_array(vec![0, 0, 0, 0]);
-        Java_hash_sillstone_audio_PithAudio_indexAddNative(
+        Java_io_github_sillstone_SillstoneAudio_indexAddNative(
             env,
             std::ptr::null_mut(),
             0,
@@ -634,7 +719,7 @@ fn jni_index_add_null_status_short_circuits() {
 #[test]
 fn jni_index_free_null_environment_is_a_noop() {
     with_fake_env(|_env| unsafe {
-        Java_hash_sillstone_audio_PithAudio_indexFreeNative(
+        Java_io_github_sillstone_SillstoneAudio_indexFreeNative(
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             0,
@@ -646,7 +731,7 @@ fn jni_index_free_null_environment_is_a_noop() {
 fn jni_signature_wav_null_data_is_invalid() {
     let ((stream, status), _produced, _recorded) = with_fake_env(|env| unsafe {
         let slot = status_slot();
-        let stream = Java_hash_sillstone_audio_PithAudio_signatureWavNative(
+        let stream = Java_io_github_sillstone_SillstoneAudio_signatureWavNative(
             env,
             std::ptr::null_mut(),
             std::ptr::null_mut(),
@@ -662,7 +747,7 @@ fn jni_signature_wav_null_data_is_invalid() {
 fn jni_signature_pcm_null_data_is_invalid() {
     let ((stream, status), _produced, _recorded) = with_fake_env(|env| unsafe {
         let slot = status_slot();
-        let stream = Java_hash_sillstone_audio_PithAudio_signaturePcmNative(
+        let stream = Java_io_github_sillstone_SillstoneAudio_signaturePcmNative(
             env,
             std::ptr::null_mut(),
             std::ptr::null_mut(),
@@ -678,9 +763,9 @@ fn jni_signature_pcm_null_data_is_invalid() {
 #[test]
 fn jni_index_add_null_data_is_invalid() {
     let ((status,), _produced, _recorded) = with_fake_env(|env| unsafe {
-        let idx = Java_hash_sillstone_audio_PithAudio_indexNewNative(env, std::ptr::null_mut());
+        let idx = Java_io_github_sillstone_SillstoneAudio_indexNewNative(env, std::ptr::null_mut());
         let slot = status_slot();
-        Java_hash_sillstone_audio_PithAudio_indexAddNative(
+        Java_io_github_sillstone_SillstoneAudio_indexAddNative(
             env,
             std::ptr::null_mut(),
             idx,
@@ -688,7 +773,7 @@ fn jni_index_add_null_data_is_invalid() {
             1,
             slot,
         );
-        Java_hash_sillstone_audio_PithAudio_indexFreeNative(env, std::ptr::null_mut(), idx);
+        Java_io_github_sillstone_SillstoneAudio_indexFreeNative(env, std::ptr::null_mut(), idx);
         (read_status(slot),)
     });
     assert_eq!(status, -1, "status");
@@ -697,9 +782,9 @@ fn jni_index_add_null_data_is_invalid() {
 #[test]
 fn jni_match_null_data_is_invalid() {
     let ((stream, status), _produced, _recorded) = with_fake_env(|env| unsafe {
-        let idx = Java_hash_sillstone_audio_PithAudio_indexNewNative(env, std::ptr::null_mut());
+        let idx = Java_io_github_sillstone_SillstoneAudio_indexNewNative(env, std::ptr::null_mut());
         let slot = status_slot();
-        let stream = Java_hash_sillstone_audio_PithAudio_matchNative(
+        let stream = Java_io_github_sillstone_SillstoneAudio_matchNative(
             env,
             std::ptr::null_mut(),
             idx,
@@ -707,9 +792,187 @@ fn jni_match_null_data_is_invalid() {
             1,
             slot,
         );
-        Java_hash_sillstone_audio_PithAudio_indexFreeNative(env, std::ptr::null_mut(), idx);
+        Java_io_github_sillstone_SillstoneAudio_indexFreeNative(env, std::ptr::null_mut(), idx);
         (stream, read_status(slot))
     });
     assert_eq!(status, -1, "status");
     assert!(stream.is_null());
+}
+
+/// Interleaved little-endian i32 PCM bytes, the layout the PCM exports take.
+fn pcm_bytes(samples: &[i32]) -> Vec<u8> {
+    samples.iter().flat_map(|s| s.to_le_bytes()).collect()
+}
+
+/// `(stream non-null, status, bytes written)` of one byte-array export call.
+type StreamRun = (bool, i32, Vec<u8>);
+
+/// Runs one byte-array export against a fresh fake environment.
+fn run_stream(f: impl FnOnce(*mut JNIEnv, JIntArray) -> JArray) -> StreamRun {
+    let ((stream, status), produced, _recorded) = with_fake_env(|env| {
+        let slot = status_slot();
+        let stream = f(env, slot);
+        (stream, read_status(slot))
+    });
+    (!stream.is_null(), status, produced)
+}
+
+/// Every deprecated `PithAudio` byte-stream export returns exactly what its
+/// canonical `SillstoneAudio` twin returns, on the happy path and on a
+/// refusal.
+#[test]
+fn jni_legacy_stream_aliases_match_the_canonical_exports() {
+    type Wav = unsafe extern "system" fn(*mut JNIEnv, JClass, JArray, JIntArray) -> JArray;
+    type Pcm = unsafe extern "system" fn(*mut JNIEnv, JClass, JArray, jint, JIntArray) -> JArray;
+    type Voices = unsafe extern "system" fn(*mut JNIEnv, JClass, jlong, jint, JIntArray) -> JArray;
+    let null = std::ptr::null_mut();
+
+    let wav: [(&str, Wav, Wav); 2] = [
+        (
+            "decodeWavNative",
+            Java_io_github_sillstone_SillstoneAudio_decodeWavNative,
+            Java_hash_sillstone_audio_PithAudio_decodeWavNative,
+        ),
+        (
+            "signatureWavNative",
+            Java_io_github_sillstone_SillstoneAudio_signatureWavNative,
+            Java_hash_sillstone_audio_PithAudio_signatureWavNative,
+        ),
+    ];
+    for (name, canonical, legacy) in wav {
+        let want =
+            run_stream(|env, slot| unsafe { canonical(env, null, byte_array(tone_wav()), slot) });
+        let got =
+            run_stream(|env, slot| unsafe { legacy(env, null, byte_array(tone_wav()), slot) });
+        assert_eq!((want.0, want.1), (true, 0), "{name} canonical");
+        assert!(!want.2.is_empty(), "{name} canonical bytes");
+        assert_eq!(got, want, "{name}");
+        let want = run_stream(|env, slot| unsafe { canonical(env, null, null, slot) });
+        let got = run_stream(|env, slot| unsafe { legacy(env, null, null, slot) });
+        assert_eq!(want.1, -1, "{name} canonical null data");
+        assert_eq!(got, want, "{name} null data");
+    }
+
+    let pcm = pcm_bytes(&voices_samples(0x0000_D1CE, 44_100));
+    let (canonical, legacy): (Pcm, Pcm) = (
+        Java_io_github_sillstone_SillstoneAudio_signaturePcmNative,
+        Java_hash_sillstone_audio_PithAudio_signaturePcmNative,
+    );
+    let want =
+        run_stream(|env, slot| unsafe { canonical(env, null, byte_array(pcm.clone()), 1, slot) });
+    let got =
+        run_stream(|env, slot| unsafe { legacy(env, null, byte_array(pcm.clone()), 1, slot) });
+    assert_eq!((want.0, want.1), (true, 0), "signaturePcmNative canonical");
+    assert!(!want.2.is_empty(), "signaturePcmNative canonical bytes");
+    assert_eq!(got, want, "signaturePcmNative");
+    let want = run_stream(|env, slot| unsafe { canonical(env, null, null, 1, slot) });
+    let got = run_stream(|env, slot| unsafe { legacy(env, null, null, 1, slot) });
+    assert_eq!(want.1, -1, "signaturePcmNative canonical null data");
+    assert_eq!(got, want, "signaturePcmNative null data");
+
+    let (canonical, legacy): (Voices, Voices) = (
+        Java_io_github_sillstone_SillstoneAudio_voicesPcmNative,
+        Java_hash_sillstone_audio_PithAudio_voicesPcmNative,
+    );
+    let want = run_stream(|env, slot| unsafe { canonical(env, null, 7, 8192, slot) });
+    let got = run_stream(|env, slot| unsafe { legacy(env, null, 7, 8192, slot) });
+    assert_eq!(
+        (want.0, want.1, want.2.len()),
+        (true, 0, 8192 * 4),
+        "voicesPcmNative canonical"
+    );
+    assert_eq!(got, want, "voicesPcmNative");
+    // Refusal: a null status array short-circuits to a null stream.
+    let ((want, got), _produced, _recorded) = with_fake_env(|env| unsafe {
+        (
+            canonical(env, null, 7, 128, null),
+            legacy(env, null, 7, 128, null),
+        )
+    });
+    assert!(want.is_null(), "voicesPcmNative canonical null status");
+    assert!(got.is_null(), "voicesPcmNative null status");
+}
+
+/// The deprecated `PithAudio` index exports run the whole lifecycle with the
+/// same match stream the safe core produces, and refuse a zero handle or a
+/// null environment the way the canonical exports do.
+#[test]
+fn jni_legacy_index_aliases_match_the_canonical_exports() {
+    type Add = unsafe extern "system" fn(*mut JNIEnv, JClass, jlong, JArray, jint, JIntArray);
+    type Match =
+        unsafe extern "system" fn(*mut JNIEnv, JClass, jlong, JArray, jint, JIntArray) -> JArray;
+    let member = voices_samples(0x0000_D1CE, 44_100);
+    let other = voices_samples(0x0000_F00D, 44_100);
+    let mut query_samples = voices_samples(0x0000_BEEF, 22_050);
+    query_samples.extend_from_slice(&member);
+
+    let member_sig: Signature = signature(&member, 1).expect("member");
+    let other_sig: Signature = signature(&other, 1).expect("other");
+    let query_sig: Signature = signature(&query_samples, 1).expect("query");
+    let index = build_index(&[member_sig, other_sig]);
+    let expected = match_stream(&query_sig, &match_signature(&query_sig, &index));
+    let null = std::ptr::null_mut();
+
+    let ((stream, status), produced, _recorded) = with_fake_env(|env| unsafe {
+        let idx = Java_hash_sillstone_audio_PithAudio_indexNewNative(env, null);
+        assert!(idx != 0, "index handle");
+        for pcm in [&member, &other] {
+            let slot = status_slot();
+            Java_hash_sillstone_audio_PithAudio_indexAddNative(
+                env,
+                null,
+                idx,
+                byte_array(pcm_bytes(pcm)),
+                1,
+                slot,
+            );
+            assert_eq!(read_status(slot), 0, "add status");
+        }
+        let slot = status_slot();
+        let stream = Java_hash_sillstone_audio_PithAudio_matchNative(
+            env,
+            null,
+            idx,
+            byte_array(pcm_bytes(&query_samples)),
+            1,
+            slot,
+        );
+        let status = read_status(slot);
+        Java_hash_sillstone_audio_PithAudio_indexFreeNative(env, null, idx);
+        (stream, status)
+    });
+    assert_eq!(status, 0, "match status");
+    assert!(!stream.is_null(), "match stream array");
+    assert_eq!(produced, expected, "match stream bytes");
+
+    let adds: [Add; 2] = [
+        Java_io_github_sillstone_SillstoneAudio_indexAddNative,
+        Java_hash_sillstone_audio_PithAudio_indexAddNative,
+    ];
+    let matchers: [Match; 2] = [
+        Java_io_github_sillstone_SillstoneAudio_matchNative,
+        Java_hash_sillstone_audio_PithAudio_matchNative,
+    ];
+    let ((statuses, handles), _produced, _recorded) = with_fake_env(|env| unsafe {
+        let mut statuses = Vec::new();
+        for add in adds {
+            let slot = status_slot();
+            add(env, null, 0, byte_array(vec![0, 0, 0, 0]), 1, slot);
+            statuses.push(read_status(slot));
+        }
+        for matcher in matchers {
+            let slot = status_slot();
+            let stream = matcher(env, null, 0, byte_array(vec![0, 0, 0, 0]), 1, slot);
+            assert!(stream.is_null(), "match on a zero handle");
+            statuses.push(read_status(slot));
+        }
+        let handles = (
+            Java_io_github_sillstone_SillstoneAudio_indexNewNative(std::ptr::null_mut(), null),
+            Java_hash_sillstone_audio_PithAudio_indexNewNative(std::ptr::null_mut(), null),
+        );
+        Java_hash_sillstone_audio_PithAudio_indexFreeNative(std::ptr::null_mut(), null, 0);
+        (statuses, handles)
+    });
+    assert_eq!(statuses, vec![-1, -1, -1, -1], "zero-handle statuses");
+    assert_eq!(handles, (0, 0), "null-environment handles");
 }

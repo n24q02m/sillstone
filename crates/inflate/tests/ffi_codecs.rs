@@ -11,7 +11,7 @@
 //! below require of the exports.
 
 use sillstone_inflate::ffi::{
-    PITH_E_INVALID, PITH_E_REJECTED, PITH_OK, sillstone_inflate_free,
+    SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_OK, sillstone_inflate_free,
     sillstone_inflate_inflate_brotli, sillstone_inflate_inflate_gzip,
     sillstone_inflate_inflate_zstd,
 };
@@ -36,7 +36,7 @@ fn call(op: Export, input: &[u8]) -> Result<Vec<u8>, i32> {
     let mut out: *mut u8 = core::ptr::null_mut();
     let mut out_len: usize = 0;
     let status = unsafe { op(input.as_ptr(), input.len(), &mut out, &mut out_len) };
-    if status != PITH_OK {
+    if status != SILLSTONE_OK {
         assert!(out.is_null(), "status {status}: out pointer was written");
         assert_eq!(out_len, 0, "status {status}: out_len was written");
         return Err(status);
@@ -73,7 +73,7 @@ fn gzip_refuses_corruption_and_truncation() {
     bad_crc[crc_at] ^= 0x01;
     assert_eq!(
         call(sillstone_inflate_inflate_gzip, &bad_crc),
-        Err(PITH_E_REJECTED)
+        Err(SILLSTONE_E_REJECTED)
     );
 
     // Flip a bit of ISIZE.
@@ -82,18 +82,18 @@ fn gzip_refuses_corruption_and_truncation() {
     bad_size[size_at] ^= 0x01;
     assert_eq!(
         call(sillstone_inflate_inflate_gzip, &bad_size),
-        Err(PITH_E_REJECTED)
+        Err(SILLSTONE_E_REJECTED)
     );
 
     // Not gzip at all, and every strict prefix of a valid member.
     assert_eq!(
         call(sillstone_inflate_inflate_gzip, b"definitely not gzip"),
-        Err(PITH_E_REJECTED)
+        Err(SILLSTONE_E_REJECTED)
     );
     for cut in 0..HELLO_GZ.len() {
         assert_eq!(
             call(sillstone_inflate_inflate_gzip, &HELLO_GZ[..cut]),
-            Err(PITH_E_REJECTED),
+            Err(SILLSTONE_E_REJECTED),
             "prefix of {cut} bytes"
         );
     }
@@ -116,14 +116,14 @@ fn brotli_refuses_every_truncation_and_foreign_framing() {
     for cut in 0..TEXT_BR.len() {
         assert_eq!(
             call(sillstone_inflate_inflate_brotli, &TEXT_BR[..cut]),
-            Err(PITH_E_REJECTED),
+            Err(SILLSTONE_E_REJECTED),
             "prefix of {cut} bytes"
         );
     }
     // A gzip member is not a Brotli stream.
     assert_eq!(
         call(sillstone_inflate_inflate_brotli, HELLO_GZ),
-        Err(PITH_E_REJECTED)
+        Err(SILLSTONE_E_REJECTED)
     );
 }
 
@@ -153,19 +153,19 @@ fn zstd_refuses_corruption_truncation_and_foreign_framing() {
     bad[40] ^= 0x01;
     assert_eq!(
         call(sillstone_inflate_inflate_zstd, &bad),
-        Err(PITH_E_REJECTED)
+        Err(SILLSTONE_E_REJECTED)
     );
 
     for cut in 0..TEXT_ZST.len() {
         assert_eq!(
             call(sillstone_inflate_inflate_zstd, &TEXT_ZST[..cut]),
-            Err(PITH_E_REJECTED),
+            Err(SILLSTONE_E_REJECTED),
             "prefix of {cut} bytes"
         );
     }
     assert_eq!(
         call(sillstone_inflate_inflate_zstd, TEXT_BR),
-        Err(PITH_E_REJECTED)
+        Err(SILLSTONE_E_REJECTED)
     );
 }
 
@@ -182,17 +182,17 @@ fn every_codec_refuses_bad_arguments_without_touching_the_slots() {
 
         // Null data with a non-zero length is a caller bug.
         let status = unsafe { op(core::ptr::null(), 5, &mut out, &mut out_len) };
-        assert_eq!(status, PITH_E_INVALID, "{name}: null data");
+        assert_eq!(status, SILLSTONE_E_INVALID, "{name}: null data");
 
         // Null data with zero length is an empty input: a decoder refusal, not a caller bug.
         let status = unsafe { op(core::ptr::null(), 0, &mut out, &mut out_len) };
-        assert_eq!(status, PITH_E_REJECTED, "{name}: empty input");
+        assert_eq!(status, SILLSTONE_E_REJECTED, "{name}: empty input");
 
         let byte = [0u8];
         let status = unsafe { op(byte.as_ptr(), 1, core::ptr::null_mut(), &mut out_len) };
-        assert_eq!(status, PITH_E_INVALID, "{name}: null out");
+        assert_eq!(status, SILLSTONE_E_INVALID, "{name}: null out");
         let status = unsafe { op(byte.as_ptr(), 1, &mut out, core::ptr::null_mut()) };
-        assert_eq!(status, PITH_E_INVALID, "{name}: null out_len");
+        assert_eq!(status, SILLSTONE_E_INVALID, "{name}: null out_len");
 
         assert!(out.is_null(), "{name}: out was written");
         assert_eq!(out_len, 0, "{name}: out_len was written");

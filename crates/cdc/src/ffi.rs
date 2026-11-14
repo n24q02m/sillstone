@@ -2,7 +2,7 @@
 //! (ctypes), Node (koffi) and Go (cgo) SDKs bind through.
 //!
 //! The suite's FFI convention, defined by this module and mirrored by
-//! every `pith-*` cdylib:
+//! every `sillstone-*` cdylib:
 //!
 //! * one flat set of `#[unsafe(no_mangle)] pub unsafe extern "C"`
 //!   functions — raw pointers plus lengths and scalars, no structs
@@ -18,11 +18,11 @@
 //!   module stays unsafe-free behind the crate-root `#![deny]`.
 //!
 //! Normalization levels cross the boundary as their wire codes
-//! [`PITH_LEVEL_0`]..[`PITH_LEVEL_3`] — the [`Normalization`] variant
+//! [`SILLSTONE_LEVEL_0`]..[`SILLSTONE_LEVEL_3`] — the [`Normalization`] variant
 //! numbers. Chunks are handed out as a flat `u64` buffer of
 //! `(offset, length, hash)` triples: 24 bytes per chunk, so the
 //! handed-out byte length is always a multiple of 24. An empty input
-//! is a legal vector (the corpus commits one) and yields `PITH_OK`
+//! is a legal vector (the corpus commits one) and yields `SILLSTONE_OK`
 //! with a zero-length buffer.
 
 #![allow(unsafe_code)]
@@ -35,26 +35,26 @@ use crate::FastCdc;
 use crate::masks::Normalization;
 
 /// Status: success.
-pub const PITH_OK: i32 = 0;
+pub const SILLSTONE_OK: i32 = 0;
 /// Status: a caller argument is invalid — a null pointer, or a
 /// normalization-level code the ABI does not define.
-pub const PITH_E_INVALID: i32 = -1;
+pub const SILLSTONE_E_INVALID: i32 = -1;
 /// Status: the core chunker refused the parameters (a
 /// [`Params::validate`](crate::Params::validate) bound failed: a size
 /// outside its range or a `min <= avg <= max` violation).
-pub const PITH_E_REJECTED: i32 = -2;
+pub const SILLSTONE_E_REJECTED: i32 = -2;
 
 /// Normalization-level wire code: level 0, no normalization (the
 /// widest chunk-size spread).
-pub const PITH_LEVEL_0: u32 = 0;
+pub const SILLSTONE_LEVEL_0: u32 = 0;
 /// Normalization-level wire code: level 1.
-pub const PITH_LEVEL_1: u32 = 1;
+pub const SILLSTONE_LEVEL_1: u32 = 1;
 /// Normalization-level wire code: level 2, the paper's sweet spot and
 /// the crate default.
-pub const PITH_LEVEL_2: u32 = 2;
+pub const SILLSTONE_LEVEL_2: u32 = 2;
 /// Normalization-level wire code: level 3, approaching fixed-size
 /// chunking.
-pub const PITH_LEVEL_3: u32 = 3;
+pub const SILLSTONE_LEVEL_3: u32 = 3;
 
 /// Chunks `data` with FastCDC and hands the caller a flat buffer of
 /// `(offset, length, hash)` triples.
@@ -62,15 +62,15 @@ pub const PITH_LEVEL_3: u32 = 3;
 /// `data` points at `len` bytes of the source (a null pointer with
 /// `len == 0` is a legal empty input). `min_size`, `avg_size`,
 /// `max_size` and `level` are the chunking parameters, `level` one of
-/// the `PITH_LEVEL_*` wire codes. On success the function allocates a
+/// the `SILLSTONE_LEVEL_*` wire codes. On success the function allocates a
 /// buffer, writes its address through `out` and its byte length
 /// through `out_len` (always a multiple of 24), and returns
-/// [`PITH_OK`]; the caller owns the buffer and must release it with
+/// [`SILLSTONE_OK`]; the caller owns the buffer and must release it with
 /// [`sillstone_cdc_free`], passing back the same pointer *and* length.
 ///
-/// Unknown level codes are [`PITH_E_INVALID`] (a caller bug — the ABI
+/// Unknown level codes are [`SILLSTONE_E_INVALID`] (a caller bug — the ABI
 /// defines only 0..=3); parameter values the core's validation refuses
-/// are [`PITH_E_REJECTED`].
+/// are [`SILLSTONE_E_REJECTED`].
 ///
 /// # Safety
 ///
@@ -89,7 +89,7 @@ pub unsafe extern "C" fn sillstone_cdc_chunk(
     out_len: *mut usize,
 ) -> i32 {
     if (data.is_null() && len != 0) || out.is_null() || out_len.is_null() {
-        return PITH_E_INVALID;
+        return SILLSTONE_E_INVALID;
     }
     // `from_raw_parts` demands a non-null, aligned data pointer even
     // for a zero-length slice, and some SDKs hand a null pointer for
@@ -109,7 +109,7 @@ pub unsafe extern "C" fn sillstone_cdc_chunk(
                 *out = ptr.cast::<u64>();
                 *out_len = byte_len;
             }
-            PITH_OK
+            SILLSTONE_OK
         }
         Err(status) => status,
     }
@@ -138,9 +138,9 @@ pub unsafe extern "C" fn sillstone_cdc_free(ptr: *mut u64, len: usize) {
 /// chunk the input and flatten the chunks to `(offset, length, hash)`
 /// triples.
 ///
-/// An unknown level wire code is [`PITH_E_INVALID`] (the caller sent a
+/// An unknown level wire code is [`SILLSTONE_E_INVALID`] (the caller sent a
 /// value the ABI does not define); a [`Params::validate`](crate::Params)
-/// failure is [`PITH_E_REJECTED`] (well-formed wire values the core
+/// failure is [`SILLSTONE_E_REJECTED`] (well-formed wire values the core
 /// refuses). Both checks return before any chunking runs, so no panic
 /// — the mask-table indexing included — is reachable through this
 /// boundary.
@@ -152,14 +152,14 @@ fn chunk_triples(
     level: u32,
 ) -> Result<Vec<u64>, i32> {
     let normalization = match level {
-        PITH_LEVEL_0 => Normalization::Level0,
-        PITH_LEVEL_1 => Normalization::Level1,
-        PITH_LEVEL_2 => Normalization::Level2,
-        PITH_LEVEL_3 => Normalization::Level3,
-        _ => return Err(PITH_E_INVALID),
+        SILLSTONE_LEVEL_0 => Normalization::Level0,
+        SILLSTONE_LEVEL_1 => Normalization::Level1,
+        SILLSTONE_LEVEL_2 => Normalization::Level2,
+        SILLSTONE_LEVEL_3 => Normalization::Level3,
+        _ => return Err(SILLSTONE_E_INVALID),
     };
     let chunker = FastCdc::with_level(bytes, min_size, avg_size, max_size, normalization)
-        .map_err(|_| PITH_E_REJECTED)?;
+        .map_err(|_| SILLSTONE_E_REJECTED)?;
     // Validated `min_size` is at least 64, so this is a tight bound on
     // the chunk count (the last chunk may be short, hence the +1).
     let mut triples = Vec::with_capacity(3 * (bytes.len() / min_size + 1));
@@ -176,11 +176,37 @@ fn chunk_triples(
     Ok(triples)
 }
 
+// Deprecated pre-rename aliases: the `PITH_*` names the suite shipped before
+// it became `sillstone`. Each one is the same value as its `SILLSTONE_*` twin.
+
+/// Deprecated alias of [`SILLSTONE_OK`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_OK`")]
+pub const PITH_OK: i32 = SILLSTONE_OK;
+/// Deprecated alias of [`SILLSTONE_E_INVALID`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_INVALID`")]
+pub const PITH_E_INVALID: i32 = SILLSTONE_E_INVALID;
+/// Deprecated alias of [`SILLSTONE_E_REJECTED`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_E_REJECTED`")]
+pub const PITH_E_REJECTED: i32 = SILLSTONE_E_REJECTED;
+/// Deprecated alias of [`SILLSTONE_LEVEL_0`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_LEVEL_0`")]
+pub const PITH_LEVEL_0: u32 = SILLSTONE_LEVEL_0;
+/// Deprecated alias of [`SILLSTONE_LEVEL_1`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_LEVEL_1`")]
+pub const PITH_LEVEL_1: u32 = SILLSTONE_LEVEL_1;
+/// Deprecated alias of [`SILLSTONE_LEVEL_2`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_LEVEL_2`")]
+pub const PITH_LEVEL_2: u32 = SILLSTONE_LEVEL_2;
+/// Deprecated alias of [`SILLSTONE_LEVEL_3`], kept for source compatibility.
+#[deprecated(note = "renamed to `SILLSTONE_LEVEL_3`")]
+pub const PITH_LEVEL_3: u32 = SILLSTONE_LEVEL_3;
+
 #[cfg(test)]
 mod tests {
     use super::{
-        PITH_E_INVALID, PITH_E_REJECTED, PITH_LEVEL_0, PITH_LEVEL_1, PITH_LEVEL_2, PITH_LEVEL_3,
-        PITH_OK, chunk_triples, sillstone_cdc_chunk, sillstone_cdc_free,
+        SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_LEVEL_0, SILLSTONE_LEVEL_1,
+        SILLSTONE_LEVEL_2, SILLSTONE_LEVEL_3, SILLSTONE_OK, chunk_triples, sillstone_cdc_chunk,
+        sillstone_cdc_free,
     };
 
     /// Regenerates the corpus's `splitmix64` input recipe
@@ -229,7 +255,7 @@ mod tests {
                 &mut out_len,
             )
         };
-        if status != PITH_OK {
+        if status != SILLSTONE_OK {
             return Err(status);
         }
         let handed = unsafe { core::slice::from_raw_parts(out, out_len / 8) };
@@ -254,10 +280,10 @@ mod tests {
         let data = splitmix64_bytes(0x5eed_5eed_5eed_5eed, 1 << 20);
         // (level wire code, committed chunk count, committed first chunk).
         let pinned: [(u32, usize, [u64; 3]); 4] = [
-            (PITH_LEVEL_0, 107, [0, 2386, 0xdead_20b0_4c88_2e33]),
-            (PITH_LEVEL_1, 109, [0, 2386, 0xdead_20b0_4c88_2e33]),
-            (PITH_LEVEL_2, 107, [0, 2386, 0xdead_20b0_4c88_2e33]),
-            (PITH_LEVEL_3, 115, [0, 10653, 0x10fd_a6bc_9c84_b4f0]),
+            (SILLSTONE_LEVEL_0, 107, [0, 2386, 0xdead_20b0_4c88_2e33]),
+            (SILLSTONE_LEVEL_1, 109, [0, 2386, 0xdead_20b0_4c88_2e33]),
+            (SILLSTONE_LEVEL_2, 107, [0, 2386, 0xdead_20b0_4c88_2e33]),
+            (SILLSTONE_LEVEL_3, 115, [0, 10653, 0x10fd_a6bc_9c84_b4f0]),
         ];
         for (level, count, first) in pinned {
             let triples =
@@ -274,7 +300,7 @@ mod tests {
         }
         // The level-2 last chunk, pinned exactly as the corpus and the
         // three SDK harnesses pin it.
-        let l2 = ffi_chunks(&data, 2048, 8192, 32768, PITH_LEVEL_2).expect("status");
+        let l2 = ffi_chunks(&data, 2048, 8192, 32768, SILLSTONE_LEVEL_2).expect("status");
         assert_eq!(&l2[l2.len() - 3..], &[1047070, 1506, 0x0000_0000_0000_0000]);
     }
 
@@ -283,7 +309,7 @@ mod tests {
     #[test]
     fn ffi_reproduces_the_subminimum_vector() {
         let data = splitmix64_bytes(9, 1024);
-        let triples = ffi_chunks(&data, 2048, 8192, 32768, PITH_LEVEL_2).expect("status");
+        let triples = ffi_chunks(&data, 2048, 8192, 32768, SILLSTONE_LEVEL_2).expect("status");
         assert_eq!(&triples[..], &[0, 1024, 0]);
     }
 
@@ -293,7 +319,7 @@ mod tests {
     #[test]
     fn ffi_reproduces_the_zeros_vector() {
         let data = vec![0u8; 256 * 1024];
-        let triples = ffi_chunks(&data, 2048, 8192, 32768, PITH_LEVEL_2).expect("status");
+        let triples = ffi_chunks(&data, 2048, 8192, 32768, SILLSTONE_LEVEL_2).expect("status");
         assert_eq!(triples.len() / 3, 8);
         for triple in triples.chunks_exact(3) {
             assert_eq!(triple[1], 32768);
@@ -301,8 +327,8 @@ mod tests {
     }
 
     /// Null pointers and unknown level codes are
-    /// [`PITH_E_INVALID`]; parameter values the core refuses are
-    /// [`PITH_E_REJECTED`]; none of it panics. A null data pointer
+    /// [`SILLSTONE_E_INVALID`]; parameter values the core refuses are
+    /// [`SILLSTONE_E_REJECTED`]; none of it panics. A null data pointer
     /// with a zero length stays legal.
     #[test]
     fn ffi_refusals() {
@@ -318,12 +344,12 @@ mod tests {
                 2048,
                 8192,
                 32768,
-                PITH_LEVEL_2,
+                SILLSTONE_LEVEL_2,
                 &mut out,
                 &mut out_len,
             )
         };
-        assert_eq!(null_data, PITH_E_INVALID);
+        assert_eq!(null_data, SILLSTONE_E_INVALID);
 
         // Null out / out_len slots.
         let null_out = unsafe {
@@ -333,12 +359,12 @@ mod tests {
                 2048,
                 8192,
                 32768,
-                PITH_LEVEL_2,
+                SILLSTONE_LEVEL_2,
                 core::ptr::null_mut(),
                 &mut out_len,
             )
         };
-        assert_eq!(null_out, PITH_E_INVALID);
+        assert_eq!(null_out, SILLSTONE_E_INVALID);
         let null_out_len = unsafe {
             sillstone_cdc_chunk(
                 data.as_ptr(),
@@ -346,12 +372,12 @@ mod tests {
                 2048,
                 8192,
                 32768,
-                PITH_LEVEL_2,
+                SILLSTONE_LEVEL_2,
                 &mut out,
                 core::ptr::null_mut(),
             )
         };
-        assert_eq!(null_out_len, PITH_E_INVALID);
+        assert_eq!(null_out_len, SILLSTONE_E_INVALID);
 
         // Unknown level wire code.
         let unknown_level = unsafe {
@@ -366,7 +392,7 @@ mod tests {
                 &mut out_len,
             )
         };
-        assert_eq!(unknown_level, PITH_E_INVALID);
+        assert_eq!(unknown_level, SILLSTONE_E_INVALID);
 
         // A null data pointer with a zero length is a legal empty input.
         let empty_ok = unsafe {
@@ -376,17 +402,17 @@ mod tests {
                 2048,
                 8192,
                 32768,
-                PITH_LEVEL_2,
+                SILLSTONE_LEVEL_2,
                 &mut out,
                 &mut out_len,
             )
         };
-        assert_eq!(empty_ok, PITH_OK);
+        assert_eq!(empty_ok, SILLSTONE_OK);
         assert_eq!(out_len, 0);
         unsafe { sillstone_cdc_free(out, out_len) };
 
         // Validation refusals: below-range min, avg < min, below-range
-        // avg, below-range max, avg > max — all PITH_E_REJECTED.
+        // avg, below-range max, avg > max — all SILLSTONE_E_REJECTED.
         for (min, avg, max) in [
             (32, 8192, 32768),   // min below 64
             (8192, 2048, 32768), // avg < min
@@ -401,21 +427,24 @@ mod tests {
                     min,
                     avg,
                     max,
-                    PITH_LEVEL_2,
+                    SILLSTONE_LEVEL_2,
                     &mut out,
                     &mut out_len,
                 )
             };
-            assert_eq!(refused, PITH_E_REJECTED, "params {min}/{avg}/{max}");
+            assert_eq!(refused, SILLSTONE_E_REJECTED, "params {min}/{avg}/{max}");
         }
 
         // The same refusals, observed through the test helper's error
         // path (the FFI status surfaces as Err instead of a panic).
         assert_eq!(
-            ffi_chunks(&data, 32, 8192, 32768, PITH_LEVEL_2),
-            Err(PITH_E_REJECTED)
+            ffi_chunks(&data, 32, 8192, 32768, SILLSTONE_LEVEL_2),
+            Err(SILLSTONE_E_REJECTED)
         );
-        assert_eq!(ffi_chunks(&data, 2048, 8192, 32768, 9), Err(PITH_E_INVALID));
+        assert_eq!(
+            ffi_chunks(&data, 2048, 8192, 32768, 9),
+            Err(SILLSTONE_E_INVALID)
+        );
 
         // Freeing a null pointer is a no-op.
         unsafe { sillstone_cdc_free(core::ptr::null_mut(), 0) };
@@ -427,8 +456,8 @@ mod tests {
     fn safe_core_matches_ffi() {
         let data = splitmix64_bytes(0x0123_4567_89ab_cdef, 64 * 1024);
         let via_core =
-            chunk_triples(&data, 2048, 2048, 2048, PITH_LEVEL_2).expect("fixed-size vector");
-        let via_ffi = ffi_chunks(&data, 2048, 2048, 2048, PITH_LEVEL_2).expect("status");
+            chunk_triples(&data, 2048, 2048, 2048, SILLSTONE_LEVEL_2).expect("fixed-size vector");
+        let via_ffi = ffi_chunks(&data, 2048, 2048, 2048, SILLSTONE_LEVEL_2).expect("status");
         assert_eq!(via_core, via_ffi);
         // 64 KiB at a fixed 2048: exactly 32 chunks of 2048 (the fixed
         // `max_size` pins every length).
@@ -437,12 +466,29 @@ mod tests {
             assert_eq!(triple[1], 2048);
         }
         assert_eq!(
-            chunk_triples(&data, 32, 8192, 32768, PITH_LEVEL_2),
-            Err(PITH_E_REJECTED)
+            chunk_triples(&data, 32, 8192, 32768, SILLSTONE_LEVEL_2),
+            Err(SILLSTONE_E_REJECTED)
         );
         assert_eq!(
             chunk_triples(&data, 2048, 8192, 32768, 9),
-            Err(PITH_E_INVALID)
+            Err(SILLSTONE_E_INVALID)
         );
+    }
+}
+
+#[cfg(test)]
+mod deprecated_alias_tests {
+    #![allow(deprecated)]
+    use super::*;
+
+    #[test]
+    fn pith_aliases_equal_their_sillstone_twins() {
+        assert_eq!(PITH_OK, SILLSTONE_OK);
+        assert_eq!(PITH_E_INVALID, SILLSTONE_E_INVALID);
+        assert_eq!(PITH_E_REJECTED, SILLSTONE_E_REJECTED);
+        assert_eq!(PITH_LEVEL_0, SILLSTONE_LEVEL_0);
+        assert_eq!(PITH_LEVEL_1, SILLSTONE_LEVEL_1);
+        assert_eq!(PITH_LEVEL_2, SILLSTONE_LEVEL_2);
+        assert_eq!(PITH_LEVEL_3, SILLSTONE_LEVEL_3);
     }
 }

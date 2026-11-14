@@ -2,7 +2,7 @@
 //! (`sdk/java`) bind through after `System.load`ing this cdylib.
 //!
 //! The names follow the JVM's resolve convention for
-//! `package hash.pith` + `class PithHash`: `Java_hash_pith_PithHash_<method>`.
+//! `package io.github.sillstone` + `class SillstoneHash`: `Java_io_github_sillstone_SillstoneHash_<method>`.
 //! The existing C ABI in [`crate::ffi`] is untouched — this module only
 //! adds `Java_*` symbols and routes through the same safe cores.
 //!
@@ -24,7 +24,7 @@
 //! # Error convention
 //!
 //! Refusals never unwind into the JVM: the export throws
-//! `hash.pith.PithFfiException(status, message)` (status codes as in
+//! `io.github.sillstone.SillstoneFfiException(status, message)` (status codes as in
 //! [`crate::ffi`]: `-1` invalid argument, `-2` core refusal) and
 //! returns a Java `null`; if the exception class cannot be resolved,
 //! a plain `java.lang.RuntimeException` is thrown via `ThrowNew`.
@@ -35,7 +35,9 @@ use alloc::ffi::CString;
 use alloc::vec::Vec;
 use core::ffi::{c_char, c_void};
 
-use crate::ffi::{PITH_E_INVALID, PITH_E_REJECTED, describe_bytes, match_slots, signature_bytes};
+use crate::ffi::{
+    SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, describe_bytes, match_slots, signature_bytes,
+};
 
 /// An opaque JVM object handle (`jobject` and friends in `jni.h`).
 #[repr(C)]
@@ -152,7 +154,7 @@ pub struct JnInterface {
 /// struct JNINativeInterface *JNIEnv;`).
 pub type JNIEnv = *const JnInterface;
 
-/// JNI binding of [`crate::detect`] for `PithHash.detect(byte[])`:
+/// JNI binding of [`crate::detect`] for `SillstoneHash.detect(byte[])`:
 /// sniffs the input and hands back the wire triple
 /// `[format, modality, pending]` as an `int[]`. A null input array or
 /// a null `env` is a thrown `-1`; detection itself is infallible.
@@ -162,7 +164,7 @@ pub type JNIEnv = *const JnInterface;
 /// `env` must be the `JNIEnv*` the JVM passed in (or null, which is
 /// reported as `-1`); `input` must be a `jbyteArray` handle (or null).
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_hash_pith_PithHash_detect(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneHash_detect(
     env: *mut JNIEnv,
     _class: JClass,
     input: JbyteArray,
@@ -178,14 +180,14 @@ pub unsafe extern "system" fn Java_hash_pith_PithHash_detect(
             unsafe { int_array(env, &wire) }
         }
         None => {
-            unsafe { throw_status(env, "sillstone_curator_detect", PITH_E_INVALID) };
+            unsafe { throw_status(env, "sillstone_curator_detect", SILLSTONE_E_INVALID) };
             core::ptr::null_mut()
         }
     }
 }
 
 /// JNI binding of [`sillstone_curator_signature`](crate::ffi) for
-/// `PithHash.signature(byte[])`: the canonical signature stream
+/// `SillstoneHash.signature(byte[])`: the canonical signature stream
 /// (`byte[]`) the `reference.json` vectors are defined over. A null
 /// input array or a null `env` is a thrown `-1`; every refusal is a
 /// thrown `-2`.
@@ -195,7 +197,7 @@ pub unsafe extern "system" fn Java_hash_pith_PithHash_detect(
 /// `env` must be the `JNIEnv*` the JVM passed in (or null, which is
 /// reported as `-1`); `input` must be a `jbyteArray` handle (or null).
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_hash_pith_PithHash_signature(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneHash_signature(
     env: *mut JNIEnv,
     _class: JClass,
     input: JbyteArray,
@@ -203,23 +205,23 @@ pub unsafe extern "system" fn Java_hash_pith_PithHash_signature(
     match unsafe { read_byte_array(env, input) } {
         Some(bytes) => unsafe { byte_array(env, "sillstone_curator_signature", signature_bytes(&bytes)) },
         None => {
-            unsafe { throw_status(env, "sillstone_curator_signature", PITH_E_INVALID) };
+            unsafe { throw_status(env, "sillstone_curator_signature", SILLSTONE_E_INVALID) };
             core::ptr::null_mut()
         }
     }
 }
 
 /// JNI binding of [`sillstone_curator_describe`](crate::ffi) for
-/// `PithHash.describe(byte[])`: the canonical description stream
+/// `SillstoneHash.describe(byte[])`: the canonical description stream
 /// (`byte[]`). Same argument/refusal convention as
-/// [`Java_hash_pith_PithHash_signature`].
+/// [`Java_io_github_sillstone_SillstoneHash_signature`].
 ///
 /// # Safety
 ///
 /// `env` must be the `JNIEnv*` the JVM passed in (or null, which is
 /// reported as `-1`); `input` must be a `jbyteArray` handle (or null).
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_hash_pith_PithHash_describe(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneHash_describe(
     env: *mut JNIEnv,
     _class: JClass,
     input: JbyteArray,
@@ -227,14 +229,14 @@ pub unsafe extern "system" fn Java_hash_pith_PithHash_describe(
     match unsafe { read_byte_array(env, input) } {
         Some(bytes) => unsafe { byte_array(env, "sillstone_curator_describe", describe_bytes(&bytes)) },
         None => {
-            unsafe { throw_status(env, "sillstone_curator_describe", PITH_E_INVALID) };
+            unsafe { throw_status(env, "sillstone_curator_describe", SILLSTONE_E_INVALID) };
             core::ptr::null_mut()
         }
     }
 }
 
 /// JNI binding of [`sillstone_curator_match`](crate::ffi) for
-/// `PithHash.match(byte[], byte[])`: the flattened outcome as a
+/// `SillstoneHash.match(byte[], byte[])`: the flattened outcome as a
 /// `long[]` of six slots `[tag, s0, s1, s2, s3, matched]` — the
 /// `u64` slot bits ride through as two's-complement `long`s. A null
 /// input array or a null `env` is a thrown `-1`; every refusal
@@ -245,7 +247,7 @@ pub unsafe extern "system" fn Java_hash_pith_PithHash_describe(
 /// `env` must be the `JNIEnv*` the JVM passed in (or null, which is
 /// reported as `-1`); `a`/`b` must be `jbyteArray` handles (or null).
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_hash_pith_PithHash_match(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneHash_match(
     env: *mut JNIEnv,
     _class: JClass,
     a: JbyteArray,
@@ -254,11 +256,11 @@ pub unsafe extern "system" fn Java_hash_pith_PithHash_match(
     let (Some(a_bytes), Some(b_bytes)) = (unsafe { read_byte_array(env, a) }, unsafe {
         read_byte_array(env, b)
     }) else {
-        unsafe { throw_status(env, "sillstone_curator_match", PITH_E_INVALID) };
+        unsafe { throw_status(env, "sillstone_curator_match", SILLSTONE_E_INVALID) };
         return core::ptr::null_mut();
     };
     let Ok((tag, slots, matched)) = match_slots(&a_bytes, &b_bytes) else {
-        unsafe { throw_status(env, "sillstone_curator_match", PITH_E_REJECTED) };
+        unsafe { throw_status(env, "sillstone_curator_match", SILLSTONE_E_REJECTED) };
         return core::ptr::null_mut();
     };
     let mut wire = [0i64; 6];
@@ -271,7 +273,7 @@ pub unsafe extern "system" fn Java_hash_pith_PithHash_match(
 }
 
 /// JNI binding of [`sillstone_curator_content_hash`](crate::ffi) for
-/// `PithHash.contentHash(byte[])`: the 32-byte content digest
+/// `SillstoneHash.contentHash(byte[])`: the 32-byte content digest
 /// (`byte[]`). A null input array or a null `env` is a thrown `-1`;
 /// every refusal is a thrown `-2`.
 ///
@@ -280,7 +282,7 @@ pub unsafe extern "system" fn Java_hash_pith_PithHash_match(
 /// `env` must be the `JNIEnv*` the JVM passed in (or null, which is
 /// reported as `-1`); `input` must be a `jbyteArray` handle (or null).
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_hash_pith_PithHash_contentHash(
+pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneHash_contentHash(
     env: *mut JNIEnv,
     _class: JClass,
     input: JbyteArray,
@@ -288,8 +290,8 @@ pub unsafe extern "system" fn Java_hash_pith_PithHash_contentHash(
     let result = match unsafe { read_byte_array(env, input) } {
         Some(bytes) => crate::content_hash(&bytes)
             .map(|digest| Vec::from(digest.as_bytes()))
-            .map_err(|_| PITH_E_REJECTED),
-        None => Err(PITH_E_INVALID),
+            .map_err(|_| SILLSTONE_E_REJECTED),
+        None => Err(SILLSTONE_E_INVALID),
     };
     match result {
         Ok(bytes) => unsafe { byte_array(env, "sillstone_curator_content_hash", Ok(bytes)) },
@@ -301,58 +303,12 @@ pub unsafe extern "system" fn Java_hash_pith_PithHash_contentHash(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneHash_detect(
-    env: *mut JNIEnv,
-    class: JClass,
-    input: JbyteArray,
-) -> JintArray {
-    unsafe { Java_hash_pith_PithHash_detect(env, class, input) }
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneHash_signature(
-    env: *mut JNIEnv,
-    class: JClass,
-    input: JbyteArray,
-) -> JbyteArray {
-    unsafe { Java_hash_pith_PithHash_signature(env, class, input) }
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneHash_describe(
-    env: *mut JNIEnv,
-    class: JClass,
-    input: JbyteArray,
-) -> JbyteArray {
-    unsafe { Java_hash_pith_PithHash_describe(env, class, input) }
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneHash_match(
-    env: *mut JNIEnv,
-    class: JClass,
-    a: JbyteArray,
-    b: JbyteArray,
-) -> JlongArray {
-    unsafe { Java_hash_pith_PithHash_match(env, class, a, b) }
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "system" fn Java_io_github_sillstone_SillstoneHash_contentHash(
-    env: *mut JNIEnv,
-    class: JClass,
-    input: JbyteArray,
-) -> JbyteArray {
-    unsafe { Java_hash_pith_PithHash_contentHash(env, class, input) }
-}
-
-#[unsafe(no_mangle)]
 pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1curator_1detect(
     env: *mut JNIEnv,
     class: JClass,
     input: JbyteArray,
 ) -> JintArray {
-    unsafe { Java_hash_pith_PithHash_detect(env, class, input) }
+    unsafe { Java_io_github_sillstone_SillstoneHash_detect(env, class, input) }
 }
 
 #[unsafe(no_mangle)]
@@ -361,7 +317,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1cura
     class: JClass,
     input: JbyteArray,
 ) -> JbyteArray {
-    unsafe { Java_hash_pith_PithHash_signature(env, class, input) }
+    unsafe { Java_io_github_sillstone_SillstoneHash_signature(env, class, input) }
 }
 
 #[unsafe(no_mangle)]
@@ -370,7 +326,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1cura
     class: JClass,
     input: JbyteArray,
 ) -> JbyteArray {
-    unsafe { Java_hash_pith_PithHash_describe(env, class, input) }
+    unsafe { Java_io_github_sillstone_SillstoneHash_describe(env, class, input) }
 }
 
 #[unsafe(no_mangle)]
@@ -380,7 +336,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1cura
     a: JbyteArray,
     b: JbyteArray,
 ) -> JlongArray {
-    unsafe { Java_hash_pith_PithHash_match(env, class, a, b) }
+    unsafe { Java_io_github_sillstone_SillstoneHash_match(env, class, a, b) }
 }
 
 #[unsafe(no_mangle)]
@@ -389,7 +345,7 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1cura
     class: JClass,
     input: JbyteArray,
 ) -> JbyteArray {
-    unsafe { Java_hash_pith_PithHash_contentHash(env, class, input) }
+    unsafe { Java_io_github_sillstone_SillstoneHash_contentHash(env, class, input) }
 }
 
 #[unsafe(no_mangle)]
@@ -522,7 +478,7 @@ unsafe fn long_array(env: *mut JNIEnv, values: &[Jlong]) -> JlongArray {
     array
 }
 
-/// Throws `hash.pith.PithFfiException(status, "<op> failed with
+/// Throws `io.github.sillstone.SillstoneFfiException(status, "<op> failed with
 /// status <status>")`; every resolution failure on the way falls back
 /// to `ThrowNew(java.lang.RuntimeException)`. A null `env` has no JVM
 /// to throw into and returns quietly (the Java caller sees `null`).
@@ -591,4 +547,89 @@ unsafe fn throw_runtime(env: *mut JNIEnv, table: &JnInterface, text: &CString) {
     if !class.is_null() {
         unsafe { (table.throw_new.expect("ThrowNew slot"))(env, class, text.as_ptr()) };
     }
+}
+
+// Deprecated pre-rename JNI exports: the symbols Java classes compiled against the
+// suite's old class names resolve. Each one forwards to its canonical
+// `io.github.sillstone` export unchanged.
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneHash_detect`]: the export for the
+/// pre-rename `hash.pith.PithHash` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneHash_detect`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneHash_detect`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_hash_pith_PithHash_detect(
+    env: *mut JNIEnv,
+    class: JClass,
+    input: JbyteArray,
+) -> JintArray {
+    unsafe { Java_io_github_sillstone_SillstoneHash_detect(env, class, input) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneHash_signature`]: the export for the
+/// pre-rename `hash.pith.PithHash` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneHash_signature`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneHash_signature`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_hash_pith_PithHash_signature(
+    env: *mut JNIEnv,
+    class: JClass,
+    input: JbyteArray,
+) -> JbyteArray {
+    unsafe { Java_io_github_sillstone_SillstoneHash_signature(env, class, input) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneHash_describe`]: the export for the
+/// pre-rename `hash.pith.PithHash` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneHash_describe`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneHash_describe`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_hash_pith_PithHash_describe(
+    env: *mut JNIEnv,
+    class: JClass,
+    input: JbyteArray,
+) -> JbyteArray {
+    unsafe { Java_io_github_sillstone_SillstoneHash_describe(env, class, input) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneHash_match`]: the export for the
+/// pre-rename `hash.pith.PithHash` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneHash_match`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneHash_match`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_hash_pith_PithHash_match(
+    env: *mut JNIEnv,
+    class: JClass,
+    a: JbyteArray,
+    b: JbyteArray,
+) -> JlongArray {
+    unsafe { Java_io_github_sillstone_SillstoneHash_match(env, class, a, b) }
+}
+
+/// Deprecated alias of [`Java_io_github_sillstone_SillstoneHash_contentHash`]: the export for the
+/// pre-rename `hash.pith.PithHash` class.
+///
+/// # Safety
+///
+/// Same contract as [`Java_io_github_sillstone_SillstoneHash_contentHash`].
+#[deprecated(note = "renamed to `Java_io_github_sillstone_SillstoneHash_contentHash`")]
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn Java_hash_pith_PithHash_contentHash(
+    env: *mut JNIEnv,
+    class: JClass,
+    input: JbyteArray,
+) -> JbyteArray {
+    unsafe { Java_io_github_sillstone_SillstoneHash_contentHash(env, class, input) }
 }

@@ -1,9 +1,9 @@
 {
-  "suite": "pith",
-  "crate": "pith-video",
+  "suite": "sillstone",
+  "crate": "sillstone-video",
   "format_version": 1,
   "generator": "cargo run --bin gen-reference -- gen",
-  "description": "Hex-exact video-lane vectors for pith-video: sampled frame-pHash chains (64-bit hex, only where the DCT threshold margins clear the libm noise floor — flat sources keep their integer pins instead), MinHash folds over the 128-word chain signature, tier-1 content digests, f64 facts as IEEE-754 bits and decode error kinds over the committed fixtures and inline hostile inputs.",
+  "description": "Hex-exact video-lane vectors for sillstone-video: sampled frame-pHash chains (64-bit hex, only where the DCT threshold margins clear the libm noise floor — flat sources keep their integer pins instead), MinHash folds over the 128-word chain signature, tier-1 content digests, f64 facts as IEEE-754 bits and decode error kinds over the committed fixtures and inline hostile inputs.",
   "vectors": [
     {
       "name": "a_128x96.mp4",

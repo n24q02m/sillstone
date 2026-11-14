@@ -18,7 +18,7 @@
 use core::ffi::c_void;
 use std::sync::{LazyLock, Mutex};
 
-use sillstone_inflate::ffi::{PITH_E_INVALID, PITH_E_REJECTED, PITH_OK};
+use sillstone_inflate::ffi::{SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, SILLSTONE_OK};
 use sillstone_inflate::{adler32, inflate_gzip, inflate_raw};
 
 type JNIEnv = *const FakeTable;
@@ -77,6 +77,37 @@ struct FakeTable {
 
 // The exports under test (linked from the crate's rlib).
 unsafe extern "system" {
+    fn Java_io_github_sillstone_SillstoneInflate_inflateRawNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        status: JIntArray,
+    ) -> JArray;
+    fn Java_io_github_sillstone_SillstoneInflate_inflateZlibNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        status: JIntArray,
+    ) -> JArray;
+    fn Java_io_github_sillstone_SillstoneInflate_inflateAutoNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        status: JIntArray,
+    ) -> JArray;
+    fn Java_io_github_sillstone_SillstoneInflate_inflateGzipNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        status: JIntArray,
+    ) -> JArray;
+    fn Java_io_github_sillstone_SillstoneInflate_adler32Native(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        status: JIntArray,
+    ) -> jlong;
+    // The deprecated pre-rename twins (`hash.sillstone.inflate.PithInflate`).
     fn Java_hash_sillstone_inflate_PithInflate_inflateRawNative(
         env: *mut JNIEnv,
         class: JClass,
@@ -312,7 +343,7 @@ fn jni_inflate_raw_matches_the_corpus_vector() {
     let (compressed, plain) = one_byte_raw();
     let (out, status) = with_fake_env(compressed, false, |env| unsafe {
         let slot = status_slot();
-        let array = Java_hash_sillstone_inflate_PithInflate_inflateRawNative(
+        let array = Java_io_github_sillstone_SillstoneInflate_inflateRawNative(
             env,
             std::ptr::null_mut(),
             SOME_ARRAY,
@@ -323,7 +354,7 @@ fn jni_inflate_raw_matches_the_corpus_vector() {
         assert_eq!(len, plain.len());
         (bytes, read_status(slot))
     });
-    assert_eq!(status, PITH_OK);
+    assert_eq!(status, SILLSTONE_OK);
     assert_eq!(out, plain);
     // The one-shot decode of the same bytes agrees.
     assert_eq!(
@@ -349,13 +380,13 @@ fn jni_inflate_zlib_and_auto_agree() {
         let (out, status) = with_fake_env(compressed.clone(), false, |env| unsafe {
             let slot = status_slot();
             let array = match which {
-                "zlib" => Java_hash_sillstone_inflate_PithInflate_inflateZlibNative(
+                "zlib" => Java_io_github_sillstone_SillstoneInflate_inflateZlibNative(
                     env,
                     std::ptr::null_mut(),
                     SOME_ARRAY,
                     slot,
                 ),
-                _ => Java_hash_sillstone_inflate_PithInflate_inflateAutoNative(
+                _ => Java_io_github_sillstone_SillstoneInflate_inflateAutoNative(
                     env,
                     std::ptr::null_mut(),
                     SOME_ARRAY,
@@ -366,7 +397,7 @@ fn jni_inflate_zlib_and_auto_agree() {
             let (bytes, _) = take_out_bytes();
             (bytes, read_status(slot))
         });
-        assert_eq!(status, PITH_OK, "{which}");
+        assert_eq!(status, SILLSTONE_OK, "{which}");
         assert_eq!(out, plain, "{which}");
     }
 }
@@ -377,7 +408,7 @@ fn jni_inflate_gzip_matches_the_fixture() {
     let expected = inflate_gzip(&container, &sillstone_inflate::Limits::default()).expect("one-shot");
     let (out, status) = with_fake_env(container, false, |env| unsafe {
         let slot = status_slot();
-        let array = Java_hash_sillstone_inflate_PithInflate_inflateGzipNative(
+        let array = Java_io_github_sillstone_SillstoneInflate_inflateGzipNative(
             env,
             std::ptr::null_mut(),
             SOME_ARRAY,
@@ -388,7 +419,7 @@ fn jni_inflate_gzip_matches_the_fixture() {
         assert_eq!(len, expected.len());
         (bytes, read_status(slot))
     });
-    assert_eq!(status, PITH_OK);
+    assert_eq!(status, SILLSTONE_OK);
     assert_eq!(out, expected);
 }
 
@@ -398,7 +429,7 @@ fn jni_empty_output_builds_an_empty_byte_array() {
     assert!(plain.is_empty());
     let (out, len, status) = with_fake_env(compressed, false, |env| unsafe {
         let slot = status_slot();
-        let array = Java_hash_sillstone_inflate_PithInflate_inflateZlibNative(
+        let array = Java_io_github_sillstone_SillstoneInflate_inflateZlibNative(
             env,
             std::ptr::null_mut(),
             SOME_ARRAY,
@@ -408,7 +439,7 @@ fn jni_empty_output_builds_an_empty_byte_array() {
         let (bytes, len) = take_out_bytes();
         (bytes, len, read_status(slot))
     });
-    assert_eq!(status, PITH_OK);
+    assert_eq!(status, SILLSTONE_OK);
     assert_eq!(len, 0);
     assert!(out.is_empty());
 }
@@ -421,7 +452,7 @@ fn jni_adler32_matches_the_crate_checksum() {
     let expected = adler32(&compressed);
     let (sum, status) = with_fake_env(compressed, false, |env| unsafe {
         let slot = status_slot();
-        let sum = Java_hash_sillstone_inflate_PithInflate_adler32Native(
+        let sum = Java_io_github_sillstone_SillstoneInflate_adler32Native(
             env,
             std::ptr::null_mut(),
             SOME_ARRAY,
@@ -429,7 +460,7 @@ fn jni_adler32_matches_the_crate_checksum() {
         );
         (sum, read_status(slot))
     });
-    assert_eq!(status, PITH_OK);
+    assert_eq!(status, SILLSTONE_OK);
     assert_eq!(sum, i64::from(expected));
 }
 
@@ -439,32 +470,32 @@ fn jni_null_data_is_invalid_on_every_inflate_export() {
         let (result, status) = with_fake_env(Vec::new(), false, |env| unsafe {
             let slot = status_slot();
             let value = match which {
-                "raw" => Java_hash_sillstone_inflate_PithInflate_inflateRawNative(
+                "raw" => Java_io_github_sillstone_SillstoneInflate_inflateRawNative(
                     env,
                     std::ptr::null_mut(),
                     std::ptr::null_mut(),
                     slot,
                 ),
-                "zlib" => Java_hash_sillstone_inflate_PithInflate_inflateZlibNative(
+                "zlib" => Java_io_github_sillstone_SillstoneInflate_inflateZlibNative(
                     env,
                     std::ptr::null_mut(),
                     std::ptr::null_mut(),
                     slot,
                 ),
-                "auto" => Java_hash_sillstone_inflate_PithInflate_inflateAutoNative(
+                "auto" => Java_io_github_sillstone_SillstoneInflate_inflateAutoNative(
                     env,
                     std::ptr::null_mut(),
                     std::ptr::null_mut(),
                     slot,
                 ),
-                "gzip" => Java_hash_sillstone_inflate_PithInflate_inflateGzipNative(
+                "gzip" => Java_io_github_sillstone_SillstoneInflate_inflateGzipNative(
                     env,
                     std::ptr::null_mut(),
                     std::ptr::null_mut(),
                     slot,
                 ),
                 _ => {
-                    let sum = Java_hash_sillstone_inflate_PithInflate_adler32Native(
+                    let sum = Java_io_github_sillstone_SillstoneInflate_adler32Native(
                         env,
                         std::ptr::null_mut(),
                         std::ptr::null_mut(),
@@ -478,7 +509,7 @@ fn jni_null_data_is_invalid_on_every_inflate_export() {
             (value, read_status(slot))
         });
         assert!(result.is_null(), "{which}");
-        assert_eq!(status, PITH_E_INVALID, "{which}");
+        assert_eq!(status, SILLSTONE_E_INVALID, "{which}");
     }
 }
 
@@ -486,7 +517,7 @@ fn jni_null_data_is_invalid_on_every_inflate_export() {
 fn jni_negative_array_length_is_invalid() {
     let (out, status) = with_fake_env(b"whatever".to_vec(), true, |env| unsafe {
         let slot = status_slot();
-        let array = Java_hash_sillstone_inflate_PithInflate_inflateRawNative(
+        let array = Java_io_github_sillstone_SillstoneInflate_inflateRawNative(
             env,
             std::ptr::null_mut(),
             SOME_ARRAY,
@@ -495,14 +526,14 @@ fn jni_negative_array_length_is_invalid() {
         (array, read_status(slot))
     });
     assert!(out.is_null());
-    assert_eq!(status, PITH_E_INVALID);
+    assert_eq!(status, SILLSTONE_E_INVALID);
 }
 
 #[test]
 fn jni_rejected_stream_is_rejected_not_crashing() {
     let (out, status) = with_fake_env(b"\x00\x00".to_vec(), false, |env| unsafe {
         let slot = status_slot();
-        let array = Java_hash_sillstone_inflate_PithInflate_inflateRawNative(
+        let array = Java_io_github_sillstone_SillstoneInflate_inflateRawNative(
             env,
             std::ptr::null_mut(),
             SOME_ARRAY,
@@ -511,5 +542,123 @@ fn jni_rejected_stream_is_rejected_not_crashing() {
         (array, read_status(slot))
     });
     assert!(out.is_null());
-    assert_eq!(status, PITH_E_REJECTED);
+    assert_eq!(status, SILLSTONE_E_REJECTED);
+}
+
+/// A byte-returning inflate export: `(env, class, data, status) -> byte[]`.
+type ByteExport = unsafe extern "system" fn(*mut JNIEnv, JClass, JArray, JIntArray) -> JArray;
+
+/// Runs `export` over `input` (or a null data array when `input` is
+/// `None`), returning the materialized output (`None` for a Java null)
+/// and the status slot.
+fn run_byte_export(export: ByteExport, input: Option<Vec<u8>>) -> (Option<Vec<u8>>, i32) {
+    let data = if input.is_some() {
+        SOME_ARRAY
+    } else {
+        std::ptr::null_mut()
+    };
+    with_fake_env(input.unwrap_or_default(), false, |env| unsafe {
+        let slot = status_slot();
+        let array = export(env, std::ptr::null_mut(), data, slot);
+        let out = (!array.is_null()).then(|| take_out_bytes().0);
+        (out, read_status(slot))
+    })
+}
+
+/// Runs the adler32 `export` likewise.
+fn run_adler_export(
+    export: unsafe extern "system" fn(*mut JNIEnv, JClass, JArray, JIntArray) -> jlong,
+    input: Option<Vec<u8>>,
+) -> (jlong, i32) {
+    let data = if input.is_some() {
+        SOME_ARRAY
+    } else {
+        std::ptr::null_mut()
+    };
+    with_fake_env(input.unwrap_or_default(), false, |env| unsafe {
+        let slot = status_slot();
+        let sum = export(env, std::ptr::null_mut(), data, slot);
+        (sum, read_status(slot))
+    })
+}
+
+#[test]
+fn legacy_inflate_exports_match_the_canonical_ones() {
+    let (raw, raw_plain) = one_byte_raw();
+    let (zlib, zlib_plain) = one_byte_zlib();
+    let gzip = gzip_hello();
+    let pairs: [(&str, ByteExport, ByteExport, Vec<u8>); 4] = [
+        (
+            "inflateRawNative",
+            Java_io_github_sillstone_SillstoneInflate_inflateRawNative,
+            Java_hash_sillstone_inflate_PithInflate_inflateRawNative,
+            raw.clone(),
+        ),
+        (
+            "inflateZlibNative",
+            Java_io_github_sillstone_SillstoneInflate_inflateZlibNative,
+            Java_hash_sillstone_inflate_PithInflate_inflateZlibNative,
+            zlib.clone(),
+        ),
+        (
+            "inflateAutoNative",
+            Java_io_github_sillstone_SillstoneInflate_inflateAutoNative,
+            Java_hash_sillstone_inflate_PithInflate_inflateAutoNative,
+            zlib,
+        ),
+        (
+            "inflateGzipNative",
+            Java_io_github_sillstone_SillstoneInflate_inflateGzipNative,
+            Java_hash_sillstone_inflate_PithInflate_inflateGzipNative,
+            gzip,
+        ),
+    ];
+    for (name, canonical, legacy, input) in pairs {
+        let want = run_byte_export(canonical, Some(input.clone()));
+        assert_eq!(want.1, SILLSTONE_OK, "{name}");
+        assert!(want.0.as_ref().is_some_and(|b| !b.is_empty()), "{name}");
+        assert_eq!(run_byte_export(legacy, Some(input)), want, "{name}");
+
+        let refused = run_byte_export(canonical, None);
+        assert_eq!(refused, (None, SILLSTONE_E_INVALID), "{name}");
+        assert_eq!(run_byte_export(legacy, None), refused, "{name}");
+    }
+    assert_eq!(
+        run_byte_export(
+            Java_hash_sillstone_inflate_PithInflate_inflateRawNative,
+            Some(raw.clone())
+        )
+        .0,
+        Some(raw_plain)
+    );
+    assert_eq!(
+        run_byte_export(
+            Java_hash_sillstone_inflate_PithInflate_inflateZlibNative,
+            Some(one_byte_zlib().0)
+        )
+        .0,
+        Some(zlib_plain)
+    );
+
+    let want = run_adler_export(
+        Java_io_github_sillstone_SillstoneInflate_adler32Native,
+        Some(raw.clone()),
+    );
+    assert_eq!(want, (i64::from(adler32(&raw)), SILLSTONE_OK));
+    assert_eq!(
+        run_adler_export(
+            Java_hash_sillstone_inflate_PithInflate_adler32Native,
+            Some(raw)
+        ),
+        want
+    );
+    let refused = run_adler_export(
+        Java_io_github_sillstone_SillstoneInflate_adler32Native,
+        None,
+    );
+    assert_eq!(refused, (0, SILLSTONE_E_INVALID));
+    assert_eq!(
+        run_adler_export(Java_hash_sillstone_inflate_PithInflate_adler32Native, None),
+        refused
+    );
 }

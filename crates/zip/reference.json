@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "crate": "pith-zip",
-  "description": "hex-exact ZIP archive reference vectors: every tests/fixtures/*.zip archive parsed by pith-zip, each member checked against its corpus entry and pinned by CRC-32 and SHA-256 content digests",
+  "crate": "sillstone-zip",
+  "description": "hex-exact ZIP archive reference vectors: every tests/fixtures/*.zip archive parsed by sillstone-zip, each member checked against its corpus entry and pinned by CRC-32 and SHA-256 content digests",
   "vectors": [
     {
       "name": "stored.zip",

@@ -1,7 +1,7 @@
 //! Unicode normalisation (NFD · NFC · NFKD · NFKC), UAX #15 quick-check
 //! detection, and case folding — driven by tables generated from the UCD.
 //!
-//! Part of the `pith` suite: the library itself builds with an empty
+//! Part of the `sillstone` suite: the library itself builds with an empty
 //! `[dependencies]` table — the whole suite resolves without a single
 //! registry package.
 //!
@@ -55,8 +55,8 @@ pub mod ffi;
 pub mod grapheme;
 #[allow(missing_docs)]
 pub mod tables;
-pub use grapheme::{char_category, char_name, graphemes, Graphemes};
-pub use tables::{GeneralCategory, Gbp, InCb};
+pub use grapheme::{Graphemes, char_category, char_name, graphemes};
+pub use tables::{Gbp, GeneralCategory, InCb};
 // The Java SDK's native-method surface: `Java_hash_sillstone_unicode_*`
 // exports that forward to the C ABI above. Compiled out of the unit
 // test build (the `#[no_mangle]` exports would collide with the test

@@ -1,4 +1,4 @@
-pith-unicode embedded UCD tables — source provenance
+sillstone-unicode embedded UCD tables — source provenance
 ====================================================
 
 The tables in `data/ucd.bin` are generated from the Unicode Character

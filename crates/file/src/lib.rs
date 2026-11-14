@@ -1,8 +1,8 @@
-//! File-domain hashing for the pith suite: content-defined chunk
+//! File-domain hashing for the sillstone suite: content-defined chunk
 //! signatures, exact chunk-set Jaccard and container text extraction.
 //!
-//! Part of the `pith` zero-dependency hashing suite: every suite crate
-//! depends only on other `pith-*` crates, so the whole suite resolves
+//! Part of the `sillstone` zero-dependency hashing suite: every suite crate
+//! depends only on other `sillstone-*` crates, so the whole suite resolves
 //! without a single registry package.
 //!
 //! This crate is the suite's file slice: it wires the file-domain

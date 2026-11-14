@@ -28,9 +28,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use sillstone_digest::SplitMix64;
 use sillstone_curator::reference::{f64_bits, fold_audio, fold_binary, fold_words, hex};
-use sillstone_curator::{Description, Facts, MatchOutcome, Signature, describe, detect, match_, signature};
+use sillstone_curator::{
+    Description, Facts, MatchOutcome, Signature, describe, detect, match_, signature,
+};
+use sillstone_digest::SplitMix64;
 
 /// Where the committed copy lives, relative to the repository root.
 const REFERENCE_PATH: &str = "reference.json";
@@ -419,11 +421,11 @@ fn reference_json() -> String {
 
     let mut s = String::new();
     s.push_str("{\n");
-    s.push_str("  \"suite\": \"pith\",\n");
-    s.push_str("  \"crate\": \"pith-hash\",\n");
+    s.push_str("  \"suite\": \"sillstone\",\n");
+    s.push_str("  \"crate\": \"sillstone-curator\",\n");
     s.push_str("  \"format_version\": 1,\n");
     s.push_str("  \"generator\": \"cargo run --bin gen-reference -- gen\",\n");
-    s.push_str("  \"description\": \"Hex-exact cross-modal reference vectors for the pith-hash curator: detect verdicts per container magic, tier-2 signature folds (image pHash, audio landmark folds, MinHash folds, FastCDC chunk folds, video frame-chain folds), describe tier-1 digests with facts, and match outcomes (integer hamming/votes, IEEE-754-bit Jaccard and score pins, exact refusal messages) over the committed fixture corpus plus deterministic inline recipes. Hash pins carry only fixtures with real low-frequency energy; flat fills are excluded (subnormal-floor DCT AC flips bits across platforms).\",\n");
+    s.push_str("  \"description\": \"Hex-exact cross-modal reference vectors for the sillstone-curator: detect verdicts per container magic, tier-2 signature folds (image pHash, audio landmark folds, MinHash folds, FastCDC chunk folds, video frame-chain folds), describe tier-1 digests with facts, and match outcomes (integer hamming/votes, IEEE-754-bit Jaccard and score pins, exact refusal messages) over the committed fixture corpus plus deterministic inline recipes. Hash pins carry only fixtures with real low-frequency energy; flat fills are excluded (subnormal-floor DCT AC flips bits across platforms).\",\n");
     s.push_str("  \"vectors\": [\n");
     s.push_str(&vectors.join(",\n"));
     s.push_str("\n  ]\n");
@@ -537,8 +539,8 @@ mod tests {
     #[test]
     fn json_carries_suite_identity() {
         let json = reference_json();
-        assert!(json.contains("\"suite\": \"pith\""));
-        assert!(json.contains("\"crate\": \"pith-hash\""));
+        assert!(json.contains("\"suite\": \"sillstone\""));
+        assert!(json.contains("\"crate\": \"sillstone-curator\""));
         assert!(json.contains("\"format_version\": 1"));
         assert!(json.ends_with("}\n"));
         assert!(json.contains("\"policy\"") || json.contains("\"value_kind\""));

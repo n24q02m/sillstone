@@ -17,7 +17,7 @@
 #![allow(non_camel_case_types)]
 
 use core::ffi::c_void;
-use sillstone_unicode::ffi::{PITH_E_INVALID, PITH_E_REJECTED, sillstone_unicode_nfc};
+use sillstone_unicode::ffi::{SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED, sillstone_unicode_nfc};
 use std::sync::{LazyLock, Mutex};
 
 type JNIEnv = *const FakeTable;
@@ -75,6 +75,50 @@ struct FakeTable {
 
 // The exported symbols under test (linked from the crate's rlib).
 unsafe extern "system" {
+    fn Java_io_github_sillstone_SillstoneUnicode_nfcNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        status: JIntArray,
+    ) -> JArray;
+    fn Java_io_github_sillstone_SillstoneUnicode_nfdNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        status: JIntArray,
+    ) -> JArray;
+    fn Java_io_github_sillstone_SillstoneUnicode_nfkcNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        status: JIntArray,
+    ) -> JArray;
+    fn Java_io_github_sillstone_SillstoneUnicode_nfkdNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        status: JIntArray,
+    ) -> JArray;
+    fn Java_io_github_sillstone_SillstoneUnicode_casefoldNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        status: JIntArray,
+    ) -> JArray;
+    fn Java_io_github_sillstone_SillstoneUnicode_casefoldSimpleNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        data: JArray,
+        status: JIntArray,
+    ) -> JArray;
+    fn Java_io_github_sillstone_SillstoneUnicode_isNormalizedNative(
+        env: *mut JNIEnv,
+        class: JClass,
+        form: jint,
+        data: JArray,
+        status: JIntArray,
+    ) -> jint;
+    // The deprecated pre-rename twins (`hash.sillstone.unicode.PithUnicode`).
     fn Java_hash_sillstone_unicode_PithUnicode_nfcNative(
         env: *mut JNIEnv,
         class: JClass,
@@ -285,7 +329,7 @@ fn with_fake_env_neg_len<T>(
 }
 
 /// The JNI statuses mirror the C ABI's refusal codes exactly
-/// (PITH_E_INVALID, PITH_E_REJECTED). Calling the C ABI entry here is
+/// (SILLSTONE_E_INVALID, SILLSTONE_E_REJECTED). Calling the C ABI entry here is
 /// the parity cross-check - and it also puts the rlib on this binary's
 /// link line, which is what lets the bare JNI declarations resolve on
 /// targets whose archive search only sees command-line archives (MSVC).
@@ -294,9 +338,9 @@ fn jni_statuses_mirror_the_c_abi() {
     let mut out: *mut u8 = core::ptr::null_mut();
     let mut out_len: usize = 0;
     let status = unsafe { sillstone_unicode_nfc(core::ptr::null(), 0, &mut out, &mut out_len) };
-    assert_eq!(status, PITH_E_INVALID, "null pointer status");
+    assert_eq!(status, SILLSTONE_E_INVALID, "null pointer status");
     let status = unsafe { sillstone_unicode_nfc(b"\xff\xfe".as_ptr(), 2, &mut out, &mut out_len) };
-    assert_eq!(status, PITH_E_REJECTED, "invalid utf-8 status");
+    assert_eq!(status, SILLSTONE_E_REJECTED, "invalid utf-8 status");
 }
 
 /// reference.json vectors[0]: U+1E0A - NFC is the identity, NFD
@@ -309,13 +353,13 @@ fn jni_buffer_exports_reproduce_the_pinned_vector() {
     ] {
         let (out, status, java_out) = with_fake_env(input.clone(), false, |env| unsafe {
             match export {
-                "nfc" => Java_hash_sillstone_unicode_PithUnicode_nfcNative(
+                "nfc" => Java_io_github_sillstone_SillstoneUnicode_nfcNative(
                     env,
                     std::ptr::null_mut(),
                     SOME_ARRAY,
                     status_slot(),
                 ),
-                _ => Java_hash_sillstone_unicode_PithUnicode_nfdNative(
+                _ => Java_io_github_sillstone_SillstoneUnicode_nfdNative(
                     env,
                     std::ptr::null_mut(),
                     SOME_ARRAY,
@@ -341,25 +385,25 @@ fn jni_tier1_exports_fold_pinned_inputs() {
     ] {
         let (out, status, java_out) = with_fake_env(input, false, |env| unsafe {
             match name {
-                "nfkc" => Java_hash_sillstone_unicode_PithUnicode_nfkcNative(
+                "nfkc" => Java_io_github_sillstone_SillstoneUnicode_nfkcNative(
                     env,
                     std::ptr::null_mut(),
                     SOME_ARRAY,
                     status_slot(),
                 ),
-                "nfkd" => Java_hash_sillstone_unicode_PithUnicode_nfkdNative(
+                "nfkd" => Java_io_github_sillstone_SillstoneUnicode_nfkdNative(
                     env,
                     std::ptr::null_mut(),
                     SOME_ARRAY,
                     status_slot(),
                 ),
-                "casefold" => Java_hash_sillstone_unicode_PithUnicode_casefoldNative(
+                "casefold" => Java_io_github_sillstone_SillstoneUnicode_casefoldNative(
                     env,
                     std::ptr::null_mut(),
                     SOME_ARRAY,
                     status_slot(),
                 ),
-                _ => Java_hash_sillstone_unicode_PithUnicode_casefoldSimpleNative(
+                _ => Java_io_github_sillstone_SillstoneUnicode_casefoldSimpleNative(
                     env,
                     std::ptr::null_mut(),
                     SOME_ARRAY,
@@ -380,7 +424,7 @@ fn jni_is_normalized_answers_and_refuses() {
     let ligature = vec![0xef, 0xac, 0x81];
     for (form, want) in [(1i32, 1i32), (2, 1), (3, 0), (4, 0)] {
         let (answer, status, _) = with_fake_env(ligature.clone(), false, |env| unsafe {
-            Java_hash_sillstone_unicode_PithUnicode_isNormalizedNative(
+            Java_io_github_sillstone_SillstoneUnicode_isNormalizedNative(
                 env,
                 std::ptr::null_mut(),
                 form,
@@ -392,7 +436,7 @@ fn jni_is_normalized_answers_and_refuses() {
         assert_eq!(answer, want, "answer form {form}");
     }
     let (answer, status, _) = with_fake_env(ligature.clone(), false, |env| unsafe {
-        Java_hash_sillstone_unicode_PithUnicode_isNormalizedNative(
+        Java_io_github_sillstone_SillstoneUnicode_isNormalizedNative(
             env,
             std::ptr::null_mut(),
             0,
@@ -403,7 +447,7 @@ fn jni_is_normalized_answers_and_refuses() {
     assert_eq!(answer, 0, "form 0 answer");
     assert_eq!(status, -1, "form 0 status");
     let (answer, status, _) = with_fake_env(vec![0xff, 0xfe], false, |env| unsafe {
-        Java_hash_sillstone_unicode_PithUnicode_isNormalizedNative(
+        Java_io_github_sillstone_SillstoneUnicode_isNormalizedNative(
             env,
             std::ptr::null_mut(),
             2,
@@ -415,26 +459,26 @@ fn jni_is_normalized_answers_and_refuses() {
     assert_eq!(status, -2, "invalid utf-8 status");
 }
 
-/// Null data arrays and negative lengths map to PITH_E_INVALID exactly
+/// Null data arrays and negative lengths map to SILLSTONE_E_INVALID exactly
 /// as the C ABI maps a null pointer.
 #[test]
 fn jni_null_data_and_negative_length_are_invalid() {
     for name in ["nfc", "nfkd", "casefoldSimple"] {
         let (out, status, java_out) = with_fake_env(vec![0x61], false, |env| unsafe {
             match name {
-                "nfc" => Java_hash_sillstone_unicode_PithUnicode_nfcNative(
+                "nfc" => Java_io_github_sillstone_SillstoneUnicode_nfcNative(
                     env,
                     std::ptr::null_mut(),
                     std::ptr::null_mut(),
                     status_slot(),
                 ),
-                "nfkd" => Java_hash_sillstone_unicode_PithUnicode_nfkdNative(
+                "nfkd" => Java_io_github_sillstone_SillstoneUnicode_nfkdNative(
                     env,
                     std::ptr::null_mut(),
                     std::ptr::null_mut(),
                     status_slot(),
                 ),
-                _ => Java_hash_sillstone_unicode_PithUnicode_casefoldSimpleNative(
+                _ => Java_io_github_sillstone_SillstoneUnicode_casefoldSimpleNative(
                     env,
                     std::ptr::null_mut(),
                     std::ptr::null_mut(),
@@ -449,19 +493,19 @@ fn jni_null_data_and_negative_length_are_invalid() {
         // A negative GetArrayLength answer is refused too.
         let (out, status, _) = with_fake_env_neg_len(vec![0x61], |env| unsafe {
             match name {
-                "nfc" => Java_hash_sillstone_unicode_PithUnicode_nfcNative(
+                "nfc" => Java_io_github_sillstone_SillstoneUnicode_nfcNative(
                     env,
                     std::ptr::null_mut(),
                     SOME_ARRAY,
                     status_slot(),
                 ),
-                "nfkd" => Java_hash_sillstone_unicode_PithUnicode_nfkdNative(
+                "nfkd" => Java_io_github_sillstone_SillstoneUnicode_nfkdNative(
                     env,
                     std::ptr::null_mut(),
                     SOME_ARRAY,
                     status_slot(),
                 ),
-                _ => Java_hash_sillstone_unicode_PithUnicode_casefoldSimpleNative(
+                _ => Java_io_github_sillstone_SillstoneUnicode_casefoldSimpleNative(
                     env,
                     std::ptr::null_mut(),
                     SOME_ARRAY,
@@ -474,11 +518,11 @@ fn jni_null_data_and_negative_length_are_invalid() {
     }
 }
 
-/// Invalid UTF-8 through a buffer export is PITH_E_REJECTED.
+/// Invalid UTF-8 through a buffer export is SILLSTONE_E_REJECTED.
 #[test]
 fn jni_invalid_utf8_is_rejected() {
     let (out, status, java_out) = with_fake_env(vec![0xff, 0xfe], false, |env| unsafe {
-        Java_hash_sillstone_unicode_PithUnicode_nfcNative(
+        Java_io_github_sillstone_SillstoneUnicode_nfcNative(
             env,
             std::ptr::null_mut(),
             SOME_ARRAY,
@@ -496,7 +540,7 @@ fn jni_invalid_utf8_is_rejected() {
 #[test]
 fn jni_null_status_or_environment_short_circuits() {
     let (out, _, _) = with_fake_env(vec![0x61], false, |env| unsafe {
-        Java_hash_sillstone_unicode_PithUnicode_nfcNative(
+        Java_io_github_sillstone_SillstoneUnicode_nfcNative(
             env,
             std::ptr::null_mut(),
             SOME_ARRAY,
@@ -506,7 +550,7 @@ fn jni_null_status_or_environment_short_circuits() {
     assert!(out.is_null(), "null status array");
 
     let (out, status, _) = with_fake_env(vec![0x61], false, |_env| unsafe {
-        Java_hash_sillstone_unicode_PithUnicode_nfcNative(
+        Java_io_github_sillstone_SillstoneUnicode_nfcNative(
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             SOME_ARRAY,
@@ -517,7 +561,7 @@ fn jni_null_status_or_environment_short_circuits() {
     assert_eq!(status, i32::MIN, "status untouched without an environment");
 
     let (answer, _, _) = with_fake_env(vec![0x61], false, |_env| unsafe {
-        Java_hash_sillstone_unicode_PithUnicode_isNormalizedNative(
+        Java_io_github_sillstone_SillstoneUnicode_isNormalizedNative(
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             1,
@@ -526,4 +570,121 @@ fn jni_null_status_or_environment_short_circuits() {
         )
     });
     assert_eq!(answer, 0, "null environment answer");
+}
+
+/// A buffer export: `(env, class, data, status) -> byte[]`.
+type BufferExport = unsafe extern "system" fn(*mut JNIEnv, JClass, JArray, JIntArray) -> JArray;
+
+/// Runs a buffer `export` over `input` (a null data array for `None`):
+/// the returned array's nullness, the status and the bytes produced.
+fn run_buffer(export: BufferExport, input: Option<Vec<u8>>) -> (bool, i32, Option<Vec<u8>>) {
+    let data = if input.is_some() {
+        SOME_ARRAY
+    } else {
+        std::ptr::null_mut()
+    };
+    let (out, status, java_out) = with_fake_env(input.unwrap_or_default(), false, |env| unsafe {
+        export(env, std::ptr::null_mut(), data, status_slot())
+    });
+    (out.is_null(), status, java_out)
+}
+
+/// Every deprecated `PithUnicode` export answers exactly like its
+/// canonical `SillstoneUnicode` twin, on the pinned inputs and on a
+/// null data array.
+#[test]
+fn legacy_unicode_exports_match_the_canonical_ones() {
+    /// `(name, canonical, legacy, input, expected output)`.
+    type Case = (&'static str, BufferExport, BufferExport, Vec<u8>, Vec<u8>);
+    let pairs: [Case; 6] = [
+        (
+            "nfc",
+            Java_io_github_sillstone_SillstoneUnicode_nfcNative,
+            Java_hash_sillstone_unicode_PithUnicode_nfcNative,
+            vec![0xe1, 0xb8, 0x8a],
+            vec![0xe1, 0xb8, 0x8a],
+        ),
+        (
+            "nfd",
+            Java_io_github_sillstone_SillstoneUnicode_nfdNative,
+            Java_hash_sillstone_unicode_PithUnicode_nfdNative,
+            vec![0xe1, 0xb8, 0x8a],
+            vec![0x44, 0xcc, 0x87],
+        ),
+        (
+            "nfkc",
+            Java_io_github_sillstone_SillstoneUnicode_nfkcNative,
+            Java_hash_sillstone_unicode_PithUnicode_nfkcNative,
+            vec![0xef, 0xac, 0x81],
+            b"fi".to_vec(),
+        ),
+        (
+            "nfkd",
+            Java_io_github_sillstone_SillstoneUnicode_nfkdNative,
+            Java_hash_sillstone_unicode_PithUnicode_nfkdNative,
+            vec![0xef, 0xac, 0x81],
+            b"fi".to_vec(),
+        ),
+        (
+            "casefold",
+            Java_io_github_sillstone_SillstoneUnicode_casefoldNative,
+            Java_hash_sillstone_unicode_PithUnicode_casefoldNative,
+            vec![0xc3, 0x9f],
+            b"ss".to_vec(),
+        ),
+        (
+            "casefoldSimple",
+            Java_io_github_sillstone_SillstoneUnicode_casefoldSimpleNative,
+            Java_hash_sillstone_unicode_PithUnicode_casefoldSimpleNative,
+            vec![0xe1, 0xba, 0x9e],
+            vec![0xc3, 0x9f],
+        ),
+    ];
+    for (name, canonical, legacy, input, want) in pairs {
+        let canonical_out = run_buffer(canonical, Some(input.clone()));
+        assert_eq!(canonical_out, (false, 0, Some(want)), "canonical {name}");
+        assert_eq!(
+            run_buffer(legacy, Some(input)),
+            canonical_out,
+            "legacy {name}"
+        );
+
+        let refused = run_buffer(canonical, None);
+        assert_eq!(
+            refused,
+            (true, SILLSTONE_E_INVALID, None),
+            "canonical {name}"
+        );
+        assert_eq!(run_buffer(legacy, None), refused, "legacy {name}");
+    }
+
+    type QuickCheck =
+        unsafe extern "system" fn(*mut JNIEnv, JClass, jint, JArray, JIntArray) -> jint;
+    let run_quick_check = |export: QuickCheck, form: jint, data: JArray| {
+        let (answer, status, _) = with_fake_env(vec![0xef, 0xac, 0x81], false, |env| unsafe {
+            export(env, std::ptr::null_mut(), form, data, status_slot())
+        });
+        (answer, status)
+    };
+    for (form, data, want) in [
+        (1, SOME_ARRAY, (1, 0)),
+        (3, SOME_ARRAY, (0, 0)),
+        (2, std::ptr::null_mut(), (0, SILLSTONE_E_INVALID)),
+    ] {
+        let canonical = run_quick_check(
+            Java_io_github_sillstone_SillstoneUnicode_isNormalizedNative,
+            form,
+            data,
+        );
+        assert_eq!(canonical, want, "canonical form {form}");
+        assert_eq!(
+            run_quick_check(
+                Java_hash_sillstone_unicode_PithUnicode_isNormalizedNative,
+                form,
+                data
+            ),
+            canonical,
+            "legacy form {form}"
+        );
+    }
 }

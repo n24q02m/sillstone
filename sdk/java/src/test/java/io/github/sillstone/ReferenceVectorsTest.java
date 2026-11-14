@@ -486,7 +486,7 @@ class ReferenceVectorsTest {
         assertEquals("error", VECTORS.get("match-error-cross-modality").get("outcome").getAsString());
         SillstoneFfiException thrown = assertThrows(SillstoneFfiException.class,
                 () -> SillstoneHash.match(PNG48, PROSE_A));
-        assertEquals(SillstoneHash.PITH_E_REJECTED, thrown.getStatus());
+        assertEquals(SillstoneHash.SILLSTONE_E_REJECTED, thrown.getStatus());
     }
 
     // ------------------------------------------------------------------
@@ -497,24 +497,24 @@ class ReferenceVectorsTest {
     void errorVideoNonAvcIsPinnedRefusal() {
         assertEquals("error", VECTORS.get("error-video-non-avc").get("outcome").getAsString());
         SillstoneFfiException thrown = assertThrows(SillstoneFfiException.class, () -> SillstoneHash.signature(MP4V));
-        assertEquals(SillstoneHash.PITH_E_REJECTED, thrown.getStatus());
+        assertEquals(SillstoneHash.SILLSTONE_E_REJECTED, thrown.getStatus());
     }
 
     @Test
     void corruptImageIsRejected() {
         byte[] corrupt = concat(new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A},
                 "garbage".getBytes(StandardCharsets.UTF_8));
-        assertEquals(SillstoneHash.PITH_E_REJECTED,
+        assertEquals(SillstoneHash.SILLSTONE_E_REJECTED,
                 assertThrows(SillstoneFfiException.class, () -> SillstoneHash.signature(corrupt)).getStatus());
-        assertEquals(SillstoneHash.PITH_E_REJECTED,
+        assertEquals(SillstoneHash.SILLSTONE_E_REJECTED,
                 assertThrows(SillstoneFfiException.class, () -> SillstoneHash.describe(corrupt)).getStatus());
-        assertEquals(SillstoneHash.PITH_E_REJECTED,
+        assertEquals(SillstoneHash.SILLSTONE_E_REJECTED,
                 assertThrows(SillstoneFfiException.class, () -> SillstoneHash.contentHash(corrupt)).getStatus());
     }
 
     @Test
     void malformedPdfIsRejected() {
-        assertEquals(SillstoneHash.PITH_E_REJECTED,
+        assertEquals(SillstoneHash.SILLSTONE_E_REJECTED,
                 assertThrows(SillstoneFfiException.class,
                         () -> SillstoneHash.signature("%PDF-1.4 garbage not a pdf"
                                 .getBytes(StandardCharsets.UTF_8))).getStatus());
