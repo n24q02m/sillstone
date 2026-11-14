@@ -1,3 +1,3 @@
 module github.com/n24q02m/sillstone/sdk/go
 
-go 1.22
+go 1.26

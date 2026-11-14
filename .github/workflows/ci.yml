@@ -11,14 +11,16 @@ permissions:
 
 jobs:
   # ============================================================================
-  # Support matrices: every list below is DERIVED, never listed. The resolver reads
-  # the floors this repository already declares -- requires-python in
-  # sdk/python/pyproject.toml, engines.node in sdk/node/package.json,
-  # maven.compiler.release in sdk/java/pom.xml, the go directive in sdk/go/go.mod and
-  # rust-version in Cargo.toml -- and the matrix jobs consume them through
-  # needs.versions.outputs.*. A hand-pinned row is exactly how a matrix falls behind
-  # a release, so scripts/ci/test_ci_versions.py fails if a literal pin for any of
-  # these five languages is added back to this file.
+  # Support matrices: every list below is DERIVED, never listed. A row is a line
+  # upstream still supports today (dated tables in scripts/ci_versions.py, read from
+  # each upstream's own schedule, so a line leaves on its end-of-life date) inside the
+  # window this repository declares -- requires-python in sdk/python/pyproject.toml,
+  # engines.node in sdk/node/package.json, maven.compiler.release in sdk/java/pom.xml,
+  # the go directive in sdk/go/go.mod and rust-version in Cargo.toml -- at most five
+  # rows per language. The matrix jobs consume them through needs.versions.outputs.*.
+  # A hand-pinned row is exactly how a matrix falls behind a release, so
+  # scripts/ci/test_ci_versions.py fails if a literal pin for any of these five
+  # languages is added back to this file.
   # ============================================================================
   versions:
     name: Resolve support matrix
@@ -166,9 +168,10 @@ jobs:
           tool: cargo-llvm-cov
 
       # One instrumented build feeds every consumer of the library: the Rust
-      # tests, the generators, and the Python and Java SDK suites that load
-      # the cdylib. The FFI and JNI shims have no Rust-side callers, so only
-      # the SDK suites reach them; the report merges all the profiles.
+      # tests, the generators, and the Python, Java, Go and Node.js SDK suites
+      # that load the cdylib. The FFI and JNI shims have no Rust-side callers, so
+      # only the SDK suites reach them; the report merges all the profiles. Each
+      # SDK suite also measures its own binding code below.
       - name: Instrument workspace
         run: |
           cargo llvm-cov show-env --export-prefix > "$RUNNER_TEMP/llvm-cov-env.sh"
@@ -211,11 +214,45 @@ jobs:
           distribution: 'temurin'
           java-version: ${{ needs.versions.outputs.java-newest }}
 
-      - name: Java binding tests (profile the JNI shim)
+      # -Pcoverage attaches JaCoCo through its own property, so the argLine that
+      # carries the native library path keeps the agent (see the profile in pom.xml).
+      - name: Java binding coverage (and profile the JNI shim)
         working-directory: sdk/java
         run: |
           source "$RUNNER_TEMP/llvm-cov-env.sh"
-          mvn test -DargLine="-Djava.library.path=$GITHUB_WORKSPACE/target/debug"
+          mvn -B -Pcoverage test "-DargLine=@{jacocoArgLine} -Djava.library.path=$GITHUB_WORKSPACE/target/debug"
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ needs.versions.outputs.go-newest }}
+
+      - name: Go binding coverage
+        working-directory: sdk/go/sillstone
+        run: |
+          source "$RUNNER_TEMP/llvm-cov-env.sh"
+          export LD_LIBRARY_PATH="$GITHUB_WORKSPACE/target/debug:${LD_LIBRARY_PATH:-}"
+          go test -coverprofile="$GITHUB_WORKSPACE/go-cov.out" ./...
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ needs.versions.outputs.node-newest }}
+
+      - name: Build Node.js N-API Addon
+        run: |
+          source "$RUNNER_TEMP/llvm-cov-env.sh"
+          node sdk/node/scripts/build.js
+
+      # Measures the JavaScript the package ships (index.js, native.js, image.js,
+      # array.js); node's coverage filter leaves the test files out.
+      - name: Node.js binding coverage
+        run: |
+          source "$RUNNER_TEMP/llvm-cov-env.sh"
+          node --test --experimental-test-coverage \
+            --test-reporter=spec --test-reporter-destination=stdout \
+            --test-reporter=lcov --test-reporter-destination=node-cov.lcov \
+            sdk/node/test/*.test.js
 
       - name: Rust line coverage (merged profiles)
         run: |
@@ -233,6 +270,29 @@ jobs:
       - name: Report Python coverage
         run: python scripts/ci/coverage_report.py py py-cov.json --target 95 --fail-under 95
 
+      # Go, Node.js and Java are measured against the same 95% target and printed as
+      # BELOW until they reach it. Their --fail-under is a ratchet, not the target: the
+      # coverage measured when the gate was added (docs/scorecard.md), so a change can
+      # raise it and no change can lower it. Raise each value to the new measurement
+      # whenever a PR lifts it; at 95 it becomes the target gate.
+      - name: Report Go coverage
+        run: python scripts/ci/coverage_report.py go go-cov.out --target 95 --fail-under 70
+
+      - name: Report Node.js coverage
+        run: python scripts/ci/coverage_report.py lcov node-cov.lcov --target 95 --fail-under 91
+
+      - name: Report Java coverage
+        run: python scripts/ci/coverage_report.py jacoco sdk/java/target/site/jacoco/jacoco.csv --target 95 --fail-under 77
+
+      # The resolver and the report script decide what this pipeline tests and gates,
+      # so they are held to the target themselves.
+      - name: CI script coverage
+        run: |
+          python -m coverage run --include=scripts/ci_versions.py,scripts/ci/coverage_report.py \
+            -m pytest -q scripts/ci/test_ci_versions.py scripts/ci/test_coverage_report.py
+          python -m coverage json -o scripts-cov.json
+          python scripts/ci/coverage_report.py py scripts-cov.json --target 95 --fail-under 95
+
       - name: Upload coverage reports
         uses: actions/upload-artifact@v7
         with:
@@ -241,11 +301,15 @@ jobs:
             rust-cov.json
             rust-cov.lcov
             py-cov.json
+            go-cov.out
+            node-cov.lcov
+            sdk/java/target/site/jacoco/jacoco.csv
+            scripts-cov.json
 
   # ============================================================================
-  # Per-language version matrices. Each job proves one support window from the
-  # floor the package declares to the newest line this repository can install; the
-  # rows come from needs.versions.outputs.* and nothing here names a version.
+  # Per-language version matrices. Each job proves one support window: the lines
+  # upstream still supports inside the window the package declares. The rows come
+  # from needs.versions.outputs.* and nothing here names a version.
   #
   # The Windows/macOS angling of every SDK stays in the Test job above: these jobs
   # vary the interpreter, not the OS, so a floor row that fails is a floor row and
@@ -279,9 +343,8 @@ jobs:
       # The resize/parity suites compare against Pillow bit for bit, so an unpinned
       # oracle would let each row define "parity" for itself: measured locally, the
       # suite passes against Pillow 13.0.0 and fails four resize comparisons against
-      # 12.3.0. Pillow 13 installs from 3.11, which is where the resolver's window
-      # starts; a row below that is reported as excluded, not tested against an
-      # oracle that disagrees with the claim.
+      # 12.3.0. Pillow 13 installs from 3.11, which is why requires-python cannot
+      # declare a floor below 3.11 while this oracle is pinned.
       - name: Install Python parity oracles
         run: python -m pip install pillow==13.0.0 numpy imagehash
 
