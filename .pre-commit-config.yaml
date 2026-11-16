@@ -1,0 +1,49 @@
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
+default_stages: [pre-commit, commit-msg]
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+
+  - repo: local
+    hooks:
+      # No cargo fmt hook: CI does not gate rustfmt, and the workspace, generated
+      # reference sources included, is not rustfmt-clean, so the hook would refuse
+      # every commit that touches a .rs file.
+      - id: cargo-clippy
+        name: cargo clippy
+        entry: cargo clippy --workspace --all-targets -- -D warnings
+        language: system
+        pass_filenames: false
+        files: \.rs$
+      - id: enforce-commit
+        name: Enforce feat and fix commit prefixes
+        entry: bash scripts/enforce-commit.sh
+        language: system
+        stages: [commit-msg]
+      - id: no-direct-push-to-default
+        name: Refuse a direct push to the default branch
+        entry: bash scripts/no-direct-push.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+      - id: verify-readme-sync
+        name: Verify README registry metadata
+        entry: python scripts/repo-bootstrap/verify_readme_sync.py --repo-root=.
+        language: system
+        pass_filenames: false
+      # Spec D5-D8 (2026-10-24): workflows run on hosted runners and start only from a
+      # dispatch. language: python because the lint needs PyYAML, which a bare system
+      # python does not carry.
+      - id: ci-policy
+        name: Workflows are ci.yml + cd.yml on hosted runners
+        entry: python scripts/repo-bootstrap/ci_policy_lint.py
+        language: python
+        additional_dependencies: [pyyaml]
+        files: ^\.github/workflows/.*\.ya?ml$
+        args: [--visibility, "public"]

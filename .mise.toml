@@ -1,0 +1,34 @@
+[tools]
+rust = "latest"
+
+[tasks.setup]
+description = "Setup development environment"
+run = [
+  "mise install",
+  "cargo fetch",
+  "python -m pip install pre-commit",
+  "pre-commit install",
+  "pre-commit install --hook-type commit-msg",
+  "echo 'Setup complete!'"
+]
+
+# The same Rust gates as the Test job in .github/workflows/ci.yml.
+[tasks.lint]
+description = "Run all quality checks (same commands as CI)"
+run = [
+  "cargo check --workspace --all-targets",
+  "cargo clippy --workspace --all-targets -- -D warnings"
+]
+
+# `cargo test` does not emit the text cdylib one integration test dlopens, so it is
+# built first, exactly as CI does.
+[tasks.test]
+description = "Run tests"
+run = [
+  "cargo build -p sillstone-text",
+  "cargo test --workspace --lib --tests"
+]
+
+[tasks.fix]
+description = "Auto-fix linting issues"
+run = "cargo clippy --workspace --all-targets --fix --allow-dirty --allow-staged"
