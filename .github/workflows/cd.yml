@@ -25,6 +25,7 @@ permissions:
   contents: write
   id-token: write
 
+# ci-policy: allow concurrency reason: serialize releases, never cancel one mid-publish
 concurrency:
   group: cd-${{ github.ref }}
   cancel-in-progress: false
@@ -33,6 +34,7 @@ jobs:
   preflight:
     name: Preflight & Conformance Gate
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
       - name: Set up Rust
@@ -56,6 +58,7 @@ jobs:
     name: Build cdylib (${{ matrix.platform }})
     needs: [preflight]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -101,6 +104,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: cdylib-${{ matrix.platform }}
+          retention-days: 5
           path: target/release/${{ matrix.artifact }}
           if-no-files-found: error
       - name: Build N-API addon
@@ -120,6 +124,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: napi-${{ matrix.platform }}
+          retention-days: 5
           path: target/release/napi/sillstone_napi.node
           if-no-files-found: error
       - name: Set up Python for wheel packaging
@@ -161,6 +166,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: wheel-${{ matrix.platform }}
+          retention-days: 5
           path: sdk/python/dist/*.whl
           if-no-files-found: error
 
@@ -168,6 +174,7 @@ jobs:
     name: Package Multi-Language SDKs
     needs: [build-cdylib]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
       - name: Download cdylib artifacts
@@ -268,6 +275,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: packaged-sdks
+          retention-days: 5
           path: |
             sdk/python/dist/*.whl
             sdk/python/dist/*.tar.gz
@@ -278,6 +286,7 @@ jobs:
     name: Publish Packages to Registries
     needs: [package-sdks]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       id-token: write
       contents: read
@@ -412,6 +421,7 @@ jobs:
     name: Publish Java package to Maven Central
     needs: [package-sdks]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
       - name: Download packaged SDK artifacts
@@ -465,6 +475,7 @@ jobs:
     name: Publish Go SDK & Module Tag
     needs: [package-sdks]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: write
     steps:
@@ -486,6 +497,9 @@ jobs:
     name: Release Gate & Registry Readback
     needs: [publish, publish-java, publish-go]
     runs-on: ubuntu-latest
+    # The readback below waits up to an hour (--wait-seconds 3600) for Maven Central
+    # to propagate, so the job limit sits above that wait instead of cutting it short.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
       - name: Set up Python
@@ -506,6 +520,7 @@ jobs:
     name: Tag and GitHub Release
     needs: [release-gate]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
       - name: Install from registry and exercise native code
