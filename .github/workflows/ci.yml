@@ -5,9 +5,32 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit for the main-integrity job to verify (default: the tip of the dispatched ref)"
+        required: false
+        type: string
+        default: ""
+      # Folded in from the former bench.yml, which was dispatch-only as well: a
+      # dispatch runs every job below, and this input also selects the bench job.
+      bench:
+        description: "Also run the bench job (parity + speed against hashlib / imagehash / Pillow / NumPy)"
+        required: false
+        type: boolean
+        default: false
+      bench_repeats:
+        description: "Bench: full-suite repetitions per OS (the acceptance bar is >= 5)"
+        required: false
+        type: string
+        default: "5"
 
 permissions:
   contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # ============================================================================
@@ -25,6 +48,7 @@ jobs:
   versions:
     name: Resolve support matrix
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       python: ${{ steps.resolve.outputs.python }}
       python-newest: ${{ steps.resolve.outputs.python-newest }}
@@ -57,6 +81,7 @@ jobs:
     name: Test (${{ matrix.os }})
     needs: versions
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -153,6 +178,7 @@ jobs:
     # version typed here.
     needs: versions
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -297,6 +323,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: coverage-reports
+          retention-days: 5
           path: |
             rust-cov.json
             rust-cov.lcov
@@ -319,6 +346,7 @@ jobs:
     name: Python ${{ matrix.python-version }}
     needs: versions
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       # A floor row that fails is the finding, not a reason to cancel the others.
       fail-fast: false
@@ -363,6 +391,7 @@ jobs:
     name: Python sdist (build from source)
     needs: versions
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -408,6 +437,7 @@ jobs:
     name: Node.js ${{ matrix.node-version }}
     needs: versions
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -439,6 +469,7 @@ jobs:
     name: Java ${{ matrix.java-version }}
     needs: versions
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -467,6 +498,7 @@ jobs:
     name: Go ${{ matrix.go-version }}
     needs: versions
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -497,6 +529,7 @@ jobs:
     name: Rust ${{ matrix.rust-version }}
     needs: versions
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -525,3 +558,63 @@ jobs:
 
       - name: Rust Workspace Test
         run: cargo test --workspace --lib --tests
+
+  # ============================================================================
+  # Bench: repeated parity + speed runs against hashlib / imagehash / Pillow /
+  # NumPy on the hosted runners, writing the raw per-run JSON as an artifact. It
+  # used to be its own dispatch-only workflow (bench.yml); it runs only when a
+  # maintainer dispatches this workflow with `bench` set, never on push or PR.
+  # ============================================================================
+  bench:
+    name: Bench (${{ matrix.os }})
+    if: github.event_name == 'workflow_dispatch' && inputs.bench
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build FFI Dynamic Library (release)
+        run: cargo build --release -p sillstone-ffi
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.15"
+
+      - name: Install oracles
+        run: python -m pip install pillow==13.0.0 numpy imagehash
+
+      - name: Runner CPU
+        shell: bash
+        run: |
+          python - <<'EOF'
+          import platform
+          print(platform.platform(), platform.machine(), platform.processor())
+          EOF
+          if [ "$RUNNER_OS" = "Linux" ]; then grep -m1 "model name" /proc/cpuinfo; grep -m1 -o -w "sha_ni\|avx2" /proc/cpuinfo | sort -u; fi
+          if [ "$RUNNER_OS" = "macOS" ]; then sysctl -n machdep.cpu.brand_string; fi
+
+      - name: Probe PyWavelets Haar arithmetic
+        run: python scripts/bench/probe_pywt_fma.py
+
+      - name: Hash parity and speed (repeated)
+        run: python scripts/bench/bench_hash_parity.py --repeats ${{ inputs.bench_repeats }} --json bench-hash-${{ matrix.os }}.json
+
+      - name: Image / array engine vs Pillow and NumPy
+        run: python scripts/bench/bench_parity.py
+
+      - name: Upload raw results
+        uses: actions/upload-artifact@v7
+        with:
+          name: bench-${{ matrix.os }}
+          retention-days: 5
+          path: bench-hash-${{ matrix.os }}.json

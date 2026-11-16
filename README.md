@@ -1,5 +1,9 @@
 # Sillstone
 
+[![CI](https://github.com/n24q02m/sillstone/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/n24q02m/sillstone/actions/workflows/ci.yml) [![License](https://img.shields.io/github/license/n24q02m/sillstone)](LICENSE) [![Release](https://img.shields.io/github/v/release/n24q02m/sillstone)](https://github.com/n24q02m/sillstone/releases/latest)
+
+[![PyPI](https://img.shields.io/pypi/v/sillstone)](https://pypi.org/project/sillstone/) [![npm](https://img.shields.io/npm/v/sillstone)](https://www.npmjs.com/package/sillstone) [![Maven Central](https://img.shields.io/maven-central/v/io.github.n24q02m/sillstone)](https://central.sonatype.com/artifact/io.github.n24q02m/sillstone) [![Go Reference](https://pkg.go.dev/badge/github.com/n24q02m/sillstone/sdk/go/sillstone.svg)](https://pkg.go.dev/github.com/n24q02m/sillstone/sdk/go/sillstone)
+
 Pure-Rust, zero-dependency multimedia, hashing, and array computing suite.
 
 ## Overview
