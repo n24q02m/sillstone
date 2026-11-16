@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "tier": 2,
+  "tier": 1,
   "description": "Pure-Rust multimedia, hashing, and array suite",
-  "homepage": "",
+  "homepage": "https://docs.n24q02m.com/sillstone/overview/",
   "topics": [
     "rust",
     "zero-dependency",

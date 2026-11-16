@@ -179,6 +179,10 @@ jobs:
     needs: versions
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # id-token lets the Codecov upload authenticate with OIDC instead of a stored token.
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -232,7 +236,7 @@ jobs:
       - name: Python binding coverage
         run: |
           source "$RUNNER_TEMP/llvm-cov-env.sh"
-          python -m pytest sdk/python/tests --cov=sillstone --cov-report=json:py-cov.json --cov-report=term-missing
+          python -m pytest sdk/python/tests --cov=sillstone --cov-report=json:py-cov.json --cov-report=xml:py-cov.xml --cov-report=term-missing
 
       - name: Set up JDK
         uses: actions/setup-java@v6
@@ -332,6 +336,17 @@ jobs:
             node-cov.lcov
             sdk/java/target/site/jacoco/jacoco.csv
             scripts-cov.json
+
+      # The same reports in the formats Codecov reads: lcov for Rust and Node.js, the
+      # Go cover profile, Cobertura XML for Python and the JaCoCo XML for Java. Only a
+      # push to main uploads, so the badge tracks main and a fork PR needs no token.
+      - name: Upload coverage to Codecov
+        if: github.event_name == 'push'
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          files: rust-cov.lcov,node-cov.lcov,go-cov.out,py-cov.xml,sdk/java/target/site/jacoco/jacoco.xml
+          use_oidc: true
+          fail_ci_if_error: true
 
   # ============================================================================
   # Per-language version matrices. Each job proves one support window: the lines
