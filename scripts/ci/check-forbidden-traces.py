@@ -36,11 +36,9 @@ def main() -> int:
             if rel in ALLOWED_EXCEPTIONS:
                 continue
 
-            # Check binary or text file
-            try:
-                data = Path(dirpath, f).read_bytes()
-            except Exception:
-                continue
+            # Check binary or text file. A file that cannot be read is an error, not a
+            # pass: skipping it would report a clean tree that was never fully scanned.
+            data = Path(dirpath, f).read_bytes()
 
             for term in FORBIDDEN:
                 if term in data:

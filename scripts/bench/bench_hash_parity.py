@@ -101,12 +101,12 @@ def bits_to_int(arr):
 
 
 def bench_image_hashes(sizes):
-    try:
-        import imagehash
-        from PIL import Image
-    except ImportError as exc:  # pragma: no cover - dev tool
-        print(f"imagehash/pillow unavailable ({exc}); skipping image-hash section")
-        return []
+    # imagehash and Pillow are the oracle for this section. Without them there is no
+    # comparison to report, so the import error ends the run instead of an empty
+    # section that main() would count as parity.
+    import imagehash
+    from PIL import Image
+
     pairs = [
         ("ahash", imagehash.average_hash, sillstone.ahash),
         ("dhash", imagehash.dhash, sillstone.dhash),

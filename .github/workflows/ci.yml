@@ -155,11 +155,12 @@ jobs:
       - name: Go SDK Tests
         working-directory: sdk/go/sillstone
         shell: bash
+        # Each OS finds the cdylib built above through its own loader search path:
+        # Windows resolves a DLL through PATH, Linux and macOS through the variables below.
         run: |
           ROOT="$(cd ../../.. && pwd)"
           if [ "$RUNNER_OS" = "Windows" ]; then
-            cp ../../../target/debug/sillstone_ffi.dll . 2>/dev/null || true
-            trap 'rm -f sillstone_ffi.dll' EXIT
+            export PATH="$ROOT/target/debug:$PATH"
           fi
           export LD_LIBRARY_PATH="$ROOT/target/debug:${LD_LIBRARY_PATH:-}"
           export DYLD_LIBRARY_PATH="$ROOT/target/debug:${DYLD_LIBRARY_PATH:-}"
