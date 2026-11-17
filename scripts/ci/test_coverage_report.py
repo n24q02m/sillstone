@@ -37,6 +37,9 @@ SF:sdk/node/a.js
 DA:1,1
 LH:9
 LF:10
+BRDA:1,0,0,1
+BRH:3
+BRF:4
 end_of_record
 SF:sdk/node/b.js
 LH:1
@@ -93,6 +96,11 @@ class LoaderTest(ReportFiles):
         files = coverage_report.load_lcov(self.write("node.lcov", LCOV))
         self.assertEqual(files, {"sdk/node/a.js": (9, 10), "sdk/node/b.js": (1, 4)})
 
+    def test_lcov_branches_reads_branch_hit_and_found_per_file(self) -> None:
+        # A record without BRH/BRF has no branches: (0, 0), which pct() counts as full.
+        files = coverage_report.load_lcov_branches(self.write("node.lcov", LCOV))
+        self.assertEqual(files, {"sdk/node/a.js": (3, 4), "sdk/node/b.js": (0, 0)})
+
     def test_jacoco_reads_lines_per_class(self) -> None:
         files = coverage_report.load_jacoco(self.write("jacoco.csv", JACOCO))
         self.assertEqual(files, {"io.example/Alpha": (19, 20), "io.example/Alpha.Inner": (5, 5)})
@@ -107,6 +115,7 @@ class LoaderTest(ReportFiles):
         self.assertEqual(coverage_report.group_key("llvm", "/w/crates/core/src/lib.rs"), "crates/core")
         self.assertEqual(coverage_report.group_key("llvm", "/w/tools/gen/src/main.rs"), "tools/gen")
         self.assertEqual(coverage_report.group_key("lcov", "sdk\\node\\a.js"), "node")
+        self.assertEqual(coverage_report.group_key("lcov-branches", "sdk/node/a.js"), "node")
         self.assertEqual(coverage_report.group_key("jacoco", "io.example/Alpha"), "io.example")
         self.assertEqual(coverage_report.group_key("py", "top.py"), "top.py")
 
@@ -144,6 +153,18 @@ class MainTest(ReportFiles):
                     code, out, _ = self.run_main(kind, str(path))
                 self.assertEqual(code, 0)
                 self.assertIn(f"## Line coverage ({kind}): {expected[kind]}", out)
+
+    def test_branch_kind_prints_and_gates_branches(self) -> None:
+        path = self.write("node.lcov", LCOV)
+        with mock.patch.dict(os.environ, {"GITHUB_STEP_SUMMARY": ""}):
+            code, out, _ = self.run_main("lcov-branches", str(path), "--target", "95")
+            self.assertEqual(code, 0)
+            self.assertIn("## Branch coverage (lcov-branches): 75.00% (3/4)", out)
+            self.assertIn("| Group | Branches covered | Total | Coverage | Target |", out)
+            self.assertIn("75.00% (3/4) sdk/node/a.js", out)
+            code, _, err = self.run_main("lcov-branches", str(path), "--fail-under", "95")
+        self.assertEqual(code, 1)
+        self.assertIn("branch coverage 75.00% is under --fail-under 95%", err)
 
     def test_shortfall_lists_files_and_fails_only_when_asked(self) -> None:
         path = self.write("go.out", GO_PROFILE)
