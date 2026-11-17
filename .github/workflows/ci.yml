@@ -316,11 +316,13 @@ jobs:
         run: python scripts/ci/coverage_report.py jacoco sdk/java/target/site/jacoco/jacoco.csv --target 95 --fail-under 78
 
       # The resolver and the report script decide what this pipeline tests and gates,
-      # so they are held to the target themselves.
+      # so they are held to the target themselves. The trace scan and the hash parity
+      # bench run in this pipeline as well, so their tests run here too.
       - name: CI script coverage
         run: |
           python -m coverage run --include=scripts/ci_versions.py,scripts/ci/coverage_report.py \
-            -m pytest -q scripts/ci/test_ci_versions.py scripts/ci/test_coverage_report.py
+            -m pytest -q scripts/ci/test_ci_versions.py scripts/ci/test_coverage_report.py \
+            scripts/ci/test_check_forbidden_traces.py scripts/ci/test_bench_hash_parity.py
           python -m coverage json -o scripts-cov.json
           python scripts/ci/coverage_report.py py scripts-cov.json --target 95 --fail-under 95
 
