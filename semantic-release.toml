@@ -1,0 +1,36 @@
+# better-semantic-release computes the release version from the conventional
+# commits since the last v* tag; cd.yml runs it and every later job builds and
+# publishes from the tag it creates. Nobody types a version.
+[semantic_release]
+tag_format = "v{version}"
+commit_message = "chore(release): v{version}"
+major_on_zero = false
+allow_zero_version = true
+# The version lives in more manifests than version_toml/version_variables can
+# describe (every crate manifest, path-dependency versions, the PEP 440 form for
+# Python), so scripts/ci/version_sync.py stays the single list of them: it
+# stamps every manifest, then re-reads them all and fails on any mismatch, and
+# `git add --update` puts every stamped file into the release commit. A failure
+# here aborts the release before anything is committed, tagged or pushed.
+# `set -e` because the block runs as one `sh -c` whose status is the last line's.
+build_command = """
+set -e
+python3 scripts/ci/version_sync.py set "$NEW_VERSION"
+python3 scripts/ci/version_sync.py check "$NEW_VERSION"
+git add --update
+"""
+
+[semantic_release.changelog.default_templates]
+changelog_file = "CHANGELOG.md"
+
+[semantic_release.remote]
+type = "github"
+
+[semantic_release.bsr]
+schema_version = 1
+# The registry-collision guard probes the package named by a root
+# pyproject.toml, and this workspace has none (the Python package is one of
+# several). Every publish step in cd.yml skips a version its registry already
+# has, and scripts/ci/check-registries.py reads all of them back before the
+# GitHub release is cut.
+registry = "none"

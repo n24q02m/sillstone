@@ -23,19 +23,26 @@ the exact command for each one.
 
 ## Release
 
-Every manifest carries the same version: the workspace and crate `Cargo.toml` files,
-`sdk/node/package.json`, `sdk/java/pom.xml`, the Python SDK (in PEP 440 form), the
-default `expected_version` of `cd.yml` and `EXPECTED_VERSION` in
-`scripts/ci/check-registries.py`. `scripts/ci/version_sync.py set <version>` moves
-all of them at once; `version_sync.py check <version>` refuses a release whose manifests
-disagree.
+Nobody picks the version. [better-semantic-release](https://github.com/n24q02m/better-semantic-release)
+computes it from the conventional commits since the last `v*` tag (`fix:` bumps the
+patch, `feat:` the minor), configured in `semantic-release.toml`.
 
-1. Open a `fix:` PR that runs `version_sync.py set <version>` and adds the release's entries
-   to `CHANGELOG.md`.
-2. After it merges, dispatch `cd.yml` with `release_type` (`beta` first, then `stable`) and
-   the same `expected_version`.
-3. CD checks the manifests, builds the cdylib for five platforms, publishes to PyPI, npm,
-   Maven Central and the Go proxy, then tags the commit and creates the GitHub Release.
+Every manifest carries the same version: the workspace and crate `Cargo.toml` files,
+`sdk/node/package.json`, `sdk/java/pom.xml`, the Python SDK (in PEP 440 form) and
+`EXPECTED_VERSION` in `scripts/ci/check-registries.py`. The release runs
+`scripts/ci/version_sync.py set <version>` to move all of them at once, then
+`version_sync.py check <version>`, which refuses a release whose manifests disagree.
+
+1. Merge `fix:`/`feat:` PRs to `main` as usual; do not edit versions or `CHANGELOG.md` by hand.
+2. Dispatch `cd.yml` with `release_type` (`beta` first, then `stable`).
+3. CD computes the version, stamps every manifest, updates `CHANGELOG.md`, commits and tags
+   `v<version>` on `main`, builds the cdylib for five platforms from that tag, publishes to
+   crates.io, PyPI, npm, Maven Central and the Go proxy, reads every registry back, then
+   creates the GitHub Release. With no `fix:`/`feat:` commit since the last tag it releases
+   nothing.
+4. If a run fails after the tag exists, dispatch `cd.yml` again with `publish_existing_tag`
+   set to that tag: it skips the version step and re-runs the build and publish jobs, each
+   of which skips what its registry already has.
 
 ## Conventions
 

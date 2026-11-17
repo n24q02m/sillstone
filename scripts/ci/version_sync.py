@@ -8,6 +8,9 @@ Cargo, npm and Maven use the semver string; Python manifests use the PEP 440 for
 (``0.3.0-beta.1`` -> ``0.3.0b1``). The current version is read from the workspace
 ``Cargo.toml``; every ``version = "<current>"`` line in the crate manifests (package
 version and path-dependency versions alike) moves with it.
+
+The release never types a version: better-semantic-release computes it and runs
+``set`` then ``check`` from its build command (``semantic-release.toml``).
 """
 
 import re
@@ -41,7 +44,6 @@ def targets(old: str, new: str):
     yield ROOT / "sdk/python/pyproject.toml", rf'^version = "{re.escape(py_old)}"', f'version = "{py_new}"'
     yield ROOT / "sdk/python/sillstone/__init__.py", rf'__version__ = "{re.escape(py_old)}"', f'__version__ = "{py_new}"'
     yield ROOT / "scripts/ci/check-registries.py", rf'EXPECTED_VERSION = "{re.escape(old)}"', f'EXPECTED_VERSION = "{new}"'
-    yield ROOT / ".github/workflows/cd.yml", rf'default: "{re.escape(old)}"', f'default: "{new}"'
 
 
 def main(argv: list[str]) -> int:
