@@ -24,13 +24,10 @@ console.log("Building N-API addon...");
 if (process.platform === "win32") {
   const nodeDef = path.join(nodeDir, "src", "node.def");
   const libNode = path.join(outDir, "libnode.a");
-  
-  // 1. Generate libnode.a import library if not present
-  try {
-    execSync(`dlltool -d "${nodeDef}" -D node.exe -l "${libNode}"`, { stdio: "inherit" });
-  } catch (e) {
-    console.error("dlltool failed:", e.message);
-  }
+
+  // 1. Generate the libnode.a import library. The link below cannot succeed
+  // without it, so a dlltool failure stops the build here with its own message.
+  execSync(`dlltool -d "${nodeDef}" -D node.exe -l "${libNode}"`, { stdio: "inherit" });
 
   // 2. Compile generated.c with gcc linking against libnode.a and sillstone_ffi.dll
   const cmd = `gcc -shared -O3 -I"${path.join(nodeDir, "src")}" -I"${path.join(repoRoot, "include")}" "${srcFile}" "${libNode}" -L"${ffiLibDir}" -lsillstone_ffi -o "${outFile}"`;

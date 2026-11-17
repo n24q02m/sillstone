@@ -583,8 +583,14 @@ jobs:
           else
             git tag "$TAG" && git push origin "refs/tags/$TAG"
           fi
-          echo "Triggering proxy.golang.org indexing for $TAG..."
-          curl -s "https://proxy.golang.org/github.com/n24q02m/sillstone/sdk/go/@v/v$V.info" || true
+          # The proxy fetches the tag from GitHub on this first request. A reply other
+          # than 200 means the module is not served, so the step fails after its retries
+          # instead of leaving the release gate to find it an hour later. The retry
+          # budget (7 tries of at most 20 s, 20 s apart) stays inside the job timeout.
+          echo "Requesting $TAG from proxy.golang.org..."
+          curl -fsS --retry 6 --retry-all-errors --retry-delay 20 --max-time 20 \
+            "https://proxy.golang.org/github.com/n24q02m/sillstone/sdk/go/@v/v$V.info"
+          echo
   release-gate:
     name: Release Gate & Registry Readback
     needs: [release, publish, publish-java, publish-go]
