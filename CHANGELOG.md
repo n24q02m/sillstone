@@ -2,6 +2,44 @@
 
 <!-- version list -->
 
+## v0.4.1-beta.1 (2026-11-17)
+
+### Bug Fixes
+
+- Align renovate.json with the fleet dependency policy
+  ([#97](https://github.com/n24q02m/sillstone/pull/97),
+  [`c91028f`](https://github.com/n24q02m/sillstone/commit/c91028f3afab5c41a412e76512c803370dec7d4e))
+
+- Bring CI workflows in line with the fleet CI policy lint
+  ([#96](https://github.com/n24q02m/sillstone/pull/96),
+  [`1287efb`](https://github.com/n24q02m/sillstone/commit/1287efbb62ebccf2e962addb60857e5db4ea2af3))
+
+- Bring sillstone up to the tier-1 repository standard
+  ([#98](https://github.com/n24q02m/sillstone/pull/98),
+  [`68e351c`](https://github.com/n24q02m/sillstone/commit/68e351c3ad904f8b4794ddfdb51459dac071011f))
+
+- Compute the release version with better-semantic-release
+  ([#99](https://github.com/n24q02m/sillstone/pull/99),
+  [`86d4dce`](https://github.com/n24q02m/sillstone/commit/86d4dce3745b1a98157768f59e9ade2e0801361a))
+
+- Declare the main branch ruleset as a ruleset file
+  ([#92](https://github.com/n24q02m/sillstone/pull/92),
+  [`0f58044`](https://github.com/n24q02m/sillstone/commit/0f5804440fc4a3d03466b3fa79a577ded0710727))
+
+- Drop the skret sync target that duplicates the central secret declaration
+  ([#93](https://github.com/n24q02m/sillstone/pull/93),
+  [`1c7b2aa`](https://github.com/n24q02m/sillstone/commit/1c7b2aac96a70bd96371685f49516b55fb52a580))
+
+- Fold bench into ci.yml and add the standard repository files
+  ([#95](https://github.com/n24q02m/sillstone/pull/95),
+  [`2dcda6d`](https://github.com/n24q02m/sillstone/commit/2dcda6d35dddfeb9dd5788d9967eb50206e689d3))
+
+### Chores
+
+- **deps**: Update dependency numpy to v2.5.5 ([#94](https://github.com/n24q02m/sillstone/pull/94),
+  [`5f23fdd`](https://github.com/n24q02m/sillstone/commit/5f23fdd6126ec767a50f2196ebfd2200a320d8a7))
+
+
 ## v0.4.0 (2026-11-14)
 
 ### Bug Fixes
