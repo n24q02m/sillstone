@@ -49,4 +49,4 @@ This document outlines the milestones, landed capabilities, and forward developm
 - Image preprocessing primitives that reproduce Hugging Face `transformers` image processors: white-background compositing, RGB conversion, center crop, rescale and normalize, dtype casts, HWC to CHW layout, patchify, padding with an attention mask and spatial shapes, and shortest-edge sizing.
 - Processor pipelines for CLIP, SigLIP 2 and SigLIP NaFlex, including the patch-budget image sizing that NaFlex uses.
 - Before any code, settle from the `transformers` source which reference the output must match: the PIL-based processors or the torchvision-based fast ones.
-- Builds on the Phase 6 image and Phase 7 tensor work, and is scheduled after them. A primitive or pipeline counts as done only when a parity suite against `transformers` on a fixed image set passes.
+- The processor pipelines build on the Phase 6 image and Phase 7 tensor work. A primitive or pipeline counts as done only when a parity suite against `transformers` on a fixed image set passes.
