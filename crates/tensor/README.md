@@ -21,7 +21,11 @@ Pure-Rust, zero-dependency implementation of N-dimensional strided arrays and te
 
 `tests/oracle/generate.py` renders the expected values with NumPy into
 `tests/oracle/vectors.json`, and `tests/numpy_oracle.rs` replays them through
-this crate. Elementwise results are within a couple of
+this crate. CI runs `generate.py --check` with the numpy pinned in
+`scripts/golden/requirements.txt`, which fails on any case the committed JSON no
+longer matches. The check runs on Windows x86_64, the platform the committed JSON
+was rendered on: numpy renders some float64 transcendental cases differently on
+Linux x86_64. Elementwise results are within a couple of
 `EPSILON * max(|expected|, 1)` units, exact where the contract is exact
 (`astype`, `concat`/`stack`/`pad`, half-precision bit patterns), and the
 recorded worst case per operation is printed by

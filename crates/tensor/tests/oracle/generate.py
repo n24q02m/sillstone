@@ -5,7 +5,11 @@ NumPy is a test-only oracle: the crate itself has no dependencies. Run this
 script from anywhere and commit both it and the JSON it writes when an
 operation's contract changes:
 
-    python crates/tensor/tests/oracle/generate.py
+    python crates/tensor/tests/oracle/generate.py           # rewrite the vectors
+    python crates/tensor/tests/oracle/generate.py --check   # name the cases that differ
+
+CI runs `--check` with the numpy pinned in `scripts/golden/requirements.txt`, so
+the JSON cannot drift from the oracle.
 
 Every vector is deterministic (no random draws), values are printed with
 `repr` so they round-trip exactly, and non-finite numbers are encoded as the
@@ -15,8 +19,10 @@ strings "nan", "inf" and "-inf" because JSON has no literal for them.
 `float32` bit pattern with the same round-to-nearest-even rule.
 """
 
+import argparse
 import json
 import math
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -77,7 +83,9 @@ def case(name, op, shape, values, expect, dtype="f64", **extra):
     )
 
 
-def main() -> int:
+def build() -> dict:
+    """The payload `vectors.json` holds: the numpy version and every case, in file order."""
+    CASES.clear()
     # --- elementwise math -------------------------------------------------
     pos = np.array([0.5, 1.0, 1.5, 2.0, 3.0, 0.1, 0.25, 10.0, 100.0, 1000.0,
                     1e-8, 1e8, 0.7071067811865476, 2.5, 3.25, 0.0001, 7.0,
@@ -215,10 +223,61 @@ def main() -> int:
                       0.0001220703125, 5.0, 1000.0, 0.7, -0.7])
     case("bf16_bits", "bf16_bits", bf_in.shape, bf_in, bf16_bits(bf_in), dtype="f64")
 
-    payload = {"numpy": np.__version__, "cases": CASES}
-    OUT.write_text(json.dumps(payload, indent=1, allow_nan=False) + "\n", encoding="utf-8")
-    print(f"wrote {OUT.relative_to(HERE.parent.parent.parent.parent)} with {len(CASES)} cases "
-          f"({OUT.stat().st_size} bytes), numpy {np.__version__}")
+    return {"numpy": np.__version__, "cases": list(CASES)}
+
+
+def diff_cases(committed, built, key):
+    """Names each case that is missing, unexpected or different.
+
+    Cases are compared as canonical JSON, not as parsed values: `-0.0 == 0.0` in
+    Python, and a sign flip is a different vector. `scripts/golden/gen_pillow_golden.py`
+    checks its vectors with the same rule.
+    """
+    def canon(value):
+        return json.dumps(value, sort_keys=True)
+
+    old = {c[key]: c for c in committed}
+    new = {c[key]: c for c in built}
+    problems = [f"missing case {k}" for k in new if k not in old]
+    problems += [f"unexpected case {k}" for k in old if k not in new]
+    for k, case_ in new.items():
+        if k in old and canon(old[k]) != canon(case_):
+            fields = sorted(f for f in case_.keys() | old[k].keys() if canon(old[k].get(f)) != canon(case_.get(f)))
+            problems.append(f"case {k} differs from the oracle in {', '.join(fields)}")
+    if not problems and [canon(c) for c in committed] != [canon(c) for c in built]:
+        problems.append("the cases are repeated or not in the generator's order")
+    return problems
+
+
+def check(path):
+    """What the committed vectors at `path` disagree with the installed numpy on.
+
+    The `numpy` field records which version generated the file and is not compared;
+    the cases are what the Rust suite replays.
+    """
+    committed = json.loads(path.read_text(encoding="utf-8"))
+    return diff_cases(committed["cases"], build()["cases"], "name")
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description="Generate or check the NumPy oracle vectors.")
+    parser.add_argument("--check", action="store_true",
+                        help="compare the committed vectors with the installed numpy instead of rewriting them")
+    args = parser.parse_args(argv)
+
+    if args.check:
+        problems = check(OUT)
+        for problem in problems:
+            print(problem, file=sys.stderr)
+        if problems:
+            print(f"{OUT.name} is stale against numpy {np.__version__}: regenerate it", file=sys.stderr)
+            return 1
+        print(f"{OUT.name} matches numpy {np.__version__}")
+        return 0
+
+    payload = build()
+    OUT.write_text(json.dumps(payload, indent=1, allow_nan=False) + "\n", encoding="utf-8", newline="\n")
+    print(f"wrote {OUT} with {len(payload['cases'])} cases ({OUT.stat().st_size} bytes), numpy {np.__version__}")
     return 0
 
 

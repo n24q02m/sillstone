@@ -42,13 +42,11 @@ The same job measures each binding's own code with its native tool, against the 
 | Python (ctypes) | coverage.py | 96.15% (1373/1428), met target | 95 (target) | - |
 | Go (cgo) | `go test -coverprofile` (statements) | 98.93% (554/560), met target | 95 (target) | - |
 | Node.js (N-API) | `node --test --experimental-test-coverage` (lcov) | 99.71% (1021/1024), met target; branches 99.13% (454/458) | 95 (target) for lines and for branches | - |
-| Java (JNI) | JaCoCo (`-Pcoverage`) | 78.15% (490/627), below target | 78 (ratchet) | `SillstoneNative` 56.63%, `Tensor` 69.64%, `Generated` 50.00% |
+| Java (JNI) | JaCoCo (`-Pcoverage`) | 98.87% (613/620), met target | 95 (target) | - |
 
 Measured by run [43534010010](https://github.com/n24q02m/sillstone/actions/runs/43534010010) on `26e1b5c`,
 2026-11-14. A binding under target keeps a ratchet instead of the target: its gate is the coverage it already has, so
 no change can lower it, and the value is raised to the new measurement in the PR that lifts it until it reaches 95.
-The way up is tests for the paths the gap list names: the Java `SillstoneNative` loader paths and `Tensor` argument
-checks.
 
 Go was measured by run [44201192077](https://github.com/n24q02m/sillstone/actions/runs/44201192077) on `bc44282`,
 2026-11-17. Of the six statements left unexecuted, one is reachable: the `Detect` error return, taken only for empty
@@ -67,6 +65,20 @@ input. The other three are guards the native side never trips: the image facts-l
 facts block is sliced to exactly that length), the `err.code` fallback in `matchSignatures` (the addon puts a status
 code on every error it throws), and the `qoiDecode` check for a layout without a facade mode (the QOI decoder returns
 only RGB and RGBA).
+
+Java was measured by run [44210616007](https://github.com/n24q02m/sillstone/actions/runs/44210616007) on `da520c6`,
+2026-11-18. `NativeLoaderTest` runs each library-discovery case in a child JVM and passes the JaCoCo agent on, so the
+loader paths that depend on the environment, the working directory and `java.io.tmpdir` are measured as well. Of the
+seven lines left unexecuted, one is reachable: the `Image` check for a native refusal, taken when an image is larger
+than the core's 1 GiB buffer ceiling while still under the 2 GiB the Java facade accepts; a test would have to hold
+more than 2 GiB of pixel buffers, so it stays untested. One is the `UnsupportedOperationException` handler around the
+`setPosixFilePermissions` call in `SillstoneNative.extractBundled`: the call completes on Linux and macOS, and only
+Windows, where it throws, takes the handler (measured on Windows, the call and the normal exit of the `try` are the
+two lines left unexecuted instead). The other five cannot run: the implicit public constructor of the
+generated `Generated` class, which has static members only; `Image.Mode.ofLayout` failing, since the QOI decoder
+returns only RGB and RGBA; the `rotate_size` null check, since the expanded canvas of any image Java can hold fits in
+an `int`; and the `Tensor.add`/`matmul` null checks, since the JNI refuses only empty or mismatched arrays, which the
+Java side never passes.
 
 ## Quality & Hygiene Gates
 
