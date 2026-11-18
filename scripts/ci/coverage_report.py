@@ -11,13 +11,14 @@ per-crate (or per-package) table and every file below the target:
     go      ``go test -coverprofile`` profile (Go)    statements
     lcov    LCOV tracefile, e.g. ``node --test
             --test-reporter=lcov`` (Node.js)          lines
+    lcov-branches  the same LCOV tracefile            branches
     jacoco  JaCoCo ``jacoco.csv`` (Java)              lines, per class
 
 The measured numbers are reported as they are; the script never fails on a
 shortfall (``--fail-under`` opts in) and never edits a claim.
 
 Usage:
-    coverage_report.py {llvm,py,go,lcov,jacoco} REPORT [--target 95] [--fail-under N]
+    coverage_report.py {llvm,py,go,lcov,lcov-branches,jacoco} REPORT [--target 95] [--fail-under N]
 """
 
 from __future__ import annotations
@@ -73,21 +74,34 @@ def load_go(path: Path) -> dict[str, tuple[int, int]]:
     return {name: (cov, tot) for name, (cov, tot) in files.items()}
 
 
-def load_lcov(path: Path) -> dict[str, tuple[int, int]]:
-    """Returns ``{file: (lines_hit, lines_found)}`` from an LCOV tracefile."""
+def _load_lcov_counts(path: Path, hit_key: str, found_key: str) -> dict[str, tuple[int, int]]:
+    """Returns ``{file: (hit, found)}`` for one LCOV summary pair (``LH``/``LF`` or ``BRH``/``BRF``)."""
     files: dict[str, tuple[int, int]] = {}
     name, hit, found = None, 0, 0
     for line in path.read_text(encoding="utf-8").splitlines():
         if line.startswith("SF:"):
             name, hit, found = line[3:], 0, 0
-        elif line.startswith("LH:"):
-            hit = int(line[3:])
-        elif line.startswith("LF:"):
-            found = int(line[3:])
+        elif line.startswith(hit_key):
+            hit = int(line[len(hit_key):])
+        elif line.startswith(found_key):
+            found = int(line[len(found_key):])
         elif line == "end_of_record" and name is not None:
             files[name] = (hit, found)
             name = None
     return files
+
+
+def load_lcov(path: Path) -> dict[str, tuple[int, int]]:
+    """Returns ``{file: (lines_hit, lines_found)}`` from an LCOV tracefile."""
+    return _load_lcov_counts(path, "LH:", "LF:")
+
+
+def load_lcov_branches(path: Path) -> dict[str, tuple[int, int]]:
+    """Returns ``{file: (branches_hit, branches_found)}`` from an LCOV tracefile.
+
+    A file without ``BRH``/``BRF`` lines has no branches and counts as ``(0, 0)``.
+    """
+    return _load_lcov_counts(path, "BRH:", "BRF:")
 
 
 def load_jacoco(path: Path) -> dict[str, tuple[int, int]]:
@@ -108,8 +122,12 @@ LOADERS = {
     "py": load_py,
     "go": load_go,
     "lcov": load_lcov,
+    "lcov-branches": load_lcov_branches,
     "jacoco": load_jacoco,
 }
+
+# Every kind measures lines (or statements) except these, which measure branches.
+BRANCH_KINDS = frozenset({"lcov-branches"})
 
 
 def group_key(kind: str, filename: str) -> str:
@@ -152,8 +170,10 @@ def main() -> int:
     total_all = sum(v[1] for v in groups.values())
     overall = pct(total_cov, total_all)
 
-    out = [f"## Line coverage ({args.kind}): {overall:.2f}% ({total_cov}/{total_all})", ""]
-    out += ["| Group | Lines covered | Total | Coverage | Target |", "|---|---:|---:|---:|---|"]
+    branches = args.kind in BRANCH_KINDS
+    unit, units = ("Branch", "Branches") if branches else ("Line", "Lines")
+    out = [f"## {unit} coverage ({args.kind}): {overall:.2f}% ({total_cov}/{total_all})", ""]
+    out += [f"| Group | {units} covered | Total | Coverage | Target |", "|---|---:|---:|---:|---|"]
     for key in sorted(groups):
         cov, tot = groups[key]
         mark = "met" if pct(cov, tot) >= args.target else "BELOW"
@@ -174,7 +194,8 @@ def main() -> int:
             fh.write(text)
 
     if args.fail_under is not None and overall < args.fail_under:
-        print(f"coverage {overall:.2f}% is under --fail-under {args.fail_under:g}%", file=sys.stderr)
+        measure = "branch coverage" if branches else "coverage"
+        print(f"{measure} {overall:.2f}% is under --fail-under {args.fail_under:g}%", file=sys.stderr)
         return 1
     return 0
 

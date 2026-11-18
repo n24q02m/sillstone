@@ -304,16 +304,16 @@ jobs:
       - name: Report Go coverage
         run: python scripts/ci/coverage_report.py go go-cov.out --target 95 --fail-under 95
 
+      - name: Report Node.js coverage
+        run: python scripts/ci/coverage_report.py lcov node-cov.lcov --target 95 --fail-under 95
+
+      # The same tracefile carries branch counts: an untaken error branch on a line that
+      # is otherwise executed counts as covered for lines, so branches are gated too.
+      - name: Report Node.js branch coverage
+        run: python scripts/ci/coverage_report.py lcov-branches node-cov.lcov --target 95 --fail-under 95
+
       - name: Report Java coverage
         run: python scripts/ci/coverage_report.py jacoco sdk/java/target/site/jacoco/jacoco.csv --target 95 --fail-under 95
-
-      # Node.js is measured against the same 95% target and printed as
-      # BELOW until it reaches it. Its --fail-under is a ratchet, not the target: the
-      # coverage measured when the gate was added (docs/scorecard.md), so a change can
-      # raise it and no change can lower it. Raise the value to the new measurement
-      # whenever a PR lifts it; at 95 it becomes the target gate.
-      - name: Report Node.js coverage
-        run: python scripts/ci/coverage_report.py lcov node-cov.lcov --target 95 --fail-under 91
 
       # The resolver and the report script decide what this pipeline tests and gates,
       # so they are held to the target themselves. The trace scan and the hash parity

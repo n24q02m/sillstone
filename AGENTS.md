@@ -47,8 +47,7 @@ Every manifest carries the same version: the workspace and crate `Cargo.toml` fi
 ## Conventions
 
 - Commits: only `feat:` and `fix:` prefixes (enforced by pre-commit `commit-msg` hook)
-- Test coverage: ≥ 95% target; the Node.js gate in `ci.yml` is a ratchet
-  that only moves up
+- Test coverage: ≥ 95% target; every coverage gate in `ci.yml` fails under 95%
 - Zero third-party Rust dependencies: `scripts/ci/check-zero-deps.py` fails on any
   registry or git source in `Cargo.lock`
 - No secrets in code, commits, or memory — use [skret](https://skret.n24q02m.com) for secret retrieval
