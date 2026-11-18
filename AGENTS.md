@@ -47,7 +47,7 @@ Every manifest carries the same version: the workspace and crate `Cargo.toml` fi
 ## Conventions
 
 - Commits: only `feat:` and `fix:` prefixes (enforced by pre-commit `commit-msg` hook)
-- Test coverage: ≥ 95% target; the Go, Node.js and Java gates in `ci.yml` are ratchets
+- Test coverage: ≥ 95% target; the Node.js and Java gates in `ci.yml` are ratchets
   that only move up
 - Zero third-party Rust dependencies: `scripts/ci/check-zero-deps.py` fails on any
   registry or git source in `Cargo.lock`
