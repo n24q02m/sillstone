@@ -19,6 +19,13 @@ from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
+# The packaging job discovers every test in this directory without the oracle
+# installed. The coverage job installs it and holds both generators to the target,
+# so a skip there fails the coverage gate instead of passing silently.
+_MISSING = [name for name in ("numpy", "PIL") if importlib.util.find_spec(name) is None]
+if _MISSING:
+    raise unittest.SkipTest(f"the parity oracle is not installed (missing {', '.join(_MISSING)})")
+
 
 def _load(name: str, relative: str):
     spec = importlib.util.spec_from_file_location(name, ROOT / relative)
@@ -33,10 +40,7 @@ numpy_oracle = _load("numpy_oracle_generate", "crates/tensor/tests/oracle/genera
 
 def _run(module, argv: list[str]) -> tuple[int, str, str]:
     out, err = io.StringIO(), io.StringIO()
-    # Some oracle cases overflow on purpose (exp of 700 in float32, 7e4 in float16),
-    # and NumPy warns about each; only what the generator itself prints is asserted.
-    with redirect_stdout(out), redirect_stderr(err), warnings.catch_warnings():
-        warnings.simplefilter("ignore", RuntimeWarning)
+    with redirect_stdout(out), redirect_stderr(err):
         code = module.main(argv)
     return code, out.getvalue(), err.getvalue()
 
@@ -47,6 +51,10 @@ class _Fixture(unittest.TestCase):
     module = None
 
     def setUp(self):
+        # Some oracle cases overflow on purpose (exp of 700 in float32, 7e4 in float16),
+        # and NumPy warns about each; only what the generator itself reports is asserted.
+        self.enterContext(warnings.catch_warnings())
+        warnings.simplefilter("ignore", RuntimeWarning)
         self.dir = pathlib.Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.dir)
         self.path = self.dir / "vectors"

@@ -127,11 +127,18 @@ jobs:
         run: python -m pip install -c scripts/golden/requirements.txt pillow numpy imagehash
 
       # Each generator regenerates its vectors with the pinned oracle and fails,
-      # naming the case, when the committed file no longer matches.
+      # naming the case, when the committed file no longer matches. The oracle is
+      # not bit-reproducible across platforms: the same pins render some float
+      # resize cases differently on macOS arm64 (Pillow) and some float64
+      # transcendental cases differently on Linux x86_64 (numpy). The committed
+      # vectors are the Windows x86_64 rendering, so the check runs there; the Rust
+      # parity suites replay those vectors on every OS.
       - name: Verify Pillow golden vectors against the pinned oracle
+        if: runner.os == 'Windows'
         run: python scripts/golden/gen_pillow_golden.py --check
 
       - name: Verify NumPy oracle vectors against the pinned oracle
+        if: runner.os == 'Windows'
         run: python crates/tensor/tests/oracle/generate.py --check
 
       - name: Python SDK Tests
