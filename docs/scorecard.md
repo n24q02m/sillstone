@@ -40,15 +40,24 @@ The same job measures each binding's own code with its native tool, against the 
 | Binding | Tool | Line coverage (measured) | CI gate (`--fail-under`) | Largest gaps |
 |---|---|---|---|---|
 | Python (ctypes) | coverage.py | 96.15% (1373/1428), met target | 95 (target) | - |
-| Go (cgo) | `go test -coverprofile` (statements) | 70.45% (403/572), below target | 70 (ratchet) | `image.go` 16.39%, `generated.go` 61.24%, `tensor.go` 82.22% |
+| Go (cgo) | `go test -coverprofile` (statements) | 98.93% (554/560), met target | 95 (target) | - |
 | Node.js (N-API) | `node --test --experimental-test-coverage` (lcov) | 99.71% (1021/1024), met target; branches 99.13% (454/458) | 95 (target) for lines and for branches | - |
 | Java (JNI) | JaCoCo (`-Pcoverage`) | 78.15% (490/627), below target | 78 (ratchet) | `SillstoneNative` 56.63%, `Tensor` 69.64%, `Generated` 50.00% |
 
 Measured by run [43534010010](https://github.com/n24q02m/sillstone/actions/runs/43534010010) on `26e1b5c`,
 2026-11-14. A binding under target keeps a ratchet instead of the target: its gate is the coverage it already has, so
 no change can lower it, and the value is raised to the new measurement in the PR that lifts it until it reaches 95.
-The way up is tests for the paths the gap lists name: the error returns of the Go image and tensor wrappers and of
-the generated entry points, and the Java `SillstoneNative` loader paths and `Tensor` argument checks.
+The way up is tests for the paths the gap list names: the Java `SillstoneNative` loader paths and `Tensor` argument
+checks.
+
+Go was measured by run [44201192077](https://github.com/n24q02m/sillstone/actions/runs/44201192077) on `bc44282`,
+2026-11-17. Of the six statements left unexecuted, one is reachable: the `Detect` error return, taken only for empty
+input, which the C ABI refuses as an invalid argument while the Python SDK returns `unknown`/`text`; it stays
+unasserted until the bindings agree on empty input. The other five are error returns the native core cannot trigger
+through the Go wrappers: the `Convert` status check (every mode pair the Go side lets through is one the core
+converts), the `QoiDecode` cases for layouts the QOI decoder never returns (gray and unknown), and the `Add`/`Matmul`
+status checks (the core fails only on null pointers, mismatched inner dimensions or sizes that overflow, and the Go
+side checks the shapes and passes only non-empty buffers it already holds).
 
 Node.js was measured by run [44204350289](https://github.com/n24q02m/sillstone/actions/runs/44204350289) on
 `c8b201e`, 2026-11-18, and is gated on branches as well as lines (`coverage_report.py lcov-branches`, same

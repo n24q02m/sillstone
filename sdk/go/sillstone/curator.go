@@ -331,51 +331,36 @@ func ParseDescribe(raw []byte) (*Description, error) {
 	}
 	tier1 := fmt.Sprintf("%x", raw[2:34])
 	modality := Modalities[modCode]
+	// The facts block has a fixed size per modality and ends the stream, so
+	// it must start at or after the 34-byte header. The signature sits in
+	// between and is checked by ParseSignature.
 	sigEnd := len(raw) - factsLen(modality)
+	if sigEnd < 34 {
+		return nil, fmt.Errorf("sillstone: describe stream of %d bytes is too short for the %d-byte %s facts block", len(raw), factsLen(modality), modality)
+	}
 	sig, err := ParseSignature(raw[34:sigEnd])
 	if err != nil {
 		return nil, err
 	}
 	factsRaw := raw[sigEnd:]
 	facts := map[string]uint64{}
-	need := func(n int) error {
-		if len(factsRaw) != n {
-			return fmt.Errorf("sillstone: facts block is %d bytes, want %d", len(factsRaw), n)
-		}
-		return nil
-	}
 	switch modality {
 	case "image":
-		if err := need(16); err != nil {
-			return nil, err
-		}
 		facts["width"] = uint64(be32(factsRaw, 0))
 		facts["height"] = uint64(be32(factsRaw, 4))
 		facts["keypoints"] = be64(factsRaw, 8)
 	case "audio":
-		if err := need(18); err != nil {
-			return nil, err
-		}
 		facts["sample_rate"] = uint64(be32(factsRaw, 0))
 		facts["channels"] = uint64(be16(factsRaw, 4))
 		facts["frames"] = uint64(be32(factsRaw, 6))
 		facts["peaks"] = be64(factsRaw, 10)
 	case "text":
-		if err := need(16); err != nil {
-			return nil, err
-		}
 		facts["words"] = be64(factsRaw, 0)
 		facts["canonical_len"] = be64(factsRaw, 8)
 	case "binary":
-		if err := need(16); err != nil {
-			return nil, err
-		}
 		facts["len"] = be64(factsRaw, 0)
 		facts["chunks"] = be64(factsRaw, 8)
 	default: // video
-		if err := need(24); err != nil {
-			return nil, err
-		}
 		facts["width"] = uint64(be32(factsRaw, 0))
 		facts["height"] = uint64(be32(factsRaw, 4))
 		facts["duration_bits"] = be64(factsRaw, 8)
