@@ -4,7 +4,8 @@
 
 Pillow and numpy are the *oracle*: they are development-time inputs of this
 script only. Nothing in the shipped crates or SDKs depends on them, and the
-Rust / Python tests read the committed JSONL, not a live Pillow.
+Rust / Python tests read the committed JSONL, not a live Pillow. CI runs
+``--check`` with the pinned oracle, so the JSONL cannot drift from it.
 
 Every line is one flat JSON object whose values are strings, numbers or null:
 
@@ -19,11 +20,13 @@ mode). The first line is a ``_provenance`` object with the oracle versions.
 
 Usage:
     pip install -r scripts/golden/requirements.txt
-    python scripts/golden/gen_pillow_golden.py
+    python scripts/golden/gen_pillow_golden.py           # rewrite the vectors
+    python scripts/golden/gen_pillow_golden.py --check   # name the cases that differ
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import random
 import sys
@@ -94,7 +97,8 @@ def rec(**kw) -> dict:
     return base
 
 
-def main() -> int:
+def build() -> list[dict]:
+    """The provenance record followed by one record per case, in file order."""
     rng = random.Random(0x51115701)
     cases: list[dict] = []
 
@@ -428,12 +432,68 @@ def main() -> int:
             "cases": len(cases),
         }
     }
+    return [meta] + [{k: c[k] for k in KEYS} for c in cases]
+
+
+def diff_cases(committed: list[dict], built: list[dict], key: str) -> list[str]:
+    """Names each case that is missing, unexpected or different.
+
+    Cases are compared as canonical JSON, not as parsed values: ``-0.0 == 0.0`` in
+    Python, and a sign flip is a different vector.
+    """
+    def canon(value) -> str:
+        return json.dumps(value, sort_keys=True)
+
+    old = {c[key]: c for c in committed}
+    new = {c[key]: c for c in built}
+    problems = [f"missing case {k}" for k in new if k not in old]
+    problems += [f"unexpected case {k}" for k in old if k not in new]
+    for k, case in new.items():
+        if k in old and canon(old[k]) != canon(case):
+            fields = sorted(f for f in case.keys() | old[k].keys() if canon(old[k].get(f)) != canon(case.get(f)))
+            problems.append(f"case {k} differs from the oracle in {', '.join(fields)}")
+    if not problems and [canon(c) for c in committed] != [canon(c) for c in built]:
+        problems.append("the cases are repeated or not in the generator's order")
+    return problems
+
+
+def check(path: Path) -> list[str]:
+    """What the committed vectors at ``path`` disagree with the installed oracle on.
+
+    The provenance line is required but not compared: it records what generated the
+    file, while the cases are what the parity suite replays.
+    """
+    built = build()
+    committed = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    problems = []
+    if not committed or "_provenance" not in committed[0]:
+        problems.append("the first line is not the _provenance line")
+    return problems + diff_cases(committed[1:], built[1:], "id")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Generate or check the Pillow golden vectors.")
+    parser.add_argument("--check", action="store_true",
+                        help="compare the committed vectors with the installed oracle instead of rewriting them")
+    args = parser.parse_args(argv)
+    oracle = f"Pillow {PIL.__version__}, numpy {np.__version__}"
+
+    if args.check:
+        problems = check(OUT)
+        for problem in problems:
+            print(problem, file=sys.stderr)
+        if problems:
+            print(f"{OUT.name} is stale against {oracle}: regenerate it", file=sys.stderr)
+            return 1
+        print(f"{OUT.name} matches {oracle}")
+        return 0
+
+    records = build()
     OUT.parent.mkdir(parents=True, exist_ok=True)
     with OUT.open("w", encoding="utf-8", newline="\n") as fh:
-        fh.write(json.dumps(meta, separators=(",", ":")) + "\n")
-        for c in cases:
-            fh.write(json.dumps({k: c[k] for k in KEYS}, separators=(",", ":")) + "\n")
-    print(f"wrote {len(cases)} cases to {OUT} ({OUT.stat().st_size} bytes)")
+        for record in records:
+            fh.write(json.dumps(record, separators=(",", ":")) + "\n")
+    print(f"wrote {len(records) - 1} cases to {OUT} ({OUT.stat().st_size} bytes)")
     return 0
 
 
