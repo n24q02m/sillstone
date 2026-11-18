@@ -174,20 +174,10 @@ public final class Tensor {
 
     /** Sum of all elements, computed by the native core. */
     public double sum() {
-        double v = Generated.sillstone_tensor_sum_f64(data);
-        if (Double.isNaN(v) && !containsNaN()) {
-            throw new SillstoneFfiException("sillstone_tensor_sum_f64", -2);
-        }
-        return v;
-    }
-
-    private boolean containsNaN() {
-        for (double v : data) {
-            if (Double.isNaN(v)) {
-                return true;
-            }
-        }
-        return false;
+        // The JNI wrapper answers NaN for a refusal only when the array is empty, which a tensor never is, and the
+        // core sum fails only on null pointers. A NaN here is the IEEE result (a NaN element, or +inf plus -inf),
+        // which NumPy returns as well.
+        return Generated.sillstone_tensor_sum_f64(data);
     }
 
     /** New shape over the same elements; one dimension may be {@code -1}. */
