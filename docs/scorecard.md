@@ -50,8 +50,9 @@ no change can lower it, and the value is raised to the new measurement in the PR
 The way up is tests for the paths the gap lists name: the error returns of the Go image and tensor wrappers and of
 the generated entry points, and the Java `SillstoneNative` loader paths and `Tensor` argument checks.
 
-Node.js is gated on branches as well as lines (`coverage_report.py lcov-branches`, same tracefile). Of the three lines
-and four branches left unexecuted, one path is reachable: `detect` on an empty buffer, which the addon refuses as an
+Node.js was measured by run [44204350289](https://github.com/n24q02m/sillstone/actions/runs/44204350289) on
+`c8b201e`, 2026-11-18, and is gated on branches as well as lines (`coverage_report.py lcov-branches`, same
+tracefile). Of the three lines and four branches left unexecuted, one path is reachable: `detect` on an empty buffer, which the addon refuses as an
 invalid argument while the Python SDK returns `unknown`/`text`; it stays unasserted until the bindings agree on empty
 input. The other three are guards the native side never trips: the image facts-length check in `parseDescribe` (the
 facts block is sliced to exactly that length), the `err.code` fallback in `matchSignatures` (the addon puts a status
