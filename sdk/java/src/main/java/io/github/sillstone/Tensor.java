@@ -32,6 +32,9 @@ public final class Tensor {
         this.data = data;
     }
 
+    /** The most elements a tensor holds: the largest {@code double[]} a JVM reliably allocates. */
+    private static final int MAX_ELEMENTS = Integer.MAX_VALUE - 8;
+
     private static int checkShape(int[] shape) {
         if (shape == null || shape.length == 0) {
             throw new IllegalArgumentException("shape must have at least one dimension");
@@ -42,7 +45,7 @@ public final class Tensor {
                 throw new IllegalArgumentException("every dimension must be positive, got " + dim);
             }
             size *= dim;
-            if (size > Integer.MAX_VALUE - 8) {
+            if (size > MAX_ELEMENTS) {
                 throw new IllegalArgumentException("tensor is too large");
             }
         }
@@ -369,6 +372,10 @@ public final class Tensor {
         int n = right.shape[1];
         if (k1 != k2) {
             throw new IllegalArgumentException("Inner matrix dimensions must agree");
+        }
+        // Checked before the native call, which would otherwise allocate the m * n result first.
+        if ((long) m * n > MAX_ELEMENTS) {
+            throw new IllegalArgumentException("matmul result " + m + "x" + n + " is too large for a Java array");
         }
         double[] out = Generated.sillstone_tensor_matmul_f64(left.data, m, k1, right.data, k2, n);
         if (out == null) {

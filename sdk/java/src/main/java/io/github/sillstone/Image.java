@@ -12,6 +12,11 @@ import java.util.Arrays;
  * core's status code, so the exception reports {@code -2} (core refusal) for failed operations
  * and {@code -1} for argument errors caught here.
  *
+ * <p>An image holds at most {@code 1 << 30} samples ({@code width * height * channels}), the native
+ * engine's per-buffer ceiling. A larger image is refused with {@link IllegalArgumentException}: by
+ * the constructor, by {@link #create(Mode, int, int, int...)}, and by every operation whose result
+ * size is known up front (resize, crop, transpose, rotate, convert) before the native call.
+ *
  * <p>Image hashes return the 64-bit hash as a {@code long} bit pattern; use
  * {@link Long#toUnsignedString(long)} to compare with the unsigned values Python and Node print.
  * The JNI hash entry points signal failure with {@code -1}, which is also a valid all-ones hash,
@@ -122,6 +127,12 @@ public final class Image {
         }
     }
 
+    /**
+     * Same ceiling as {@code sillstone_image::raster::MAX_BUFFER_BYTES}
+     * (crates/image/src/raster/raster.rs): the core refuses any image buffer larger than this.
+     */
+    static final int MAX_BUFFER_BYTES = 1 << 30;
+
     private final Mode mode;
     private final int width;
     private final int height;
@@ -141,7 +152,7 @@ public final class Image {
             throw new IllegalArgumentException("width and height must be at least 1");
         }
         long want = (long) width * height * mode.channels;
-        if (want > Integer.MAX_VALUE - 8) {
+        if (want > MAX_BUFFER_BYTES) {
             throw new IllegalArgumentException("image is too large");
         }
         if (data.length != want) {
@@ -165,7 +176,7 @@ public final class Image {
             px[c] = (byte) (color.length == 0 ? 0 : color.length == 1 ? color[0] : c < color.length ? color[c] : 0);
         }
         long total = (long) width * height * ch;
-        if (total > Integer.MAX_VALUE - 8) {
+        if (total > MAX_BUFFER_BYTES) {
             throw new IllegalArgumentException("image is too large");
         }
         byte[] out = new byte[(int) total];
@@ -213,7 +224,7 @@ public final class Image {
 
     private static int checked(String op, long outW, long outH, int channels) {
         long len = outW * outH * channels;
-        if (outW < 1 || outH < 1 || len > Integer.MAX_VALUE - 8) {
+        if (outW < 1 || outH < 1 || len > MAX_BUFFER_BYTES) {
             throw new IllegalArgumentException(op + ": output size " + outW + "x" + outH + " is out of range");
         }
         return (int) len;

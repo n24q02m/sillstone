@@ -969,6 +969,27 @@ fn tensor_exports_reject_shapes_that_disagree_with_the_arrays() {
 }
 
 #[test]
+fn tensor_matmul_refuses_a_result_no_java_array_can_hold() {
+    with_env(|env| unsafe {
+        // [2^20, 1] x [1, 2^20] is 2^40 doubles (8 TiB) from two 8 MiB operands. The
+        // product must be refused before its buffer is allocated, not abort the process.
+        let side: jint = 1 << 20;
+        let ones = vec![1.0; 1 << 20];
+        let product = Java_io_github_sillstone_Generated_sillstone_1tensor_1matmul_1f64(
+            env,
+            NULL,
+            double_array(&ones),
+            side,
+            1,
+            double_array(&ones),
+            1,
+            side,
+        );
+        assert!(product.is_null());
+    });
+}
+
+#[test]
 fn rotate_size_reports_the_expanded_canvas() {
     with_env(|env| unsafe {
         let size = |w, h, angle: f64, expand| {
