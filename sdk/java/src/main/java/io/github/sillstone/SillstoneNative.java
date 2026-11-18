@@ -45,8 +45,9 @@ final class SillstoneNative {
     static String platformId(String osName, String osArch) {
         String os = osName.toLowerCase(Locale.ROOT);
         String arch = osArch.toLowerCase(Locale.ROOT);
-        String normOs = os.contains("win") ? "win32"
-                : (os.contains("mac") || os.contains("darwin")) ? "darwin"
+        // "darwin" contains "win", so macOS is matched before Windows.
+        String normOs = (os.contains("mac") || os.contains("darwin")) ? "darwin"
+                : os.contains("win") ? "win32"
                 : os.contains("linux") ? "linux" : null;
         String normArch = (arch.equals("amd64") || arch.equals("x86_64")) ? "x64"
                 : (arch.equals("aarch64") || arch.equals("arm64")) ? "arm64" : null;
@@ -83,8 +84,10 @@ final class SillstoneNative {
             }
             Path file = dir.resolve(fileName);
             Files.copy(stream, file, StandardCopyOption.REPLACE_EXISTING);
-            file.toFile().deleteOnExit();
+            // deleteOnExit works in reverse order of registration: the directory is
+            // registered first so that it is removed after the file it holds.
             dir.toFile().deleteOnExit();
+            file.toFile().deleteOnExit();
             return file.toAbsolutePath().toString();
         } catch (java.io.IOException e) {
             throw new SillstoneLibraryNotFoundException("could not extract bundled native " + resource + ": " + e);
@@ -166,11 +169,11 @@ final class SillstoneNative {
 
     private static String cdylibName(String stem) {
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
-        if (os.contains("win")) {
-            return stem + ".dll";
-        }
         if (os.contains("mac") || os.contains("darwin")) {
             return "lib" + stem + ".dylib";
+        }
+        if (os.contains("win")) {
+            return stem + ".dll";
         }
         return "lib" + stem + ".so";
     }
