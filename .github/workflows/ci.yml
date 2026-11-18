@@ -120,8 +120,26 @@ jobs:
         with:
           python-version: ${{ needs.versions.outputs.python-newest }}
 
+      # scripts/golden/requirements.txt pins the oracle the committed Pillow and NumPy
+      # vectors were generated from; -c applies those pins without installing the
+      # rest of that file.
       - name: Install Python parity oracles
-        run: python -m pip install pillow==13.0.0 numpy imagehash
+        run: python -m pip install -c scripts/golden/requirements.txt pillow numpy imagehash
+
+      # Each generator regenerates its vectors with the pinned oracle and fails,
+      # naming the case, when the committed file no longer matches. The oracle is
+      # not bit-reproducible across platforms: the same pins render some float
+      # resize cases differently on macOS arm64 (Pillow) and some float64
+      # transcendental cases differently on Linux x86_64 (numpy). The committed
+      # vectors are the Windows x86_64 rendering, so the check runs there; the Rust
+      # parity suites replay those vectors on every OS.
+      - name: Verify Pillow golden vectors against the pinned oracle
+        if: runner.os == 'Windows'
+        run: python scripts/golden/gen_pillow_golden.py --check
+
+      - name: Verify NumPy oracle vectors against the pinned oracle
+        if: runner.os == 'Windows'
+        run: python crates/tensor/tests/oracle/generate.py --check
 
       - name: Python SDK Tests
         run: python -m unittest discover -s sdk/python/tests
@@ -315,14 +333,16 @@ jobs:
       - name: Report Java coverage
         run: python scripts/ci/coverage_report.py jacoco sdk/java/target/site/jacoco/jacoco.csv --target 95 --fail-under 95
 
-      # The resolver and the report script decide what this pipeline tests and gates,
-      # so they are held to the target themselves. The trace scan and the hash parity
-      # bench run in this pipeline as well, so their tests run here too.
+      # The resolver, the report script and the two oracle generators decide what this
+      # pipeline tests and gates, so they are held to the target themselves. The trace
+      # scan and the hash parity bench run in this pipeline as well, so their tests run
+      # here too.
       - name: CI script coverage
         run: |
-          python -m coverage run --include=scripts/ci_versions.py,scripts/ci/coverage_report.py \
+          python -m coverage run --include=scripts/ci_versions.py,scripts/ci/coverage_report.py,scripts/golden/gen_pillow_golden.py,crates/tensor/tests/oracle/generate.py \
             -m pytest -q scripts/ci/test_ci_versions.py scripts/ci/test_coverage_report.py \
-            scripts/ci/test_check_forbidden_traces.py scripts/ci/test_bench_hash_parity.py
+            scripts/ci/test_check_forbidden_traces.py scripts/ci/test_bench_hash_parity.py \
+            scripts/ci/test_oracle_vectors.py
           python -m coverage json -o scripts-cov.json
           python scripts/ci/coverage_report.py py scripts-cov.json --target 95 --fail-under 95
 

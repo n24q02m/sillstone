@@ -1,5 +1,5 @@
 {
- "numpy": "2.4.4",
+ "numpy": "2.5.5",
  "cases": [
   {
    "name": "exp_f64",
