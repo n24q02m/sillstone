@@ -42,7 +42,7 @@ The same job measures each binding's own code with its native tool, against the 
 | Python (ctypes) | coverage.py | 96.15% (1373/1428), met target | 95 (target) | - |
 | Go (cgo) | `go test -coverprofile` (statements) | 98.93% (554/560), met target | 95 (target) | - |
 | Node.js (N-API) | `node --test --experimental-test-coverage` (lcov) | 91.41% (936/1024), below target | 91 (ratchet) | `array.js` 86.65%, `native.js` 89.86%, `index.js` 92.03% |
-| Java (JNI) | JaCoCo (`-Pcoverage`) | 98.71% (612/620), met target | 95 (target) | - |
+| Java (JNI) | JaCoCo (`-Pcoverage`) | 98.87% (613/620), met target | 95 (target) | - |
 
 Measured by run [43534010010](https://github.com/n24q02m/sillstone/actions/runs/43534010010) on `26e1b5c`,
 2026-11-14. A binding under target keeps a ratchet instead of the target: its gate is the coverage it already has, so
@@ -59,14 +59,15 @@ converts), the `QoiDecode` cases for layouts the QOI decoder never returns (gray
 status checks (the core fails only on null pointers, mismatched inner dimensions or sizes that overflow, and the Go
 side checks the shapes and passes only non-empty buffers it already holds).
 
-Java was measured with the CI command on `fix/java-binding-coverage`, 2026-11-18. `NativeLoaderTest` runs each
-library-discovery case in a child JVM and passes the JaCoCo agent on, so the loader paths that depend on the
-environment, the working directory and `java.io.tmpdir` are measured as well. Of the eight lines left unexecuted, one
-is reachable: the `Image` check for a native refusal, taken when an image is larger than the core's 1 GiB buffer
-ceiling while still under the 2 GiB the Java facade accepts; a test would have to hold more than 2 GiB of pixel
-buffers, so it stays untested. Two are the two sides of the `setPosixFilePermissions` call in
-`SillstoneNative.extractBundled`: the call completes on Linux and macOS and throws `UnsupportedOperationException` on
-Windows, so each platform misses the other's line. The other five cannot run: the implicit public constructor of the
+Java was measured by run [44210616007](https://github.com/n24q02m/sillstone/actions/runs/44210616007) on `da520c6`,
+2026-11-18. `NativeLoaderTest` runs each library-discovery case in a child JVM and passes the JaCoCo agent on, so the
+loader paths that depend on the environment, the working directory and `java.io.tmpdir` are measured as well. Of the
+seven lines left unexecuted, one is reachable: the `Image` check for a native refusal, taken when an image is larger
+than the core's 1 GiB buffer ceiling while still under the 2 GiB the Java facade accepts; a test would have to hold
+more than 2 GiB of pixel buffers, so it stays untested. One is the `UnsupportedOperationException` handler around the
+`setPosixFilePermissions` call in `SillstoneNative.extractBundled`: the call completes on Linux and macOS, and only
+Windows, where it throws, takes the handler (measured on Windows, the call and the normal exit of the `try` are the
+two lines left unexecuted instead). The other five cannot run: the implicit public constructor of the
 generated `Generated` class, which has static members only; `Image.Mode.ofLayout` failing, since the QOI decoder
 returns only RGB and RGBA; the `rotate_size` null check, since the expanded canvas of any image Java can hold fits in
 an `int`; and the `Tensor.add`/`matmul` null checks, since the JNI refuses only empty or mismatched arrays, which the
