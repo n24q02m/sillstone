@@ -795,12 +795,17 @@ pub unsafe extern "system" fn Java_io_github_sillstone_Generated_sillstone_1tens
         return core::ptr::null_mut();
     }
     let (m, k1, k2, n) = (m as usize, k1 as usize, k2 as usize, n as usize);
+    // The product goes back as one Java array, whose length is a jint. Refuse a
+    // larger one here: allocating its buffer first could abort the whole JVM.
+    let Some(out_len) = m.checked_mul(n).filter(|&len| jint::try_from(len).is_ok()) else {
+        return core::ptr::null_mut();
+    };
     let a = unsafe { get_input_doubles(env, a) };
     let b = unsafe { get_input_doubles(env, b) };
     if a.len() != m.saturating_mul(k1) || b.len() != k2.saturating_mul(n) {
         return core::ptr::null_mut();
     }
-    let mut out = vec![0.0f64; m * n];
+    let mut out = vec![0.0f64; out_len];
     let status = unsafe {
         sillstone_tensor::ffi::sillstone_tensor_matmul_f64(
             a.as_ptr(),
