@@ -50,12 +50,14 @@ no change can lower it, and the value is raised to the new measurement in the PR
 The way up is tests for the paths the gap lists name: the Node.js array dtype/shape error branches and
 library-loading fallbacks, and the Java `SillstoneNative` loader paths and `Tensor` argument checks.
 
-The six Go statements left unexecuted are error returns the native core cannot trigger through the Go wrappers:
-`Detect` on empty input (the only input the C ABI refuses there), the `Convert` status check (every mode pair the
-Go side lets through is one the core converts), the `QoiDecode` cases for layouts the QOI decoder never returns
-(gray and unknown), and the `Add`/`Matmul` status checks (the core fails only on null pointers, mismatched inner
-dimensions or sizes that overflow, and the Go side checks the shapes and passes only non-empty buffers it already
-holds).
+Go was measured by run [44201192077](https://github.com/n24q02m/sillstone/actions/runs/44201192077) on `bc44282`,
+2026-11-17. Of the six statements left unexecuted, one is reachable: the `Detect` error return, taken only for empty
+input, which the C ABI refuses as an invalid argument while the Python SDK returns `unknown`/`text`; it stays
+unasserted until the bindings agree on empty input. The other five are error returns the native core cannot trigger
+through the Go wrappers: the `Convert` status check (every mode pair the Go side lets through is one the core
+converts), the `QoiDecode` cases for layouts the QOI decoder never returns (gray and unknown), and the `Add`/`Matmul`
+status checks (the core fails only on null pointers, mismatched inner dimensions or sizes that overflow, and the Go
+side checks the shapes and passes only non-empty buffers it already holds).
 
 ## Quality & Hygiene Gates
 
