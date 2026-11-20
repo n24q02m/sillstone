@@ -9,7 +9,7 @@
     <packaging>jar</packaging>
 
     <name>sillstone</name>
-    <description>Pure-Rust zero-dependency multimedia, hashing, and array computing suite</description>
+    <description>Archived, no longer maintained: pure-Rust zero-dependency multimedia, hashing, and array computing suite</description>
     <url>https://github.com/n24q02m/sillstone</url>
 
     <licenses>

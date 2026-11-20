@@ -1,5 +1,7 @@
 # Sillstone Roadmap
 
+> **Archived:** sillstone is no longer maintained. No milestone below is planned any more. Published packages stay available on their registries but receive no further fixes, including security fixes.
+
 This document outlines the milestones, landed capabilities, and forward development trajectory for the `sillstone` monorepo.
 
 ## Landed Milestones

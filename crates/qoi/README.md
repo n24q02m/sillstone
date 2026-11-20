@@ -1,5 +1,7 @@
 # sillstone-qoi
 
+> **Archived:** sillstone is no longer maintained. Published packages stay available on their registries but receive no further fixes, including security fixes.
+
 Pure-Rust, zero-dependency implementation of the **Quite OK Image (QOI)** format encoder and decoder.
 
 QOI is an ultra-fast lossless image compression format that matches PNG compression ratios while achieving 10-50x faster encoding and 3-4x faster decoding.
