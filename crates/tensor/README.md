@@ -1,5 +1,7 @@
 # sillstone-tensor
 
+> **Archived:** sillstone is no longer maintained. Published packages stay available on their registries but receive no further fixes, including security fixes.
+
 Pure-Rust, zero-dependency implementation of N-dimensional strided arrays and tensor computing (**NumPy replacement**).
 
 ## Features

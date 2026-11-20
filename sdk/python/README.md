@@ -1,5 +1,7 @@
 # Sillstone
 
+> **Archived:** sillstone is no longer maintained. Published packages stay available on their registries but receive no further fixes, including security fixes.
+
 Pure-Rust, zero-dependency multimedia, hashing, and array computing suite.
 
 ## Overview
