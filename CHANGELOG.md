@@ -2,6 +2,71 @@
 
 <!-- version list -->
 
+## v0.4.1-beta.2 (2026-11-20)
+
+### Bug Fixes
+
+- Check the Pillow and NumPy vectors against the pinned oracle in CI
+  ([#106](https://github.com/n24q02m/sillstone/pull/106),
+  [`a9db222`](https://github.com/n24q02m/sillstone/commit/a9db222859ae2a308af68f4915f0fc13a675559e))
+
+- Cite the CI run that measured Go coverage and separate the reachable Detect path
+  ([#103](https://github.com/n24q02m/sillstone/pull/103),
+  [`2adfa3a`](https://github.com/n24q02m/sillstone/commit/2adfa3a7923d208e09de273802af4fe08f6b6841))
+
+- Cite the CI run that measured Java coverage
+  ([#105](https://github.com/n24q02m/sillstone/pull/105),
+  [`8be5350`](https://github.com/n24q02m/sillstone/commit/8be5350825107f2157f49042827a0b85f4b0d6c7))
+
+- Cite the CI run that measured Node.js line and branch coverage
+  ([#104](https://github.com/n24q02m/sillstone/pull/104),
+  [`6d54e5c`](https://github.com/n24q02m/sillstone/commit/6d54e5c138874b3b1370c6da2ea702df2f604eeb))
+
+- Cover the Go binding to the 95% target and bounds-check describe streams
+  ([#103](https://github.com/n24q02m/sillstone/pull/103),
+  [`2adfa3a`](https://github.com/n24q02m/sillstone/commit/2adfa3a7923d208e09de273802af4fe08f6b6841))
+
+- Cover the Java binding to the 95% target and fix three bugs the tests found
+  ([#105](https://github.com/n24q02m/sillstone/pull/105),
+  [`8be5350`](https://github.com/n24q02m/sillstone/commit/8be5350825107f2157f49042827a0b85f4b0d6c7))
+
+- Cover the Node.js binding to the 95% target and gate its branches
+  ([#104](https://github.com/n24q02m/sillstone/pull/104),
+  [`6d54e5c`](https://github.com/n24q02m/sillstone/commit/6d54e5c138874b3b1370c6da2ea702df2f604eeb))
+
+- List vision preprocessing with transformers parity as an upcoming roadmap phase
+  ([#101](https://github.com/n24q02m/sillstone/pull/101),
+  [`56a65a9`](https://github.com/n24q02m/sillstone/commit/56a65a9c8358daa80309d9c6e210dbd917de0b45))
+
+- Mark sillstone as archived and no longer maintained
+  ([#108](https://github.com/n24q02m/sillstone/pull/108),
+  [`4216f39`](https://github.com/n24q02m/sillstone/commit/4216f3983047a071cfd2741694ad536257f17d6f))
+
+- Publish crates through crates.io trusted publishing instead of a stored token
+  ([#100](https://github.com/n24q02m/sillstone/pull/100),
+  [`e93757f`](https://github.com/n24q02m/sillstone/commit/e93757f94d525aca63cc000783e493553cae1772))
+
+- Refuse Java image and matmul sizes the native layer cannot serve
+  ([#107](https://github.com/n24q02m/sillstone/pull/107),
+  [`f6b8abd`](https://github.com/n24q02m/sillstone/commit/f6b8abdf2698f60dde06915aa6efcc68fe79f3f4))
+
+- Run the oracle check on the platform the vectors were rendered on
+  ([#106](https://github.com/n24q02m/sillstone/pull/106),
+  [`a9db222`](https://github.com/n24q02m/sillstone/commit/a9db222859ae2a308af68f4915f0fc13a675559e))
+
+- Run the trace scan and hash parity tests in CI
+  ([#102](https://github.com/n24q02m/sillstone/pull/102),
+  [`8440e7a`](https://github.com/n24q02m/sillstone/commit/8440e7a78c8f8ebecfe85cb5eacf989242e0f137))
+
+- Stop CI steps from swallowing the failures they exist to catch
+  ([#102](https://github.com/n24q02m/sillstone/pull/102),
+  [`8440e7a`](https://github.com/n24q02m/sillstone/commit/8440e7a78c8f8ebecfe85cb5eacf989242e0f137))
+
+- Tie only the processor pipelines to the image and tensor phases
+  ([#101](https://github.com/n24q02m/sillstone/pull/101),
+  [`56a65a9`](https://github.com/n24q02m/sillstone/commit/56a65a9c8358daa80309d9c6e210dbd917de0b45))
+
+
 ## v0.4.1-beta.1 (2026-11-17)
 
 ### Bug Fixes
